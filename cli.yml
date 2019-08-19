@@ -1,0 +1,35 @@
+name: bpdump
+version: "0.1.0"
+author: Dr Maxim Orlovsky <orlovsky@datagnition.com>
+about: Bitcoin protocol dumping tool - like TCP dump, but for LNP/BP stack
+args:
+  - COMMAND:
+      help: command to perform
+      index: 1
+      required: true
+      possible_values:
+        - block
+        - tx
+  - INPUT:
+      help: Sets the input file to use (otherwise uses STDIN)
+      required: false
+      index: 2
+  - OUTPUT:
+      help: Sets output file to dump the information (otherwise uses STDOUT)
+      required: false
+      index: 3
+      requires: [ 'INPUT' ]
+  - verbose:
+      short: v
+      multiple: true
+      help: Sets the level of verbosity
+  - format:
+      short: f
+      multiple: false
+      takes_value: true
+      help: Defines output format
+      value_names:
+        - csv
+        - yaml
+        - json
+        - text
