@@ -5,7 +5,6 @@ extern crate bitcoin;
 use std::fs::File;
 use std::io;
 use clap::{App, ArgMatches};
-use std::io::BufRead;
 use bitcoin::network::stream_reader::StreamReader;
 use bitcoin::{Block, BitcoinHash};
 
@@ -30,19 +29,21 @@ fn main() {
     eprintln!("Pass --features yaml to cargo when trying this example.");
 }
 
+
 fn parse_block(matches: ArgMatches) -> std::io::Result<()> {
     let filename = matches.value_of("INPUT");
     eprintln!("Parsing block file {}", filename.unwrap_or("STDIN"));
 
-    let mut stdin;
-    let buf_reader: Box<BufRead> = match filename {
-        Some(name) => Box::new(io::BufReader::new(File::open(name)?)),
+    let mut stream_reader = match filename {
+        Some(name) => {
+            let buf_read: Box<dyn io::Read> = Box::new(io::BufReader::new(File::open(name)?));
+            StreamReader::new(buf_read, None)
+        },
         None => {
-            stdin = io::stdin();
-            Box::new(stdin.lock())
+            let stdin: Box<dyn io::Read> = Box::new(io::stdin());
+            StreamReader::new(stdin, None)
         },
     };
-    let mut stream_reader = StreamReader::new(Box::new(buf_reader), None);
 
     let mut blkno = 0;
     loop {
@@ -56,7 +57,7 @@ fn parse_block(matches: ArgMatches) -> std::io::Result<()> {
         }
         // Skipping block length
         eprintln!("Magick number ok");
-        let _ = stream_reader.read_next::<u32>();
+        let _ = stream_reader.read_next::<u32>()?;
         // Reading block
         match stream_reader.read_next::<Block>() {
             Err(err) => {
