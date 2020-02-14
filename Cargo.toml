@@ -10,13 +10,14 @@ edition = "2018"
 
 [dependencies]
 yaml = "0.3.0"
-bitcoin = "~0.19.0"
+#bitcoin = { git = "https://github.com/pandoracore/rust-bitcoin.git", branch = "generic-reader" }
+bitcoin = "~0.23.0"
 bech32 = "~0.6.0"
 bitcoin-bech32 = "~0.9.0"
 bitcoin_hashes = "~0.3.0"
 
-[patch.crates-io]
-bitcoin = { git = "https://github.com/pandoracore/rust-bitcoin.git", branch = "generic-reader" }
+# [patch.crates-io]
+# bitcoin = { git = "https://github.com/pandoracore/rust-bitcoin.git", branch = "generic-reader" }
 
 [dependencies.secp256k1]
 version = "~0.12.0" # We require this version because of compatibility issues with bitcoin 0.18.0

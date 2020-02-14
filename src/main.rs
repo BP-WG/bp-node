@@ -9,7 +9,6 @@ use bitcoin::network::stream_reader::StreamReader;
 use bitcoin::{Block, BitcoinHash};
 
 
-#[cfg(feature = "yaml")]
 fn main() -> std::io::Result<()> {
     eprintln!("\nBitcoin protocol dumping tool\n");
 
@@ -20,13 +19,6 @@ fn main() -> std::io::Result<()> {
         "block" => parse_block(matches),
         _ => unreachable!(),
     }
-}
-
-#[cfg(not(feature = "yaml"))]
-fn main() {
-    // As stated above, if clap is not compiled with the YAML feature, it is disabled.
-    eprintln!("YAML feature is disabled.");
-    eprintln!("Pass --features yaml to cargo when trying this example.");
 }
 
 
@@ -57,7 +49,7 @@ fn parse_block(matches: ArgMatches) -> std::io::Result<()> {
         }
         // Skipping block length
         eprintln!("Magick number ok");
-        let _ = stream_reader.read_next::<u32>()?;
+        let _ = stream_reader.read_next::<u32>();
         // Reading block
         match stream_reader.read_next::<Block>() {
             Err(err) => {
