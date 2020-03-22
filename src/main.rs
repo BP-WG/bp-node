@@ -10,7 +10,7 @@ use std::fs::File;
 use std::io;
 use std::env;
 use std::convert::{TryFrom, TryInto};
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
 use chrono::NaiveDateTime;
 use clap::{App, ArgMatches};
 use diesel::prelude::*;
@@ -62,6 +62,7 @@ fn parse_block(matches: ArgMatches) -> std::io::Result<()> {
         },
     };
 
+    eprintln!("Clearning database tables");
     diesel::delete(schema::txin::table).execute(&conn);
     diesel::delete(schema::txout::table).execute(&conn);
     diesel::delete(schema::tx::table).execute(&conn);
@@ -96,6 +97,7 @@ fn parse_block(matches: ArgMatches) -> std::io::Result<()> {
                 let block_usbid: u64 = ShortId::try_from(short_id::Descriptor::OnchainBlock { height: block_height })
                     .expect("Descriptor is constructed from real blockchain data so it must not fail")
                     .into();
+                eprintln!("Block {:x}, hash {}:", block_usbid, block.block_hash());
                 diesel::insert_into(schema::block::table).values(&models::Block {
                     id: block_usbid as i64,
                     block_id: block.block_hash().to_vec(),
@@ -116,6 +118,7 @@ fn parse_block(matches: ArgMatches) -> std::io::Result<()> {
                         tx_index: tx_index as u16
                     }).expect("Descriptor is constructed from real blockchain data so it must not fail")
                       .into();
+                    eprintln!("\tTransaction {}, {} inputs, {} outputs", tx.txid(), tx.input.len(), tx.output.len());
                     diesel::insert_into(schema::tx::table).values(&models::Tx {
                         id: tx_usbid as i64,
                         ver: tx.version as i32,
@@ -130,13 +133,31 @@ fn parse_block(matches: ArgMatches) -> std::io::Result<()> {
                     diesel::insert_into(schema::txin::table)
                         .values(tx.input.iter().enumerate().map(|(input_index, txin)| {
                             let prev_vout: u16 = txin.previous_output.vout as u16;
-                            let mut txoset = utxo.get_mut(&txin.previous_output.txid)
-                                .expect("Validated transaction always spends existing transaction");
-                            let txo_descriptor = txoset.remove(&prev_vout)
-                                .expect("Validated transaction always spends existing transaction output");
-                            if txoset.is_empty() {
-                                utxo.remove(&txin.previous_output.txid);
-                            }
+
+                            let txo_descriptor = if tx.is_coin_base() {
+                                let descriptor = short_id::Descriptor::OnchainBlock { height: block_height };
+                                let cb_usbid: u64 = ShortId::try_from(descriptor)
+                                    .expect("Descriptor is constructed from real blockchain data so it must not fail")
+                                    .into();
+                                diesel::insert_into(schema::txout::table)
+                                    .values(models::Txout {
+                                        id: cb_usbid as i64,
+                                        amount: tx.output[0].value as i64,
+                                        script: vec![]
+                                    })
+                                    .get_results::<models::Txout>(&conn)
+                                    .expect("Error inserting coinbase input");
+                                descriptor
+                            } else {
+                                let mut txoset = utxo.get_mut(&txin.previous_output.txid)
+                                    .expect("Validated transaction always spends existing transaction");
+                                let descriptor = txoset.remove(&prev_vout)
+                                    .expect("Validated transaction always spends existing transaction output");
+                                if txoset.is_empty() {
+                                    utxo.remove(&txin.previous_output.txid);
+                                }
+                                descriptor
+                            };
 
                             let txin_usbid: u64 = ShortId::try_from(short_id::Descriptor::OnchainTxInput {
                                 block_height,
@@ -156,11 +177,39 @@ fn parse_block(matches: ArgMatches) -> std::io::Result<()> {
                         }).collect::<Vec<models::Txin>>())
                         .get_results::<models::Txin>(&conn)
                         .expect("Error saving transaction inputs");
+
+                    diesel::insert_into(schema::txout::table)
+                        .values(tx.output.iter().enumerate().map(|(output_index, txout)| {
+                            let txout_descriptor = short_id::Descriptor::OnchainTxOutput {
+                                block_height,
+                                block_checksum,
+                                tx_index: tx_index as u16,
+                                output_index: output_index as u16
+                            };
+                            let txout_usbid: u64 = ShortId::try_from(txout_descriptor)
+                                .expect("Descriptor is constructed from real blockchain data so it must not fail")
+                                .into();
+
+                            let txid = tx.txid();
+                            let mut txoset = match utxo.entry(txid) {
+                                Entry::Vacant(entry) => entry.insert(HashMap::new()),
+                                Entry::Occupied(entry) => entry.into_mut(),
+                            };
+                            txoset.insert(output_index as u16, txout_descriptor);
+
+                            models::Txout {
+                                id: txout_usbid as i64,
+                                amount: txout.value as i64,
+                                script: txout.script_pubkey.to_bytes()
+                            }
+                        }).collect::<Vec<models::Txout>>())
+                        .get_results::<models::Txout>(&conn)
+                        .expect("Error saving transaction outputs");
                 }
 
-                eprintln!("* read block no {}, id {}", block_height, block.block_hash());
-                println!("{:#?}", block.header);
-                println!("{:#?}", block.txdata[0]);
+                //eprintln!("* read block no {}, id {}", block_height, block.block_hash());
+                //println!("{:#?}", block.header);
+                //println!("{:#?}", block.txdata[0]);
                 block_height += 1;
             },
         }
