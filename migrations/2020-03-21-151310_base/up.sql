@@ -34,13 +34,13 @@ create index block_ver_index
 
 create table tx
 (
-    id     bigint   not null
+    id        bigint   not null
         constraint tx_pk
             primary key,
-    ver       smallint not null,
+    ver       integer  not null,
     locktime  integer  not null,
-    out_count integer  not null,
-    in_count  integer  not null,
+    out_count smallint not null,
+    in_count  smallint not null,
     fee       bigint
 );
 
@@ -52,7 +52,7 @@ create unique index tx_id_uindex
 
 create table txout
 (
-    id  bigint not null
+    id     bigint not null
         constraint txout_pk
             primary key,
     amount bigint not null,

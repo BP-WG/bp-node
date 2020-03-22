@@ -1,7 +1,6 @@
 use chrono::NaiveDateTime;
-//use bitcoin::hash_types::{BlockHash, TxMerkleNode};
 
-use super::schema::block;
+use super::schema::*;
 
 #[derive(Identifiable, Queryable, Insertable)]
 #[table_name="block"]
@@ -16,3 +15,29 @@ pub struct Block {
     pub tx_count: i32,
 }
 
+#[derive(Identifiable, Queryable, Insertable)]
+#[table_name="tx"]
+pub struct Tx {
+    pub id: i64,
+    pub ver: i32,
+    pub locktime: i32,
+    pub out_count: i16,
+    pub in_count: i16,
+    pub fee: Option<i64>
+}
+
+#[derive(Identifiable, Queryable, Insertable)]
+#[table_name="txin"]
+pub struct Txin {
+    pub id: i64,
+    pub seq: i32,
+    pub txout_id: i64,
+}
+
+#[derive(Identifiable, Queryable, Insertable)]
+#[table_name="txout"]
+pub struct Txout {
+    pub id: i64,
+    pub amount: i64,
+    pub script: Vec<u8>
+}

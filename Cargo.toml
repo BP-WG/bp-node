@@ -13,7 +13,7 @@ yaml = "~0.3"
 diesel = { version = "~1.4", features = ["postgres", "uuid", "numeric", "chrono"] }
 dotenv = "~0.15"
 chrono = "~0.4"
-bitcoin = "~0.23"
+lnpbp = { git = "https://github.com/lnp-bp/rust-lnpbp", branch = "feat-lnpbp5" }
 bech32 = "~0.6"
 
 [dependencies.clap]

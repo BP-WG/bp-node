@@ -14,10 +14,10 @@ table! {
 table! {
     tx (id) {
         id -> Int8,
-        ver -> Int2,
+        ver -> Int4,
         locktime -> Int4,
-        out_count -> Int4,
-        in_count -> Int4,
+        out_count -> Int2,
+        in_count -> Int2,
         fee -> Nullable<Int8>,
     }
 }
