@@ -9,3 +9,6 @@ edition = "2018"
 [dependencies]
 dotenv = "~0.15"
 clap = "~2.33"
+chrono = "~0.4"
+diesel = { version = "~1.4", features = ["postgres", "numeric", "chrono"] }
+txlib = { path = "../txlib" }
