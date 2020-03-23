@@ -1,0 +1,11 @@
+[package]
+name = "txparserd"
+description = "Parser for building bitcoin transaction index based on LNPBP-5"
+version = "0.1.0"
+license = "MIT"
+authors = ["Dr. Maxim Orlovsky <orlovsky@pandoracore.com>"]
+edition = "2018"
+
+[dependencies]
+dotenv = "~0.15"
+clap = "~2.33"

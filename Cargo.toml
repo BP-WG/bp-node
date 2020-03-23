@@ -1,22 +1,2 @@
-[package]
-name = "bpdump"
-description = "Bitcoin protocol Swiss army knife - like `tcpdump`, but for LNP/BP stack"
-version = "0.1.0"
-license = "MIT"
-authors = ["Dr Maxim Orlovsky <orlovsky@datagnition.com>"]
-keywords = [ "bitcoin", "lightning", "blockchain" ]
-readme = "README.md"
-edition = "2018"
-
-[dependencies]
-yaml = "~0.3"
-diesel = { version = "~1.4", features = ["postgres", "uuid", "numeric", "chrono"] }
-dotenv = "~0.15"
-chrono = "~0.4"
-lnpbp = { git = "https://github.com/lnp-bp/rust-lnpbp", branch = "feat-lnpbp5" }
-bech32 = "~0.6"
-
-[dependencies.clap]
-version = "~2.33"
-default-features = true
-features = [ "yaml" ]
+[workspace]
+members = ["txlib", "txparserd", "txqueryd", "fsparser", "zmqnotifier"]
