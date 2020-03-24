@@ -10,5 +10,6 @@ edition = "2018"
 dotenv = "~0.15"
 clap = "~2.33"
 chrono = "~0.4"
+derive_wrapper = "~0.1"
 diesel = { version = "~1.4", features = ["postgres", "numeric", "chrono"] }
 txlib = { path = "../txlib" }

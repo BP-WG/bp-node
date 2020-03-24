@@ -11,10 +11,11 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, NaiveDate};
 use diesel::sql_types::Interval;
 use diesel::pg::data_types::PgInterval;
 use super::schema::*;
+use std::time::SystemTime;
 
 #[derive(Identifiable, Queryable, Insertable)]
 #[table_name="state"]
@@ -38,6 +39,37 @@ pub struct State {
     pub utxo_bytes: i32,
     pub block_cache_size: i32,
     pub block_cache_bytes: i32,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        let now = NaiveDateTime::from_timestamp(SystemTime::now().into(), 0);
+        Self {
+            id: 0,
+            started_at: now,
+            updated_at: now,
+            last_block_hash: vec![],
+            last_block_time: NaiveDateTime::from_timestamp(0, 0),
+            known_height: 0,
+            processed_height: 0,
+            processed_txs: 0,
+            processed_txins: 0,
+            processed_txouts: 0,
+            processed_blocks: 0,
+            processed_volume: 0,
+            processed_bytes: 0,
+            processed_time: PgInterval {
+                microseconds: 0,
+                days: 0,
+                months: 0
+            },
+            utxo_size: 0,
+            utxo_volume: 0,
+            utxo_bytes: 0,
+            block_cache_size: 0,
+            block_cache_bytes: 0
+        }
+    }
 }
 
 #[derive(Queryable, Insertable)]

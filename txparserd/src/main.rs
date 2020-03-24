@@ -11,16 +11,22 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
+#![feature(use_extern_macros)]
+
 #[macro_use]
 extern crate diesel;
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate derive_wrapper;
 extern crate dotenv;
 extern crate chrono;
+#[macro_use]
 extern crate txlib;
 
 mod state;
 mod schema;
+mod parser;
 
 fn main() {
     println!("Hello, world!");
