@@ -15,3 +15,4 @@ diesel = { version = "~1.4", features = ["postgres", "numeric", "chrono"] }
 txlib = { path = "../txlib" }
 tokio = { version = "~0.2", features = ["full"] }
 futures = "~0.3"
+zmq = "~0.9"

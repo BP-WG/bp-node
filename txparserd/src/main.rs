@@ -81,6 +81,7 @@ mod controller {
 #[macro_use]
 extern crate tokio;
 extern crate futures;
+extern crate zmq;
 
 use tokio::net::{TcpListener, TcpStream};
 
@@ -106,18 +107,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
 
         {
-            let mut listener2 = TcpListener::bind("127.0.0.1:6896").await?;
-            println!("Listening on 127.0.0.1:6896");
+            let context = zmq::Context::new();
+            let responder = context.socket(zmq::REP).unwrap();
+
+            assert!(responder.bind("tcp://*:5555").is_ok());
 
             tokio::spawn(async move {
+                let mut msg = zmq::Message::new();
                 loop {
-                    let (socket, _) = listener2.accept().await.unwrap();
-                    println!("New client on 6896 port");
-
-                    tokio::spawn(async move {
-                        // Process each socket concurrently.
-                        process(socket).await
-                    });
+                    responder.recv(&mut msg, 0).unwrap();
+                    println!("Received {}", msg.as_str().unwrap());
+                    responder.send("World", 0).unwrap();
                 }
             })
         }
