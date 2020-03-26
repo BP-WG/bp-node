@@ -11,8 +11,6 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-#![feature(use_extern_macros)]
-
 #[macro_use]
 extern crate diesel;
 #[macro_use]
@@ -24,10 +22,117 @@ extern crate chrono;
 #[macro_use]
 extern crate txlib;
 
+
+/*
 mod state;
 mod schema;
 mod parser;
+*/
 
-fn main() {
-    println!("Hello, world!");
+//mod input;
+/*
+mod controller {
+    use crate::input;
+
+    pub struct Config {
+        pub input_socket: String
+    }
+
+    impl Default for Config {
+        fn default() -> Self {
+            Self {
+                input_socket: String::from("tcp://0.0.0.0:88318")
+            }
+        }
+    }
+
+
+    pub struct Server {
+        //parser: Parser,
+        //monitor: Monitor,
+        input: input::Server,
+    }
+
+    pub struct Stats {
+        pub input: input::Stats
+    }
+
+    impl Server {
+        pub fn init_and_run(config: Config) -> Result<Self, tokio_zmq::Error> {
+            let server = Self {
+                //parser: (),
+                //monitor: (),
+                input: input::Server.init_and_run(config.into())
+            };
+            Ok(server)
+        }
+
+        pub fn get_stats(&self) -> Stats {
+            Stats { input: self.input.get_stats() }
+        }
+    }
+
+    pub struct StateReport {
+
+    }
+}*/
+
+
+#[macro_use]
+extern crate tokio;
+extern crate futures;
+
+use tokio::net::{TcpListener, TcpStream};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+    tokio::join!(
+        {
+            let mut listener = TcpListener::bind("127.0.0.1:7897").await?;
+            println!("Listening on 127.0.0.1:7897");
+
+            tokio::spawn(async move {
+                loop {
+                    let (socket, _) = listener.accept().await.unwrap();
+                    println!("New client on 7897 port");
+
+                    tokio::spawn(async move {
+                        // Process each socket concurrently.
+                        process(socket).await
+                    });
+                }
+            })
+        },
+
+        {
+            let mut listener2 = TcpListener::bind("127.0.0.1:6896").await?;
+            println!("Listening on 127.0.0.1:6896");
+
+            tokio::spawn(async move {
+                loop {
+                    let (socket, _) = listener2.accept().await.unwrap();
+                    println!("New client on 6896 port");
+
+                    tokio::spawn(async move {
+                        // Process each socket concurrently.
+                        process(socket).await
+                    });
+                }
+            })
+        }
+    );
+
+    Ok(())
+
+    // TODO:
+    //   1. Read and parse config
+    //   2. Init internal state
+    //   3. Init main threads
+
+//    controller::Server::init_and_run(controller::Config::default());
+}
+
+async fn process(socket: TcpStream) {
+
 }
