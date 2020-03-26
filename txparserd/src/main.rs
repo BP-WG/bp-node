@@ -11,6 +11,8 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
+#![feature(never_type)]
+
 #[macro_use]
 extern crate diesel;
 #[macro_use]
@@ -22,6 +24,10 @@ extern crate chrono;
 #[macro_use]
 extern crate txlib;
 
+#[macro_use]
+extern crate tokio;
+extern crate futures;
+extern crate zmq;
 
 /*
 mod state;
@@ -29,10 +35,13 @@ mod schema;
 mod parser;
 */
 
-//mod input;
-/*
-mod controller {
-    use crate::input;
+mod input;
+
+mod error;
+
+pub mod controller {
+    use tokio::net::{TcpListener, TcpStream};
+    use crate::{input, error::Error};
 
     pub struct Config {
         pub input_socket: String
@@ -40,88 +49,81 @@ mod controller {
 
     impl Default for Config {
         fn default() -> Self {
+            let input_config = input::Config::default();
             Self {
-                input_socket: String::from("tcp://0.0.0.0:88318")
+                input_socket: input_config.socket
             }
         }
     }
 
-
     pub struct Server {
         //parser: Parser,
         //monitor: Monitor,
-        input: input::Server,
+        //input: input::Server,
     }
 
     pub struct Stats {
-        pub input: input::Stats
+        //pub input: input::Stats
+    }
+
+    impl Default for Stats {
+        fn default() -> Self {
+            Self {}
+        }
     }
 
     impl Server {
-        pub fn init_and_run(config: Config) -> Result<Self, tokio_zmq::Error> {
+        #[tokio::main]
+        pub async fn init_and_run(config: Config) -> Result<Self, Error> {
             let server = Self {
                 //parser: (),
                 //monitor: (),
-                input: input::Server.init_and_run(config.into())
+                //input: input::Server.init_and_run(config.into())
             };
+
+            let config = Config::default();
+            let input_server = input::Server::init_and_run(config.into())?;
+
+            tokio::join!(
+                {
+                    let mut listener = TcpListener::bind("127.0.0.1:7897").await?;
+                    println!("Listening on 127.0.0.1:7897");
+
+                    tokio::spawn(async move {
+                        loop {
+                            let (socket, _) = listener.accept().await.unwrap();
+                            println!("New client on 7897 port");
+
+                            tokio::spawn(async move {
+                                // Process each socket concurrently.
+                                //process(socket).await
+                            });
+                        }
+                    })
+                },
+
+                input_server.task
+            );
+
+
             Ok(server)
         }
 
         pub fn get_stats(&self) -> Stats {
-            Stats { input: self.input.get_stats() }
+            Stats::default()
+            //Stats { input: self.input.get_stats() }
         }
     }
 
     pub struct StateReport {
 
     }
-}*/
+}
 
 
-#[macro_use]
-extern crate tokio;
-extern crate futures;
-extern crate zmq;
 
-use tokio::net::{TcpListener, TcpStream};
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
-    tokio::join!(
-        {
-            let mut listener = TcpListener::bind("127.0.0.1:7897").await?;
-            println!("Listening on 127.0.0.1:7897");
-
-            tokio::spawn(async move {
-                loop {
-                    let (socket, _) = listener.accept().await.unwrap();
-                    println!("New client on 7897 port");
-
-                    tokio::spawn(async move {
-                        // Process each socket concurrently.
-                        process(socket).await
-                    });
-                }
-            })
-        },
-
-        {
-            let context = zmq::Context::new();
-            let responder = context.socket(zmq::REP).unwrap();
-
-            assert!(responder.bind("tcp://*:5555").is_ok());
-
-            tokio::spawn(async move {
-                let mut msg = zmq::Message::new();
-                loop {
-                    responder.recv(&mut msg, 0).unwrap();
-                    println!("Received {}", msg.as_str().unwrap());
-                    responder.send("World", 0).unwrap();
-                }
-            })
-        }
-    );
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    controller::Server::init_and_run(controller::Config::default());
 
     Ok(())
 
@@ -131,8 +133,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //   3. Init main threads
 
 //    controller::Server::init_and_run(controller::Config::default());
-}
-
-async fn process(socket: TcpStream) {
-
 }
