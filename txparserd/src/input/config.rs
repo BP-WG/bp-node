@@ -1,5 +1,5 @@
 
-pub use crate::controller;
+pub use crate::Config as MainConfig;
 
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
 #[display_from(Debug)]
@@ -15,8 +15,8 @@ impl Default for Config {
     }
 }
 
-impl From<controller::Config> for Config {
-    fn from(config: controller::Config) -> Self {
+impl From<MainConfig> for Config {
+    fn from(config: MainConfig) -> Self {
         Config {
             socket: config.input_socket
         }

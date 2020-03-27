@@ -31,8 +31,4 @@ impl Server {
             task,
         })
     }
-
-    pub fn get_stats(&self) -> Stats {
-        self.stats.clone()
-    }
 }

@@ -11,13 +11,15 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-use chrono::{NaiveDateTime, NaiveDate};
+use chrono::{NaiveDateTime, NaiveDate, Utc};
+use diesel::prelude::*;
 use diesel::sql_types::Interval;
 use diesel::pg::data_types::PgInterval;
+use txlib::lnpbp::bp::{short_id, Descriptor, BlockChecksum};
 use super::schema::*;
-use std::time::SystemTime;
 
-#[derive(Identifiable, Queryable, Insertable)]
+#[derive(Identifiable, Queryable, Insertable, AsChangeset, Clone, Debug, Display)]
+#[display_from(Debug)]
 #[table_name="state"]
 pub struct State {
     pub id: i16,
@@ -43,7 +45,7 @@ pub struct State {
 
 impl Default for State {
     fn default() -> Self {
-        let now = NaiveDateTime::from_timestamp(SystemTime::now().into(), 0);
+        let now = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0);
         Self {
             id: 0,
             started_at: now,
@@ -88,4 +90,15 @@ pub struct Utxo {
     pub block_checksum: i16,
     pub tx_index: i16,
     pub output_index: i16,
+}
+
+impl From<Utxo> for short_id::Descriptor {
+    fn from(utxo: Utxo) -> Self {
+        short_id::Descriptor::OnchainTxOutput {
+            block_height: utxo.block_height as u32,
+            block_checksum: BlockChecksum::from_inner(utxo.block_checksum as u8),
+            tx_index: utxo.tx_index as u16,
+            output_index: utxo.output_index as u16
+        }
+    }
 }

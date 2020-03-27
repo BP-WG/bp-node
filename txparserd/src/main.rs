@@ -31,70 +31,51 @@ extern crate tokio;
 extern crate futures;
 extern crate zmq;
 
-/*
 mod state;
 mod schema;
 mod parser;
-*/
 
 mod input;
 mod monitor;
 mod error;
 
-pub mod controller {
-    use tokio::net::{TcpListener, TcpStream};
-    use crate::{input, monitor, error::Error};
+use tokio::net::{TcpListener, TcpStream};
+use crate::error::Error;
 
-    #[derive(Clone, PartialEq, Eq, Debug, Display)]
-    #[display_from(Debug)]
-    pub struct Config {
-        pub input_socket: String,
-        pub monitor_socket: String,
-    }
+#[derive(Clone, PartialEq, Eq, Debug, Display)]
+#[display_from(Debug)]
+pub struct Config {
+    pub input_socket: String,
+    pub monitor_socket: String,
+}
 
-    impl Default for Config {
-        fn default() -> Self {
-            let input_config = input::Config::default();
-            let monitor_config = monitor::Config::default();
-            Self {
-                input_socket: input_config.socket,
-                monitor_socket: monitor_config.socket,
-            }
-        }
-    }
-
-    pub struct Server {
-        //parser: Parser,
-        pub monitor: monitor::Server,
-        pub input: input::Server,
-    }
-
-    impl Server {
-        pub fn init_and_run(config: Config) -> Result<Self, Error> {
-            let config = Config::default();
-
-            let input = input::Server::init_and_run(config.clone().into())?;
-            let monitor = monitor::Server::init_and_run(config.clone().into())?;
-
-            Ok(Self {
-                input,
-                monitor,
-            })
+impl Default for Config {
+    fn default() -> Self {
+        let input_config = input::Config::default();
+        let monitor_config = monitor::Config::default();
+        Self {
+            input_socket: input_config.socket,
+            monitor_socket: monitor_config.socket,
         }
     }
 }
 
-
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Error> {
     // TODO:
     //   1. Read and parse config
     //   2. Init internal state
     //   3. Init main threads
 
-    let controller = controller::Server::init_and_run(controller::Config::default()).unwrap();
+    let config = Config::default();
+
+    let input = input::Server::init_and_run(config.clone().into())?;
+    let monitor = monitor::Server::init_and_run(config.clone().into())?;
+
     tokio::join!(
-        controller.input.task,
-        controller.monitor.task
+        input.task,
+        monitor.task
     );
+
+    Ok(())
 }
