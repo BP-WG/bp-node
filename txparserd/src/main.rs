@@ -21,6 +21,8 @@ extern crate clap;
 extern crate derive_wrapper;
 extern crate dotenv;
 extern crate chrono;
+extern crate tiny_http;
+extern crate prometheus;
 #[macro_use]
 extern crate txlib;
 
@@ -36,101 +38,63 @@ mod parser;
 */
 
 mod input;
-
+mod monitor;
 mod error;
 
 pub mod controller {
     use tokio::net::{TcpListener, TcpStream};
-    use crate::{input, error::Error};
+    use crate::{input, monitor, error::Error};
 
+    #[derive(Clone, PartialEq, Eq, Debug, Display)]
+    #[display_from(Debug)]
     pub struct Config {
-        pub input_socket: String
+        pub input_socket: String,
+        pub monitor_socket: String,
     }
 
     impl Default for Config {
         fn default() -> Self {
             let input_config = input::Config::default();
+            let monitor_config = monitor::Config::default();
             Self {
-                input_socket: input_config.socket
+                input_socket: input_config.socket,
+                monitor_socket: monitor_config.socket,
             }
         }
     }
 
     pub struct Server {
         //parser: Parser,
-        //monitor: Monitor,
-        //input: input::Server,
-    }
-
-    pub struct Stats {
-        //pub input: input::Stats
-    }
-
-    impl Default for Stats {
-        fn default() -> Self {
-            Self {}
-        }
+        pub monitor: monitor::Server,
+        pub input: input::Server,
     }
 
     impl Server {
-        #[tokio::main]
-        pub async fn init_and_run(config: Config) -> Result<Self, Error> {
-            let server = Self {
-                //parser: (),
-                //monitor: (),
-                //input: input::Server.init_and_run(config.into())
-            };
-
+        pub fn init_and_run(config: Config) -> Result<Self, Error> {
             let config = Config::default();
-            let input_server = input::Server::init_and_run(config.into())?;
 
-            tokio::join!(
-                {
-                    let mut listener = TcpListener::bind("127.0.0.1:7897").await?;
-                    println!("Listening on 127.0.0.1:7897");
+            let input = input::Server::init_and_run(config.clone().into())?;
+            let monitor = monitor::Server::init_and_run(config.clone().into())?;
 
-                    tokio::spawn(async move {
-                        loop {
-                            let (socket, _) = listener.accept().await.unwrap();
-                            println!("New client on 7897 port");
-
-                            tokio::spawn(async move {
-                                // Process each socket concurrently.
-                                //process(socket).await
-                            });
-                        }
-                    })
-                },
-
-                input_server.task
-            );
-
-
-            Ok(server)
+            Ok(Self {
+                input,
+                monitor,
+            })
         }
-
-        pub fn get_stats(&self) -> Stats {
-            Stats::default()
-            //Stats { input: self.input.get_stats() }
-        }
-    }
-
-    pub struct StateReport {
-
     }
 }
 
 
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    controller::Server::init_and_run(controller::Config::default());
-
-    Ok(())
-
+#[tokio::main]
+async fn main() {
     // TODO:
     //   1. Read and parse config
     //   2. Init internal state
     //   3. Init main threads
 
-//    controller::Server::init_and_run(controller::Config::default());
+    let controller = controller::Server::init_and_run(controller::Config::default()).unwrap();
+    tokio::join!(
+        controller.input.task,
+        controller.monitor.task
+    );
 }

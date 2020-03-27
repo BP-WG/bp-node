@@ -13,8 +13,8 @@ impl Server {
         let context = zmq::Context::new();
         let responder = context.socket(zmq::REP).unwrap();
 
-        assert!(responder.bind("tcp://*:5555").is_ok());
-        println!("Listening on 127.0.0.1:5555");
+        assert!(responder.bind(config.socket.as_str()).is_ok());
+        println!("Listening on {}", config.socket);
 
         let task = tokio::spawn(async move {
             let mut msg = zmq::Message::new();

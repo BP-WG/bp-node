@@ -10,7 +10,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            socket: String::from("tcp://0.0.0.0:88318")
+            socket: String::from("tcp://0.0.0.0:14224")
         }
     }
 }

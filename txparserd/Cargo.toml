@@ -16,3 +16,5 @@ txlib = { path = "../txlib" }
 tokio = { version = "~0.2", features = ["full"] }
 futures = "~0.3"
 zmq = "~0.9"
+tiny_http = "~0.6"
+prometheus = "~0.8"
