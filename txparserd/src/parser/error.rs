@@ -13,6 +13,7 @@
 
 
 use diesel::result::Error as DbError;
+use diesel::ConnectionError;
 
 #[derive(Debug, Display)]
 #[display_from(Debug)]
@@ -22,11 +23,18 @@ pub enum Error {
     BlockValidationIncosistency,
     IndexDbError(DbError),
     StateDbError(DbError),
+    DbConnectionError(ConnectionError),
     InputThreadDropped
 }
 
 impl From<DbError> for Error {
     fn from(err: DbError) -> Self {
         Error::IndexDbError(err)
+    }
+}
+
+impl From<ConnectionError> for Error {
+    fn from(err: ConnectionError) -> Self {
+        Error::DbConnectionError(err)
     }
 }

@@ -12,18 +12,20 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use crate::Config as MainConfig;
+use crate::config::Config as MainConfig;
 
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
 #[display_from(Debug)]
 pub struct Config {
-    pub socket: String
+    pub db_index_url: String,
+    pub db_state_url: String,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            socket: String::from("tcp://0.0.0.0:14224")
+            db_index_url: String::from("postgresql://postgres:example@localhost:5432/bitcointx"),
+            db_state_url: String::from("postgresql://postgres:example@localhost:5432/txparserd"),
         }
     }
 }
@@ -31,7 +33,8 @@ impl Default for Config {
 impl From<MainConfig> for Config {
     fn from(config: MainConfig) -> Self {
         Config {
-            socket: config.input_socket
+            db_index_url: config.db_index_url,
+            db_state_url: config.db_state_url,
         }
     }
 }

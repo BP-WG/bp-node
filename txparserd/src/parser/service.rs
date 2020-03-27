@@ -15,6 +15,8 @@ use tokio::{
     sync::mpsc,
     task::JoinHandle
 };
+use diesel::prelude::*;
+use diesel::pg::PgConnection;
 use txlib::lnpbp::bitcoin::Block;
 use super::*;
 
@@ -26,11 +28,14 @@ pub struct Service {
 
 impl Service {
     pub fn init_and_run(config: Config, mut rx: mpsc::Receiver<Vec<Block>>) -> Result<Self, Error> {
-        // TODO: Open daabase connection and init bulk parser
+        let index_conn = PgConnection::establish(&config.db_index_url)?;
+        let state_conn = PgConnection::establish(&config.db_state_url)?;
+
+        let mut bulk_parser = BulkParser::restore_or_create(index_conn, state_conn)?;
 
         let task = tokio::spawn(async move {
             while let Some(blocks) = rx.recv().await {
-                // TODO: Process blocks
+                bulk_parser.feed(blocks)?;
             }
             Err(Error::InputThreadDropped)
         });

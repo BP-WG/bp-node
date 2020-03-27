@@ -24,11 +24,13 @@ pub struct Service {
 
 impl Service {
     pub fn init_and_run(config: Config) -> Result<Self, Error> {
-        let http_server = tiny_http::Server::http(config.socket).unwrap_or_else(|e| {
+        let http_server = tiny_http::Server::http(config.socket.clone()).unwrap_or_else(|e| {
             panic!(
-                "failed to start monitoring HTTP server"
+                "Failed to start monitoring HTTP server: {:?}", e
             )
         });
+
+        println!("Listening on {}", config.socket);
 
         let task = tokio::spawn(async move {
             loop {

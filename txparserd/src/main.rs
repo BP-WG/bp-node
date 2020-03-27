@@ -36,37 +36,18 @@ mod schema;
 mod parser;
 mod input;
 mod monitor;
+mod config;
 
 use tokio::{
     sync::mpsc,
     net::{TcpListener, TcpStream}
 };
 use crate::error::Error;
-
-#[derive(Clone, PartialEq, Eq, Debug, Display)]
-#[display_from(Debug)]
-pub struct Config {
-    pub input_socket: String,
-    pub monitor_socket: String,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        let input_config = input::Config::default();
-        let monitor_config = monitor::Config::default();
-        Self {
-            input_socket: input_config.socket,
-            monitor_socket: monitor_config.socket,
-        }
-    }
-}
+use crate::config::Config;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // TODO:
-    //   1. Read and parse config
-    //   2. Init internal state
-    //   3. Init main threads
+    // TODO: Init config from command-line arguments, environment and config file
 
     let config = Config::default();
 

@@ -12,7 +12,7 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use crate::Config as MainConfig;
+use crate::config::Config as MainConfig;
 
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
 #[display_from(Debug)]
@@ -23,7 +23,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            socket: String::from("tcp://0.0.0.0:88318")
+            socket: String::from("tcp://*:18318")
         }
     }
 }

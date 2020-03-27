@@ -35,7 +35,7 @@ use crate::schema as state_schema;
 use super::*;
 
 
-pub struct BulkService {
+pub struct BulkParser {
     state_conn: PgConnection,
     index_conn: PgConnection,
     state: Stats,
@@ -43,7 +43,7 @@ pub struct BulkService {
     block_cache: BlockMap,
 }
 
-impl BulkService {
+impl BulkParser {
     pub fn restore_or_create(state_conn: PgConnection, index_conn: PgConnection) -> Result<Self, Error> {
         let state = state_schema::state::dsl::state.find(0).first(&state_conn)?;
         let utxo = state_schema::utxo::dsl::utxo.load::<Utxo>(&state_conn)?
