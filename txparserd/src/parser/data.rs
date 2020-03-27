@@ -28,7 +28,7 @@ pub(super) type BlockMap = HashMap<BlockHash, Block>;
 #[derive(Clone, Debug, Display)]
 #[display_from(Debug)]
 pub(super) struct ParseData {
-    pub state: State,
+    pub state: Stats,
     pub utxo: UtxoMap,
     pub blocks: Vec<models::Block>,
     pub txs: Vec<models::Tx>,
@@ -37,7 +37,7 @@ pub(super) struct ParseData {
 }
 
 impl ParseData {
-    pub(super) fn init(state: State, utxo: &UtxoMap) -> Self {
+    pub(super) fn init(state: Stats, utxo: &UtxoMap) -> Self {
         Self {
             state,
             utxo: utxo.clone(),

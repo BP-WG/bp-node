@@ -37,7 +37,10 @@ mod parser;
 mod input;
 mod monitor;
 
-use tokio::net::{TcpListener, TcpStream};
+use tokio::{
+    sync::mpsc,
+    net::{TcpListener, TcpStream}
+};
 use crate::error::Error;
 
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
@@ -67,7 +70,11 @@ async fn main() -> Result<(), Error> {
 
     let config = Config::default();
 
-    let input = input::Service::init_and_run(config.clone().into())?;
+    // TODO: Take buffer size from the configuration options
+    let (mut parser_sender, mut parser_receiver) = mpsc::channel(100);
+
+    let mut parser = parser::Service::init_and_run(config.clone().into(), parser_receiver);
+    let input = input::Service::init_and_run(config.clone().into(), parser_sender)?;
     let monitor = monitor::Service::init_and_run(config.clone().into())?;
 
     tokio::join!(

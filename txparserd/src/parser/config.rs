@@ -12,21 +12,26 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use diesel::result::Error as DbError;
+use crate::Config as MainConfig;
 
-#[derive(Debug, Display)]
+#[derive(Clone, PartialEq, Eq, Debug, Display)]
 #[display_from(Debug)]
-pub enum Error {
-    IndexDbIntegrityError,
-    BlockchainIndexesOutOfShortIdRanges,
-    BlockValidationIncosistency,
-    IndexDbError(DbError),
-    StateDbError(DbError),
-    InputThreadDropped
+pub struct Config {
+    pub socket: String
 }
 
-impl From<DbError> for Error {
-    fn from(err: DbError) -> Self {
-        Error::IndexDbError(err)
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            socket: String::from("tcp://0.0.0.0:14224")
+        }
+    }
+}
+
+impl From<MainConfig> for Config {
+    fn from(config: MainConfig) -> Self {
+        Config {
+            socket: config.input_socket
+        }
     }
 }

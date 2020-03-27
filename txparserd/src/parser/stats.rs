@@ -24,7 +24,7 @@ use crate::schema::*;
 #[derive(Identifiable, Queryable, Insertable, AsChangeset, Clone, Debug, Display)]
 #[display_from(Debug)]
 #[table_name="state"]
-pub struct State {
+pub struct Stats {
     pub id: i16,
     pub started_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -46,7 +46,7 @@ pub struct State {
     pub block_cache_bytes: i32,
 }
 
-impl Default for State {
+impl Default for Stats {
     fn default() -> Self {
         let now = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0);
         Self {

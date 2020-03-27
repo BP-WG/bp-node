@@ -12,8 +12,11 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use tokio::task::JoinHandle;
-
+use tokio::{
+    sync::mpsc,
+    task::JoinHandle
+};
+use txlib::lnpbp::bitcoin::Block;
 use super::*;
 
 pub struct Service {
@@ -23,7 +26,7 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn init_and_run(config: Config) -> Result<Self, Error> {
+    pub fn init_and_run(config: Config, mut parser_sender: mpsc::Sender<Vec<Block>>) -> Result<Self, Error> {
         let context = zmq::Context::new();
         let responder = context.socket(zmq::REP).unwrap();
 
@@ -35,6 +38,7 @@ impl Service {
             loop {
                 responder.recv(&mut msg, 0)?;
                 println!("Received {}", msg.as_str().unwrap());
+                parser_sender.send(vec![]).await;
                 responder.send("World", 0)?;
             }
         });

@@ -13,13 +13,17 @@
 
 
 pub mod error;
+pub mod config;
 pub mod data;
-pub mod state;
+pub mod stats;
+mod bulk_parser;
+mod block_parser;
 pub mod service;
-pub mod block_parser;
 
 pub use error::Error;
+pub use config::*;
 pub use data::*;
-pub use state::*;
+pub use stats::*;
+pub(self) use bulk_parser::*;
+pub(self) use block_parser::*;
 pub use service::*;
-pub use block_parser::*;
