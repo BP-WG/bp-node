@@ -11,12 +11,15 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
+
 use chrono::{NaiveDateTime, NaiveDate, Utc};
-use diesel::prelude::*;
-use diesel::sql_types::Interval;
-use diesel::pg::data_types::PgInterval;
+use diesel::{
+    prelude::*,
+    sql_types::Interval,
+    pg::data_types::PgInterval
+};
 use txlib::lnpbp::bp::{short_id, Descriptor, BlockChecksum};
-use super::schema::*;
+use crate::schema::*;
 
 #[derive(Identifiable, Queryable, Insertable, AsChangeset, Clone, Debug, Display)]
 #[display_from(Debug)]

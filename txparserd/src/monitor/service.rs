@@ -1,14 +1,28 @@
+// Bitcoin transaction processing & database indexing daemon
+// Written in 2020 by
+//     Dr. Maxim Orlovsky <orlovsky@pandoracore.com>
+//
+// To the extent possible under law, the author(s) have dedicated all
+// copyright and related and neighboring rights to this software to
+// the public domain worldwide. This software is distributed without
+// any warranty.
+//
+// You should have received a copy of the MIT License
+// along with this software.
+// If not, see <https://opensource.org/licenses/MIT>.
+
+
 use tiny_http;
 use tokio::task::JoinHandle;
 use prometheus::{Opts, Registry, Counter, TextEncoder, Encoder};
 
 use super::*;
 
-pub struct Server {
+pub struct Service {
     pub task: JoinHandle<Result<!, Error>>
 }
 
-impl Server {
+impl Service {
     pub fn init_and_run(config: Config) -> Result<Self, Error> {
         let http_server = tiny_http::Server::http(config.socket).unwrap_or_else(|e| {
             panic!(

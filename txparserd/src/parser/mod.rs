@@ -12,26 +12,14 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use crate::Config as MainConfig;
+pub mod error;
+pub mod data;
+pub mod state;
+pub mod service;
+pub mod block_parser;
 
-#[derive(Clone, PartialEq, Eq, Debug, Display)]
-#[display_from(Debug)]
-pub struct Config {
-    pub socket: String
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            socket: String::from("tcp://0.0.0.0:14224")
-        }
-    }
-}
-
-impl From<MainConfig> for Config {
-    fn from(config: MainConfig) -> Self {
-        Config {
-            socket: config.input_socket
-        }
-    }
-}
+pub use error::Error;
+pub use data::*;
+pub use state::*;
+pub use service::*;
+pub use block_parser::*;

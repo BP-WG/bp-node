@@ -31,13 +31,11 @@ extern crate tokio;
 extern crate futures;
 extern crate zmq;
 
-mod state;
+mod error;
 mod schema;
 mod parser;
-
 mod input;
 mod monitor;
-mod error;
 
 use tokio::net::{TcpListener, TcpStream};
 use crate::error::Error;
@@ -69,8 +67,8 @@ async fn main() -> Result<(), Error> {
 
     let config = Config::default();
 
-    let input = input::Server::init_and_run(config.clone().into())?;
-    let monitor = monitor::Server::init_and_run(config.clone().into())?;
+    let input = input::Service::init_and_run(config.clone().into())?;
+    let monitor = monitor::Service::init_and_run(config.clone().into())?;
 
     tokio::join!(
         input.task,

@@ -14,8 +14,7 @@
 use std::collections::{HashMap, hash_map::Entry};
 use diesel::{
     prelude::*,
-    pg::PgConnection,
-    result::Error as DbError
+    pg::PgConnection
 };
 use txlib::{
     schema,
@@ -32,165 +31,19 @@ use txlib::{
         common::macros::*
     }
 };
-use crate::{
-    state::*,
-    schema as state_schema,
-};
+use crate::schema as state_schema;
+use super::*;
 
 #[derive(Debug, Display)]
 #[display_from(Debug)]
-pub enum Error {
-    IndexDbIntegrityError,
-    BlockchainIndexesOutOfShortIdRanges,
-    BlockValidationIncosistency,
-    IndexDbError(DbError),
-    StateDbError(DbError)
-}
-
-impl From<DbError> for Error {
-    fn from(err: DbError) -> Self {
-        Error::IndexDbError(err)
-    }
-}
-
-
-type VoutMap = HashMap<u16, Descriptor>;
-type UtxoMap = HashMap<Txid, VoutMap>;
-type BlockMap = HashMap<BlockHash, Block>;
-
-#[derive(Clone, Debug, Display)]
-#[display_from(Debug)]
-pub(self) struct ParseData {
-    pub state: State,
-    pub utxo: UtxoMap,
-    pub blocks: Vec<models::Block>,
-    pub txs: Vec<models::Tx>,
-    pub txins: Vec<models::Txin>,
-    pub txouts: Vec<models::Txout>,
-}
-
-impl ParseData {
-    pub(self) fn init(state: State, utxo: &UtxoMap) -> Self {
-        Self {
-            state,
-            utxo: utxo.clone(),
-            blocks: vec![],
-            txs: vec![],
-            txins: vec![],
-            txouts: vec![]
-        }
-    }
-}
-
-
-pub struct Parser {
-    state_conn: PgConnection,
-    index_conn: PgConnection,
-    state: State,
-    utxo: UtxoMap,
-    block_cache: BlockMap,
-}
-
-impl Parser {
-    pub fn restore_or_create(state_conn: PgConnection, index_conn: PgConnection) -> Result<Self, Error> {
-        let state = state_schema::state::dsl::state.find(0).first(&state_conn)?;
-        let utxo = state_schema::utxo::dsl::utxo.load::<Utxo>(&state_conn)?
-            .into_iter().try_fold::<_, _, Result<UtxoMap, Error>>(UtxoMap::new(), |mut map, utxo| {
-                map.entry(Txid::from_slice(&utxo.txid[..]).map_err(|_| Error::IndexDbIntegrityError)?)
-                    .or_insert_with(VoutMap::new)
-                    .insert(utxo.output_index as u16, utxo.into());
-                Ok(map)
-            })?;
-        let block_cache = state_schema::cached_block::dsl::cached_block.load::<CachedBlock>(&state_conn)?
-            .into_iter().try_fold::<_, _, Result<BlockMap, Error>>(BlockMap::new(), |mut map, block| {
-                map.insert(
-                    BlockHash::from_slice(&block.hash[..]).map_err(|_| Error::IndexDbIntegrityError)?,
-                    deserialize(&block.block[..]).map_err(|_| Error::IndexDbIntegrityError)?
-                );
-                Ok(map)
-            })?;
-        Ok(Self {
-            state_conn,
-            index_conn,
-            state,
-            utxo,
-            block_cache
-        })
-    }
-
-    pub fn init_from_scratch(state_conn: PgConnection, index_conn: PgConnection) -> Self {
-        Self {
-            state_conn,
-            index_conn,
-            state: State::default(),
-            utxo: HashMap::new(),
-            block_cache: HashMap::new()
-        }
-    }
-
-    pub fn feed(&mut self, blocks: Vec<Block>) -> Result<(), Error> {
-        // TODO: Ensure thread safety
-
-        // TODO: Run though blocks and sort them into cached and processable
-
-        // TODO: For processable blocks collect all state and data updates
-        let block_chain = Vec::<Block>::with_capacity(blocks.len());
-        let data = block_chain
-            .into_iter()
-            .try_fold::<_, _, Result<ParseData, Error>>(
-                ParseData::init(self.state.clone(), &self.utxo),
-                |mut data, block| {
-                BlockParser::parse(&mut data, block)?;
-                Ok(data)
-            })?;
-
-        self.state_conn.transaction(|| {
-            self.index_conn.transaction(|| {
-                let data = data.clone();
-                diesel::insert_into(schema::block::table)
-                    .values(data.blocks)
-                    .execute(&self.index_conn)?;
-                diesel::insert_into(schema::tx::table)
-                    .values(data.txs)
-                    .execute(&self.index_conn)?;
-                diesel::insert_into(schema::txout::table)
-                    .values(data.txouts)
-                    .execute(&self.index_conn)?;
-                diesel::insert_into(schema::txin::table)
-                    .values(data.txins)
-                    .execute(&self.index_conn)?;
-
-                // TODO: Store state with UTXO and blocks cache
-                diesel::update(state_schema::state::dsl::state.find(0))
-                    .set(data.state)
-                    .execute(&self.state_conn)
-                    .map_err(|err| Error::StateDbError(err))
-            })
-        })?;
-
-        self.state = data.state;
-        // TODO: Update UTXO and blocks cache
-
-        Ok(())
-    }
-
-    pub fn get_state(&self) -> State {
-        // TODO: Ensure thread safety
-        self.state.clone()
-    }
-}
-
-
-#[derive(Debug, Display)]
-#[display_from(Debug)]
-pub(self) struct BlockParser<'a> {
+pub(super) struct BlockParser<'a> {
     coinbase_amount: Option<u64>,
     descriptor: Descriptor,
     result: &'a mut ParseData,
 }
 
 impl<'a> BlockParser<'a> {
-    pub(self) fn parse(data: &'a mut ParseData, block: Block) -> Result<(), Error> {
+    pub(super) fn parse(data: &'a mut ParseData, block: Block) -> Result<(), Error> {
         let block_checksum = BlockChecksum::from(block.block_hash());
         let mut parser = Self {
             coinbase_amount: None,
