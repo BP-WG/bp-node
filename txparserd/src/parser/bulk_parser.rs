@@ -80,9 +80,7 @@ impl BulkParser {
         }
     }
 
-    pub fn feed(&mut self, blocks: Vec<Block>) -> Result<(), Error> {
-        // TODO: Ensure thread safety
-
+    pub async fn feed(&mut self, blocks: Vec<Block>) -> Result<(), Error> {
         // TODO: Run though blocks and sort them into cached and processable
 
         // TODO: For processable blocks collect all state and data updates

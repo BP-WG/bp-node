@@ -43,8 +43,12 @@ use tokio::{
     task::JoinHandle,
     net::{TcpListener, TcpStream}
 };
-use crate::error::DaemonError;
-use crate::config::Config;
+use crate::{
+    config::Config,
+    error::DaemonError,
+    parser::InputChannel,
+    input::ParserChannel,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), DaemonError> {
@@ -54,9 +58,12 @@ async fn main() -> Result<(), DaemonError> {
 
     // TODO: Take buffer size from the configuration options
     let (mut parser_sender, mut parser_receiver) = mpsc::channel(100);
+    let (mut input_sender, mut input_receiver) = mpsc::channel(100);
+    let mut input_channel = InputChannel { req: parser_receiver, rep: input_sender };
+    let mut parser_channel = ParserChannel { req: parser_sender, rep: input_receiver };
 
-    let parser_task = parser::run(config.clone().into(), parser_receiver)?;
-    let input_task = input::run(config.clone().into(), parser_sender)?;
+    let parser_task = parser::run(config.clone().into(), input_channel)?;
+    let input_task = input::run(config.clone().into(), parser_channel)?;
     let monitor_task = monitor::run(config.clone().into())?;
 
     tokio::join!(

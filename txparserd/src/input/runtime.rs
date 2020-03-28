@@ -21,10 +21,13 @@ use txlib::lnpbp::bitcoin::{
     Block,
     consensus::deserialize
 };
-use super::{Config, Stats};
-use crate::error::DaemonError;
+use super::{Config, Stats, ParserChannel};
+use crate::{
+    parser,
+    error::DaemonError
+};
 
-pub fn run(config: Config, mut parser_sender: mpsc::Sender<Vec<Block>>) -> Result<JoinHandle<Result<!, DaemonError>>, DaemonError> {
+pub fn run(config: Config, mut parser: ParserChannel) -> Result<JoinHandle<Result<!, DaemonError>>, DaemonError> {
     let context = zmq::Context::new();
     let responder = context.socket(zmq::REP).unwrap();
     responder.bind(config.socket.as_str())?;
@@ -33,7 +36,7 @@ pub fn run(config: Config, mut parser_sender: mpsc::Sender<Vec<Block>>) -> Resul
         config,
         stats: Stats::default(),
         responder,
-        parser_sender
+        parser,
     };
 
     let task = tokio::spawn(async move {
@@ -47,7 +50,7 @@ struct Service {
     config: Config,
     stats: Stats,
     responder: zmq::Socket,
-    parser_sender: mpsc::Sender<Vec<Block>>,
+    parser: ParserChannel,
 }
 
 impl Service {
@@ -78,7 +81,8 @@ impl Service {
 
         let block = deserialize(&block_data[..])?;
 
-        let res = self.parser_sender.send(vec![block]).await.map_err(|_| DaemonError::IpcSocketError);
+        let req = parser::Request { id: 0, cmd: parser::Command::Block(block) };
+        let rep = self.parser.req.send(req).await.map_err(|_| DaemonError::IpcSocketError);
 
         let resp = zmq::Message::from("ACK");
 
@@ -93,7 +97,8 @@ impl Service {
                 Ok(vec)
             })?;
 
-        let res = self.parser_sender.send(blocks).await.map_err(|_| DaemonError::IpcSocketError);
+        let req = parser::Request { id: 0, cmd: parser::Command::Blocks(blocks) };
+        let rep = self.parser.req.send(req).await.map_err(|_| DaemonError::IpcSocketError);
 
         let resp = zmq::Message::from("ACK");
 

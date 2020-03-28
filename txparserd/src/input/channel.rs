@@ -11,14 +11,10 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-pub mod config;
-pub mod stats;
-pub mod runtime;
-pub mod channel;
+use tokio::sync::mpsc::{Sender, Receiver};
+use crate::parser;
 
-pub use config::*;
-pub use stats::*;
-pub use runtime::*;
-pub use channel::*;
-
-use crate::error::DaemonError;
+pub struct ParserChannel {
+    pub req: Sender<parser::Request>,
+    pub rep: Receiver<parser::Reply>,
+}

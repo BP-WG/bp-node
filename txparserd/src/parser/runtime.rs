@@ -15,13 +15,14 @@ use tokio::{
     sync::mpsc,
     task::JoinHandle
 };
+use futures::FutureExt;
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use txlib::lnpbp::bitcoin::Block;
-use super::{Config, Stats, Error, BulkParser};
+use super::{Config, Stats, Error, BulkParser, channel::*};
 use crate::error::DaemonError;
 
-pub fn run(config: Config, mut rx: mpsc::Receiver<Vec<Block>>) -> Result<JoinHandle<Result<!, Error>>, Error> {
+pub fn run(config: Config, mut input: InputChannel) -> Result<JoinHandle<Result<!, Error>>, Error> {
     let index_conn = PgConnection::establish(&config.db_index_url)?;
     let state_conn = PgConnection::establish(&config.db_state_url)?;
 
@@ -31,7 +32,7 @@ pub fn run(config: Config, mut rx: mpsc::Receiver<Vec<Block>>) -> Result<JoinHan
         config,
         stats: Stats::default(),
         bulk_parser,
-        input_receiver: rx,
+        input,
     };
 
     let task = tokio::spawn(async move {
@@ -41,18 +42,28 @@ pub fn run(config: Config, mut rx: mpsc::Receiver<Vec<Block>>) -> Result<JoinHan
     Ok(task)
 }
 
-
 struct Service {
     config: Config,
     stats: Stats,
     bulk_parser: BulkParser,
-    input_receiver: mpsc::Receiver<Vec<Block>>,
+    input: InputChannel,
 }
 
 impl Service {
     async fn run_loop(mut self) -> Result<!, Error> {
-        while let Some(blocks) = self.input_receiver.recv().await {
-            self.bulk_parser.feed(blocks)?;
+        let mut busy = false;
+        while let Some(req) = self.input.req.recv().await {
+            match req.cmd {
+                Command::Block(block) => (),
+                Command::Blocks(blocks) => {
+                    if busy {
+
+                    }
+                    busy = true;
+                    self.bulk_parser.feed(blocks).then(|res| async { busy = false; res });
+                },
+                _ => (),
+            }
         }
         Err(Error::InputThreadDropped)
     }
