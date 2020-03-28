@@ -14,6 +14,7 @@
 
 use std::io;
 use txlib::lnpbp::bitcoin;
+use crate::parser;
 
 #[derive(Debug, Display)]
 #[display_from(Debug)]
@@ -23,6 +24,8 @@ pub enum DaemonError {
     MalformedMessage,
     ConsensusEncodingError(bitcoin::consensus::encode::Error),
     IpcSocketError,
+    ParserError(parser::Error),
+    HttpMonitoringPortError,
 }
 
 impl From<zmq::Error> for DaemonError {
@@ -34,6 +37,12 @@ impl From<zmq::Error> for DaemonError {
 impl From<io::Error> for DaemonError {
     fn from(err: io::Error) -> Self {
         DaemonError::IoError(err)
+    }
+}
+
+impl From<parser::Error> for DaemonError {
+    fn from(err: parser::Error) -> Self {
+        DaemonError::ParserError(err)
     }
 }
 

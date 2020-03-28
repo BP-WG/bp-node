@@ -55,13 +55,14 @@ async fn main() -> Result<(), DaemonError> {
     // TODO: Take buffer size from the configuration options
     let (mut parser_sender, mut parser_receiver) = mpsc::channel(100);
 
-    let mut parser = parser::Service::init_and_run(config.clone().into(), parser_receiver);
+    let parser_task = parser::run(config.clone().into(), parser_receiver)?;
     let input_task = input::run(config.clone().into(), parser_sender)?;
-    let monitor = monitor::Service::init_and_run(config.clone().into())?;
+    let monitor_task = monitor::run(config.clone().into())?;
 
     tokio::join!(
         input_task,
-        monitor.task
+        parser_task,
+        monitor_task
     );
 
     Ok(())

@@ -24,7 +24,7 @@ pub enum Error {
     IndexDbError(DbError),
     StateDbError(DbError),
     DbConnectionError(ConnectionError),
-    InputThreadDropped
+    InputThreadDropped,
 }
 
 impl From<DbError> for Error {

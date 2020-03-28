@@ -12,9 +12,9 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 pub mod config;
-pub mod service;
+pub mod runtime;
 
 pub use config::*;
-pub use service::*;
+pub use runtime::*;
 
 use crate::error::DaemonError;
