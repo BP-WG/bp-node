@@ -13,10 +13,10 @@
 
 pub mod config;
 pub mod stats;
-pub mod service;
+pub mod runtime;
 
 pub use config::*;
 pub use stats::*;
-pub use service::*;
+pub use runtime::*;
 
-use crate::error::Error;
+use crate::error::DaemonError;

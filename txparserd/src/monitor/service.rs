@@ -19,11 +19,11 @@ use prometheus::{Opts, Registry, Counter, TextEncoder, Encoder};
 use super::*;
 
 pub struct Service {
-    pub task: JoinHandle<Result<!, Error>>
+    pub task: JoinHandle<Result<!, DaemonError>>
 }
 
 impl Service {
-    pub fn init_and_run(config: Config) -> Result<Self, Error> {
+    pub fn init_and_run(config: Config) -> Result<Self, DaemonError> {
         let http_server = tiny_http::Server::http(config.socket.clone()).unwrap_or_else(|e| {
             panic!(
                 "Failed to start monitoring HTTP server: {:?}", e

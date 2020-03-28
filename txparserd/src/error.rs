@@ -13,22 +13,32 @@
 
 
 use std::io;
+use txlib::lnpbp::bitcoin;
 
 #[derive(Debug, Display)]
 #[display_from(Debug)]
-pub enum Error {
+pub enum DaemonError {
     IoError(io::Error),
-    ZmqError(zmq::Error)
+    ZmqError(zmq::Error),
+    MalformedMessage,
+    ConsensusEncodingError(bitcoin::consensus::encode::Error),
+    IpcSocketError,
 }
 
-impl From<zmq::Error> for Error {
+impl From<zmq::Error> for DaemonError {
     fn from(err: zmq::Error) -> Self {
-        Error::ZmqError(err)
+        DaemonError::ZmqError(err)
     }
 }
 
-impl From<io::Error> for Error {
+impl From<io::Error> for DaemonError {
     fn from(err: io::Error) -> Self {
-        Error::IoError(err)
+        DaemonError::IoError(err)
+    }
+}
+
+impl From<bitcoin::consensus::encode::Error> for DaemonError {
+    fn from(err: bitcoin::consensus::encode::Error) -> Self {
+        DaemonError::ConsensusEncodingError(err)
     }
 }

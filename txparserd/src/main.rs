@@ -40,13 +40,14 @@ mod config;
 
 use tokio::{
     sync::mpsc,
+    task::JoinHandle,
     net::{TcpListener, TcpStream}
 };
-use crate::error::Error;
+use crate::error::DaemonError;
 use crate::config::Config;
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<(), DaemonError> {
     // TODO: Init config from command-line arguments, environment and config file
 
     let config = Config::default();
@@ -55,11 +56,11 @@ async fn main() -> Result<(), Error> {
     let (mut parser_sender, mut parser_receiver) = mpsc::channel(100);
 
     let mut parser = parser::Service::init_and_run(config.clone().into(), parser_receiver);
-    let input = input::Service::init_and_run(config.clone().into(), parser_sender)?;
+    let input_task = input::run(config.clone().into(), parser_sender)?;
     let monitor = monitor::Service::init_and_run(config.clone().into())?;
 
     tokio::join!(
-        input.task,
+        input_task,
         monitor.task
     );
 
