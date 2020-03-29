@@ -69,6 +69,7 @@ impl Service {
         match str::from_utf8(&command[..]).map_err(|_| DaemonError::MalformedMessage)? {
             "BLOCK" => self.proc_cmd_blck(multipart).await,
             "BLOCKS" => self.proc_cmd_blcks(multipart).await,
+            // TODO: Add support for other commands
             _ => Err(DaemonError::MalformedMessage),
         }
     }
@@ -82,10 +83,13 @@ impl Service {
         let block = deserialize(&block_data[..])?;
 
         let req = parser::Request { id: 0, cmd: parser::Command::Block(block) };
-        let rep = self.parser.req.send(req).await.map_err(|_| DaemonError::IpcSocketError);
-
-        let resp = zmq::Message::from("ACK");
-
+        self.parser.req.send(req).await.map_err(|_| DaemonError::IpcSocketError)?;
+        let resp_str = match self.parser.rep.recv().await.ok_or(DaemonError::IpcSocketError)? {
+            parser::Reply::Block(parser::FeedReply::Consumed) => "ACK",
+            parser::Reply::Block(parser::FeedReply::Busy) => "BUSY",
+            _ => "ERR",
+        };
+        let resp = zmq::Message::from(resp_str);
         Ok(resp)
     }
 
@@ -98,10 +102,13 @@ impl Service {
             })?;
 
         let req = parser::Request { id: 0, cmd: parser::Command::Blocks(blocks) };
-        let rep = self.parser.req.send(req).await.map_err(|_| DaemonError::IpcSocketError);
-
-        let resp = zmq::Message::from("ACK");
-
+        self.parser.req.send(req).await.map_err(|_| DaemonError::IpcSocketError);
+        let resp_str = match self.parser.rep.recv().await.ok_or(DaemonError::IpcSocketError)? {
+            parser::Reply::Blocks(parser::FeedReply::Consumed) => "ACK",
+            parser::Reply::Blocks(parser::FeedReply::Busy) => "BUSY",
+            _ => "ERR",
+        };
+        let resp = zmq::Message::from(resp_str);
         Ok(resp)
     }
 }

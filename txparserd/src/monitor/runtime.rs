@@ -39,7 +39,7 @@ struct Service {
 }
 
 impl Service {
-    async fn run_loop(mut self) -> Result<!, DaemonError> {
+    async fn run_loop(self) -> Result<!, DaemonError> {
         loop {
             let request = self.http_server.recv().unwrap();
             let mut buffer = vec![];

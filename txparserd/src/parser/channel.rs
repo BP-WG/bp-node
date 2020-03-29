@@ -40,36 +40,32 @@ pub enum Command {
 #[derive(Clone, Debug, Display)]
 #[display_from(Debug)]
 pub enum Reply {
-    Block(BlocksReply),
-    Blocks(BlocksReply),
+    Block(FeedReply),
+    Blocks(FeedReply),
     Status(StatusReply),
     Statistics(Stats),
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
 #[display_from(Debug)]
-pub enum BlockReply {
+pub enum FeedReply {
     Consumed,
-    Invalid,
     Busy
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
 #[display_from(Debug)]
-pub enum BlocksReply {
-    Consumed {
-        chained: u16,
-        cached: u16,
-        known: u16,
-        invalid: u16,
-    },
-    Busy
+pub struct FeedStatus {
+    pub chained: u16,
+    pub cached: u16,
+    pub known: u16,
+    pub invalid: u16,
 }
 
 #[derive(Clone, Debug, Display)]
 #[display_from(Debug)]
 pub enum StatusReply {
-    Active(Stats),
+    Active(FeedStatus),
     Completed,
     NotFound,
 }
