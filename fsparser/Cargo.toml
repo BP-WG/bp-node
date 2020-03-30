@@ -6,3 +6,6 @@ edition = "2018"
 
 [dependencies]
 clap = "~2.33"
+derive_wrapper = "~0.1"
+zmq = "~0.9"
+bitcoin = "~0.23"

@@ -12,6 +12,7 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
+use log::*;
 use tokio::{
     sync::mpsc,
     task::JoinHandle
@@ -26,11 +27,13 @@ use crate::{
     parser,
     error::DaemonError
 };
+use futures::TryFutureExt;
 
 pub fn run(config: Config, mut parser: ParserChannel) -> Result<JoinHandle<Result<!, DaemonError>>, DaemonError> {
     let context = zmq::Context::new();
     let responder = context.socket(zmq::REP).unwrap();
-    responder.bind(config.socket.as_str())?;
+    let socket = config.socket.clone();
+    responder.bind(socket.as_str())?;
 
     let service = Service {
         config,
@@ -43,6 +46,8 @@ pub fn run(config: Config, mut parser: ParserChannel) -> Result<JoinHandle<Resul
         service.run_loop().await
     });
 
+    info!("Input service is listening for incoming blocks on {}", socket);
+
     Ok(task)
 }
 
@@ -54,12 +59,20 @@ struct Service {
 }
 
 impl Service {
-    async fn run_loop(mut self) -> Result<!, DaemonError> {
+    async fn run_loop(mut self) -> ! {
         loop {
-            let mut multipart = self.responder.recv_multipart(0)?;
-            let response = self.proc_cmd(multipart).await?;
-            self.responder.send(response, 0)?;
+            self.run().await.and_then(|err| {
+                error!("Error processing client's input: {:?}", err);
+                Ok(())
+            });
         }
+    }
+
+    async fn run(&mut self) -> Result<(), DaemonError> {
+        let mut multipart = self.responder.recv_multipart(0)?;
+        debug!("Incoming input message");
+        let response = self.proc_cmd(multipart).await?;
+        self.responder.send(response, 0).map_err(|_| { DaemonError::IpcSocketError })
     }
 
     async fn proc_cmd(&mut self, multipart: Vec<Vec<u8>>) -> Result<zmq::Message, DaemonError> {
@@ -76,39 +89,41 @@ impl Service {
 
     async fn proc_cmd_blck(&mut self, multipart: &[Vec<u8>]) -> Result<zmq::Message, DaemonError> {
         let block_data = match (multipart.first(), multipart.len()) {
-            (Some(data), 0) => Ok(data),
+            (Some(data), 1) => Ok(data),
             (_, _) => Err(DaemonError::MalformedMessage),
         }?;
 
         let block = deserialize(&block_data[..])?;
 
         let req = parser::Request { id: 0, cmd: parser::Command::Block(block) };
-        self.parser.req.send(req).await.map_err(|_| DaemonError::IpcSocketError)?;
-        let resp_str = match self.parser.rep.recv().await.ok_or(DaemonError::IpcSocketError)? {
-            parser::Reply::Block(parser::FeedReply::Consumed) => "ACK",
-            parser::Reply::Block(parser::FeedReply::Busy) => "BUSY",
-            _ => "ERR",
-        };
-        let resp = zmq::Message::from(resp_str);
-        Ok(resp)
+        self.parser.req.try_send(req).map_err(|_| DaemonError::IpcSocketError)?;
+        self.proc_reply_blocks().await
     }
 
     async fn proc_cmd_blcks(&mut self, multipart: &[Vec<u8>]) -> Result<zmq::Message, DaemonError> {
         let blocks = multipart
             .iter()
-            .try_fold::<_, _, Result<Vec<Block>, bitcoin::consensus::encode::Error>>(Vec::<Block>::new(), |mut vec, block_data| {
-                vec.push(deserialize(&block_data[..])?);
-                Ok(vec)
-            })?;
+            .try_fold::<_, _, Result<Vec<Block>, bitcoin::consensus::encode::Error>>(
+                Vec::<Block>::new(),
+                |mut vec, block_data| {
+                    vec.push(deserialize(&block_data[..])?);
+                    Ok(vec)
+                })?;
 
         let req = parser::Request { id: 0, cmd: parser::Command::Blocks(blocks) };
         self.parser.req.send(req).await.map_err(|_| DaemonError::IpcSocketError);
-        let resp_str = match self.parser.rep.recv().await.ok_or(DaemonError::IpcSocketError)? {
-            parser::Reply::Blocks(parser::FeedReply::Consumed) => "ACK",
-            parser::Reply::Blocks(parser::FeedReply::Busy) => "BUSY",
+        self.proc_reply_blocks().await
+    }
+
+    async fn proc_reply_blocks(&mut self) -> Result<zmq::Message, DaemonError> {
+        let parser_reply = self.parser.rep.recv().await.ok_or(DaemonError::IpcSocketError)?;
+        let our_reply = zmq::Message::from(match parser_reply {
+            parser::Reply::Block(parser::FeedReply::Consumed)
+            | parser::Reply::Blocks(parser::FeedReply::Consumed) => "ACK",
+            parser::Reply::Block(parser::FeedReply::Busy)
+            | parser::Reply::Blocks(parser::FeedReply::Busy) => "BUSY",
             _ => "ERR",
-        };
-        let resp = zmq::Message::from(resp_str);
-        Ok(resp)
+        });
+        Ok(our_reply)
     }
 }

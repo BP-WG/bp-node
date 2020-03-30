@@ -17,8 +17,8 @@ use super::Stats;
 
 
 pub struct InputChannel {
-    pub req: Receiver<Request>,
-    pub rep: Sender<Reply>,
+    pub req: Sender<Reply>,
+    pub rep: Receiver<Request>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Display)]

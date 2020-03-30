@@ -19,6 +19,9 @@ extern crate diesel;
 extern crate clap;
 #[macro_use]
 extern crate derive_wrapper;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 extern crate dotenv;
 extern crate chrono;
 extern crate tiny_http;
@@ -38,6 +41,8 @@ mod input;
 mod monitor;
 mod config;
 
+use std::env;
+use log::*;
 use tokio::{
     sync::mpsc,
     task::JoinHandle,
@@ -52,6 +57,14 @@ use crate::{
 
 #[tokio::main]
 async fn main() -> Result<(), DaemonError> {
+    println!("\ntxparserd: Bitcoin blockchain parser tool adding the data from it to the index database\n");
+
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "debug");
+    }
+    env_logger::init();
+    log::set_max_level(LevelFilter::Debug);
+
     // TODO: Init config from command-line arguments, environment and config file
 
     let config = Config::default();
@@ -59,8 +72,8 @@ async fn main() -> Result<(), DaemonError> {
     // TODO: Take buffer size from the configuration options
     let (mut parser_sender, mut parser_receiver) = mpsc::channel(100);
     let (mut input_sender, mut input_receiver) = mpsc::channel(100);
-    let mut input_channel = InputChannel { req: parser_receiver, rep: input_sender };
     let mut parser_channel = ParserChannel { req: parser_sender, rep: input_receiver };
+    let mut input_channel = InputChannel { req: input_sender, rep: parser_receiver };
 
     let parser_task = parser::run(config.clone().into(), input_channel)?;
     let input_task = input::run(config.clone().into(), parser_channel)?;

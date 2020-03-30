@@ -45,15 +45,18 @@ pub struct BulkParser {
 
 impl BulkParser {
     pub fn restore_or_create(state_conn: PgConnection, index_conn: PgConnection) -> Result<Self, Error> {
-        let state = state_schema::state::dsl::state.find(0).first(&state_conn)?;
-        let utxo = state_schema::utxo::dsl::utxo.load::<Utxo>(&state_conn)?
+        let state = state_schema::state::dsl::state.find(0).first(&state_conn)
+            .or::<diesel::result::Error>(Ok(Stats::default()))?;
+        let utxo = state_schema::utxo::dsl::utxo.load::<Utxo>(&state_conn)
+            .or::<diesel::result::Error>(Ok(Vec::new()))?
             .into_iter().try_fold::<_, _, Result<UtxoMap, Error>>(UtxoMap::new(), |mut map, utxo| {
                 map.entry(Txid::from_slice(&utxo.txid[..]).map_err(|_| Error::IndexDbIntegrityError)?)
                     .or_insert_with(VoutMap::new)
                     .insert(utxo.output_index as u16, utxo.into());
                 Ok(map)
             })?;
-        let block_cache = state_schema::cached_block::dsl::cached_block.load::<CachedBlock>(&state_conn)?
+        let block_cache = state_schema::cached_block::dsl::cached_block.load::<CachedBlock>(&state_conn)
+            .or::<diesel::result::Error>(Ok(Vec::new()))?
             .into_iter().try_fold::<_, _, Result<BlockMap, Error>>(BlockMap::new(), |mut map, block| {
                 map.insert(
                     BlockHash::from_slice(&block.hash[..]).map_err(|_| Error::IndexDbIntegrityError)?,

@@ -31,6 +31,8 @@ pub fn run(config: Config) -> Result<JoinHandle<Result<!, DaemonError>>, DaemonE
         service.run_loop().await
     });
 
+    info!("Monitoring service is listening on {}", config.socket);
+
     Ok(task)
 }
 

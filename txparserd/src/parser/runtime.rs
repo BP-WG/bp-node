@@ -12,6 +12,7 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 use std::ops::Deref;
+use log::*;
 use tokio::{
     sync::mpsc,
     task::JoinHandle
@@ -27,7 +28,7 @@ pub fn run(config: Config, mut input: InputChannel) -> Result<JoinHandle<Result<
     let index_conn = PgConnection::establish(&config.db_index_url)?;
     let state_conn = PgConnection::establish(&config.db_state_url)?;
 
-    let mut bulk_parser = BulkParser::restore_or_create(index_conn, state_conn)?;
+    let mut bulk_parser = BulkParser::restore_or_create(state_conn, index_conn)?;
 
     let service = Service {
         config,
@@ -40,6 +41,8 @@ pub fn run(config: Config, mut input: InputChannel) -> Result<JoinHandle<Result<
     let task = tokio::spawn(async move {
         service.run_loop().await
     });
+
+    info!("Parser thread initialized");
 
     Ok(task)
 }
@@ -54,17 +57,16 @@ struct Service {
 
 impl Service {
     async fn run_loop(mut self) -> Result<!, Error> {
-        let mut busy = false;
-        while let Some(req) = self.input.req.recv().await {
+        while let Some(req) = self.input.rep.recv().await {
             let rep = match req.cmd {
                 Command::Block(block) => Reply::Block(self.proc_cmd_blocks(req.id, vec![block])),
                 Command::Blocks(blocks) => Reply::Blocks(self.proc_cmd_blocks(req.id, blocks)),
-                // FIXME:
+                // FIXME: support other IPC requests
                 _ => Reply::Block(FeedReply::Busy),
                 //Command::Status(id) => self.proc_cmd_status(req.id),
                 //Command::Statistics => self.proc_cmd_statistics(),
             };
-            self.input.rep.send(rep);
+            self.input.req.send(rep);
         }
         Err(Error::InputThreadDropped)
     }
