@@ -60,10 +60,10 @@ async fn main() -> Result<(), DaemonError> {
     println!("\ntxparserd: Bitcoin blockchain parser tool adding the data from it to the index database\n");
 
     if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "debug");
+        env::set_var("RUST_LOG", "trace");
     }
     env_logger::init();
-    log::set_max_level(LevelFilter::Debug);
+    log::set_max_level(LevelFilter::Trace);
 
     // TODO: Init config from command-line arguments, environment and config file
 
@@ -74,6 +74,14 @@ async fn main() -> Result<(), DaemonError> {
     let (mut input_sender, mut input_receiver) = mpsc::channel(100);
     let mut parser_channel = ParserChannel { req: parser_sender, rep: input_receiver };
     let mut input_channel = InputChannel { req: input_sender, rep: parser_receiver };
+
+    debug!("Sending request via channel");
+    input_channel.req.send(parser::Reply::Block(parser::FeedReply::Consumed)).await;
+    debug!("Request sent; waiting for receiving the request");
+    match parser_channel.rep.recv().await {
+        Some(rep) => debug!("Received response: {:?}", rep),
+        None => error!("Channel is broken"),
+    }
 
     let parser_task = parser::run(config.clone().into(), input_channel)?;
     let input_task = input::run(config.clone().into(), parser_channel)?;

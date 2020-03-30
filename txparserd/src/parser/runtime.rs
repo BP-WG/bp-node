@@ -39,7 +39,12 @@ pub fn run(config: Config, mut input: InputChannel) -> Result<JoinHandle<Result<
     };
 
     let task = tokio::spawn(async move {
-        service.run_loop().await
+        service.run_loop().inspect(|status| {
+            match status {
+                Ok(_) => panic!("Normally parser thread run loop should never return"),
+                Err(err) => error!("Got error from parser run loop: {:?}", err),
+            }
+        }).await
     });
 
     info!("Parser thread initialized");
@@ -58,28 +63,42 @@ struct Service {
 impl Service {
     async fn run_loop(mut self) -> Result<!, Error> {
         while let Some(req) = self.input.rep.recv().await {
+            trace!("Received request {}", req);
             let rep = match req.cmd {
-                Command::Block(block) => Reply::Block(self.proc_cmd_blocks(req.id, vec![block])),
-                Command::Blocks(blocks) => Reply::Blocks(self.proc_cmd_blocks(req.id, blocks)),
+                Command::Block(block) =>
+                    Reply::Block(self.proc_cmd_blocks(req.id, vec![block])),
+                Command::Blocks(blocks) =>
+                    Reply::Blocks(self.proc_cmd_blocks(req.id, blocks)),
                 // FIXME: support other IPC requests
                 _ => Reply::Block(FeedReply::Busy),
                 //Command::Status(id) => self.proc_cmd_status(req.id),
                 //Command::Statistics => self.proc_cmd_statistics(),
             };
-            self.input.req.send(rep);
+            trace!("Sending {} reply back to input service", rep);
+            self.input.req.send(rep).await.map_err(|_| Error::InputThreadDropped)?;
+            trace!("Reply sent, waiting for new requests to arrive");
         }
         Err(Error::InputThreadDropped)
     }
 
     fn proc_cmd_blocks(&mut self, req_id: u64, blocks: Vec<Block>) -> FeedReply {
+        trace!("Processing received {} blocks ...", blocks.len());
         let mut active_req = &mut self.active_req;
         if active_req.is_some() {
+            trace!("Busy with processing previous request, returning BUSY status");
             return FeedReply::Busy;
         }
+        trace!("Sending data to bulk parser ...");
         *active_req = Some(req_id);
-        self.bulk_parser
-            .feed(blocks)
-            .inspect(|_| *active_req = None);
+        //tokio::spawn(async move {
+            self.bulk_parser
+                .feed(blocks)
+                .inspect(|status| {
+                    trace!("Bulk parser has finished processing with {:?} status", status);
+                    *active_req = None
+                });
+        //});
+        trace!("Returning CONSUMED status");
         FeedReply::Consumed
     }
 }

@@ -59,6 +59,8 @@ impl<'a> BlockParser<'a> {
 
 impl BlockParser<'_> {
     fn parse_block(&mut self, block: &Block) -> Result<(), Error> {
+        debug!("Processing block {}", block.block_hash());
+
         self.descriptor = Descriptor::OnchainBlock {
             block_height: self.result.state.known_height as u32,
             block_checksum: BlockChecksum::from(block.block_hash())

@@ -17,6 +17,10 @@ use tokio::{
     sync::mpsc,
     task::JoinHandle
 };
+use futures::{
+    FutureExt,
+    TryFutureExt
+};
 use txlib::lnpbp::bitcoin::{
     self,
     Block,
@@ -27,7 +31,6 @@ use crate::{
     parser,
     error::DaemonError
 };
-use futures::TryFutureExt;
 
 pub fn run(config: Config, mut parser: ParserChannel) -> Result<JoinHandle<Result<!, DaemonError>>, DaemonError> {
     let context = zmq::Context::new();
@@ -61,17 +64,20 @@ struct Service {
 impl Service {
     async fn run_loop(mut self) -> ! {
         loop {
-            self.run().await.and_then(|err| {
-                error!("Error processing client's input: {:?}", err);
-                Ok(())
-            });
+            self.run().inspect(|status| {
+                match status {
+                    Ok(_) => debug!("Client request processing completed"),
+                    Err(err) => error!("Error processing client's input: {:?}", err),
+                }
+            }).await;
         }
     }
 
     async fn run(&mut self) -> Result<(), DaemonError> {
         let mut multipart = self.responder.recv_multipart(0)?;
-        debug!("Incoming input message");
+        trace!("Incoming input message");
         let response = self.proc_cmd(multipart).await?;
+        trace!("Received response from command processor: {:?}", response);
         self.responder.send(response, 0).map_err(|_| { DaemonError::IpcSocketError })
     }
 
@@ -79,7 +85,9 @@ impl Service {
         use std::str;
 
         let (command, multipart) = multipart.split_first().ok_or(DaemonError::MalformedMessage)?;
-        match str::from_utf8(&command[..]).map_err(|_| DaemonError::MalformedMessage)? {
+        let cmd = str::from_utf8(&command[..]).map_err(|_| DaemonError::MalformedMessage)?;
+        debug!("Processing {} command from client ...", cmd);
+        match cmd {
             "BLOCK" => self.proc_cmd_blck(multipart).await,
             "BLOCKS" => self.proc_cmd_blcks(multipart).await,
             // TODO: Add support for other commands
@@ -116,7 +124,9 @@ impl Service {
     }
 
     async fn proc_reply_blocks(&mut self) -> Result<zmq::Message, DaemonError> {
+        trace!("Waiting for reply from parser service on block processing ...");
         let parser_reply = self.parser.rep.recv().await.ok_or(DaemonError::IpcSocketError)?;
+        trace!("Got {} reply from parser", parser_reply);
         let our_reply = zmq::Message::from(match parser_reply {
             parser::Reply::Block(parser::FeedReply::Consumed)
             | parser::Reply::Blocks(parser::FeedReply::Consumed) => "ACK",
@@ -124,6 +134,7 @@ impl Service {
             | parser::Reply::Blocks(parser::FeedReply::Busy) => "BUSY",
             _ => "ERR",
         });
+        trace!("Sending back to client {:?} response", our_reply);
         Ok(our_reply)
     }
 }

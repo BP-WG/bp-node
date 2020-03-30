@@ -84,9 +84,11 @@ impl BulkParser {
     }
 
     pub async fn feed(&mut self, blocks: Vec<Block>) -> Result<(), Error> {
+        debug!("Processing {} blocks", blocks.len());
         // TODO: Run though blocks and sort them into cached and processable
 
         // TODO: For processable blocks collect all state and data updates
+        trace!("Running block processor for each of the blocks ...");
         let block_chain = Vec::<Block>::with_capacity(blocks.len());
         let data = block_chain
             .into_iter()
@@ -97,6 +99,7 @@ impl BulkParser {
                 Ok(data)
             })?;
 
+        trace!("Per-block processing has completed; insterting data into database as a transaction ...");
         self.state_conn.transaction(|| {
             self.index_conn.transaction(|| {
                 let data = data.clone();
@@ -121,9 +124,11 @@ impl BulkParser {
             })
         })?;
 
+        trace!("Updating bulk parsing state data");
         self.state = data.state;
         // TODO: Update UTXO and blocks cache
 
+        trace!("Returning success from the bulk parser");
         Ok(())
     }
 
