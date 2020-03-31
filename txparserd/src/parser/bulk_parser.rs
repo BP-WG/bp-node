@@ -83,7 +83,7 @@ impl BulkParser {
         }
     }
 
-    pub async fn feed(&mut self, blocks: Vec<Block>) -> Result<(), Error> {
+    pub fn feed(&mut self, blocks: Vec<Block>) -> Result<(), Error> {
         debug!("Processing {} blocks", blocks.len());
         // TODO: Run though blocks and sort them into cached and processable
 

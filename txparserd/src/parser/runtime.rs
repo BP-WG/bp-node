@@ -34,11 +34,11 @@ pub fn run(config: Config, mut input: InputChannel) -> Result<JoinHandle<Result<
         config,
         bulk_parser,
         input,
-        active_req: None,
         stats: Stats::default(),
     };
 
     let task = tokio::spawn(async move {
+        info!("Parser thread initialized");
         service.run_loop().inspect(|status| {
             match status {
                 Ok(_) => panic!("Normally parser thread run loop should never return"),
@@ -47,8 +47,6 @@ pub fn run(config: Config, mut input: InputChannel) -> Result<JoinHandle<Result<
         }).await
     });
 
-    info!("Parser thread initialized");
-
     Ok(task)
 }
 
@@ -56,12 +54,12 @@ struct Service {
     config: Config,
     bulk_parser: BulkParser,
     input: InputChannel,
-    active_req: Option<u64>,
     stats: Stats,
 }
 
 impl Service {
     async fn run_loop(mut self) -> Result<!, Error> {
+        trace!("Parser run loop");
         while let Some(req) = self.input.rep.recv().await {
             trace!("Received request {}", req);
             let rep = match req.cmd {
@@ -83,21 +81,9 @@ impl Service {
 
     fn proc_cmd_blocks(&mut self, req_id: u64, blocks: Vec<Block>) -> FeedReply {
         trace!("Processing received {} blocks ...", blocks.len());
-        let mut active_req = &mut self.active_req;
-        if active_req.is_some() {
-            trace!("Busy with processing previous request, returning BUSY status");
-            return FeedReply::Busy;
-        }
         trace!("Sending data to bulk parser ...");
-        *active_req = Some(req_id);
-        //tokio::spawn(async move {
-            self.bulk_parser
-                .feed(blocks)
-                .inspect(|status| {
-                    trace!("Bulk parser has finished processing with {:?} status", status);
-                    *active_req = None
-                });
-        //});
+        let status = self.bulk_parser.feed(blocks);
+        trace!("Bulk parser has finished processing with {:?} status", status);
         trace!("Returning CONSUMED status");
         FeedReply::Consumed
     }

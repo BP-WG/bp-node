@@ -76,10 +76,10 @@ async fn main() -> Result<(), DaemonError> {
     let mut input_channel = InputChannel { req: input_sender, rep: parser_receiver };
 
     debug!("Sending request via channel");
-    input_channel.req.send(parser::Reply::Block(parser::FeedReply::Consumed)).await;
+    parser_channel.req.send(parser::Request{id:0, cmd:parser::Command::Statistics}).await;
     debug!("Request sent; waiting for receiving the request");
-    match parser_channel.rep.recv().await {
-        Some(rep) => debug!("Received response: {:?}", rep),
+    match input_channel.rep.recv().await {
+        Some(rep) => debug!("Received request: {:?}", rep),
         None => error!("Channel is broken"),
     }
 
