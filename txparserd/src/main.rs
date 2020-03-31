@@ -55,20 +55,7 @@ use crate::{
     input::ParserChannel,
 };
 
-#[tokio::main]
-async fn main() -> Result<(), DaemonError> {
-    println!("\ntxparserd: Bitcoin blockchain parser tool adding the data from it to the index database\n");
-
-    if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "trace");
-    }
-    env_logger::init();
-    log::set_max_level(LevelFilter::Trace);
-
-    // TODO: Init config from command-line arguments, environment and config file
-
-    let config = Config::default();
-
+async fn run(config: Config) -> Result<(), DaemonError> {
     // TODO: Take buffer size from the configuration options
     let (mut parser_sender, mut parser_receiver) = mpsc::channel(100);
     let (mut input_sender, mut input_receiver) = mpsc::channel(100);
@@ -94,4 +81,23 @@ async fn main() -> Result<(), DaemonError> {
     );
 
     Ok(())
+}
+
+#[tokio::main]
+async fn main() {
+    println!("\ntxparserd: Bitcoin blockchain parser tool adding the data from it to the index database\n");
+
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "trace");
+    }
+    env_logger::init();
+    log::set_max_level(LevelFilter::Trace);
+
+    // TODO: Init config from command-line arguments, environment and config file
+
+    let config = Config::default();
+
+    if let Err(err) = run(config).await {
+        eprintln!("Error running daemon: {:?}", err);
+    };
 }

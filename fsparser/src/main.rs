@@ -23,7 +23,9 @@ fn main() -> io::Result<()> {
 
     let context = zmq::Context::new();
     let client = context.socket(zmq::REQ).unwrap();
-    client.connect("tcp://127.0.0.1:18318").expect("Can't connect to parser daemon");
+    let listener = context.socket(zmq::SUB).unwrap();
+    client.connect("tcp://127.0.0.1:18318").expect("Can't connect to parser daemon REQ service");
+    listener.connect("tcp://127.0.0.1:18319").expect("Can't connect to parser daemon PUB service");
     println!("Connected to txparserd daemon");
 
     loop {
@@ -63,9 +65,10 @@ fn main() -> io::Result<()> {
                         .expect("Parser response must be string")
                         .expect("Can't receive parser daemon response")
                         .as_str() {
-                        "ACK" => ".",
+                        "ACK" => "+",
                         "ERR" => "!",
-                        _ => "_"
+                        "BUSY" => ".",
+                        _ => "?"
                     };
                     if block_no % 80 == 0 {
                         println!("{}", print);

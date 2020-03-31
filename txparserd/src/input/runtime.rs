@@ -33,11 +33,19 @@ use crate::{
     error::DaemonError
 };
 
-pub fn run(config: Config, mut parser: ParserChannel) -> Result<JoinHandle<Result<!, DaemonError>>, DaemonError> {
+pub fn run(config: Config, mut parser: ParserChannel)
+    -> Result<JoinHandle<Result<!, DaemonError>>, DaemonError>
+{
     let context = zmq::Context::new();
-    let responder = context.socket(zmq::REP).unwrap();
-    let socket_addr = config.socket.clone();
-    responder.bind(socket_addr.as_str())?;
+
+    let req_socket_addr = config.req_socket.clone();
+    let pub_socket_addr = config.pub_socket.clone();
+
+    let responder = context.socket(zmq::REP)?;
+    responder.bind(req_socket_addr.as_str())?;
+
+    let publisher = context.socket(zmq::PUB)?;
+    publisher.bind(pub_socket_addr.as_str())?;
 
     let busy = Arc::new(Mutex::new(false));
     let busy2 = busy.clone();
@@ -52,16 +60,17 @@ pub fn run(config: Config, mut parser: ParserChannel) -> Result<JoinHandle<Resul
 
     let mut parser_rep = parser.rep;
     tokio::spawn(async move {
-        info!("Running parser status monitoring thread");
+        info!("Parser status notification service publishes data to {}", pub_socket_addr);
         loop {
             let resp = parser_rep.recv().await;
             trace!("Parser has completed with response {:?}", resp);
             *busy2.lock().await = false;
+            publisher.send(zmq::Message::from("RDY"), 0);
         }
     });
 
     let task = tokio::spawn(async move {
-        info!("Input service is listening for incoming blocks on {}", socket_addr);
+        info!("Input service is listening for incoming blocks on {}", req_socket_addr);
         service.run_loop().await
     });
 

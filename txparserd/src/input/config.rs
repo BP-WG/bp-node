@@ -17,13 +17,15 @@ use crate::config::Config as MainConfig;
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
 #[display_from(Debug)]
 pub struct Config {
-    pub socket: String
+    pub req_socket: String,
+    pub pub_socket: String,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            socket: String::from("tcp://*:18318")
+            req_socket: String::from("tcp://*:18318"),
+            pub_socket: String::from("tcp://*:18319"),
         }
     }
 }
@@ -31,7 +33,8 @@ impl Default for Config {
 impl From<MainConfig> for Config {
     fn from(config: MainConfig) -> Self {
         Config {
-            socket: config.input_socket
+            req_socket: config.input_req_socket,
+            pub_socket: config.input_pub_socket,
         }
     }
 }
