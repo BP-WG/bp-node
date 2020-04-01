@@ -21,7 +21,7 @@ mod bulk_parser;
 mod block_parser;
 pub mod runtime;
 
-pub use error::Error;
+pub use error::*;
 pub use config::*;
 pub use data::*;
 pub use stats::*;

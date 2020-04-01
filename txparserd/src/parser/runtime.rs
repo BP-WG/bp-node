@@ -11,7 +11,10 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-use std::ops::Deref;
+use std::{
+    io,
+    ops::Deref,
+};
 use log::*;
 use tokio::{
     sync::mpsc,
@@ -20,71 +23,156 @@ use tokio::{
 use futures::{Future, FutureExt};
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
-use txlib::lnpbp::bitcoin::Block;
-use super::{Config, Stats, Error, BulkParser, channel::*};
-use crate::error::DaemonError;
 
-pub fn run(config: Config, mut input: InputChannel) -> Result<JoinHandle<Result<!, Error>>, Error> {
-    let index_conn = PgConnection::establish(&config.db_index_url)?;
-    let state_conn = PgConnection::establish(&config.db_state_url)?;
+use txlib::lnpbp::bitcoin::{
+    Block,
+    consensus::encode::deserialize,
+    network::stream_reader::StreamReader
+};
+use super::{Config, Stats, error::*, BulkParser, channel::*};
+use crate::{input, error::*, TryService, INPUT_PARSER_SOCKET};
 
-    let mut bulk_parser = BulkParser::restore_or_create(state_conn, index_conn)?;
+pub fn run(config: Config, context: &mut zmq::Context)
+           -> Result<Vec<JoinHandle<!>>, BootstrapError>
+{
+    // Connecting to the database
+    let index_conn = PgConnection::establish(&config.db_index_url)
+        .map_err(|e| BootstrapError::IndexDBConnectionError(e))?;
+    debug!("Index database connected");
+    let state_conn = PgConnection::establish(&config.db_state_url)
+        .map_err(|e| BootstrapError::StateDBConnectionError(e))?;
+    debug!("State database connected");
 
-    let service = Service {
+    // Initializing parser
+    let mut parser = BulkParser::restore_or_create(state_conn, index_conn)?;
+    debug!("Parser state is restored");
+
+    // Opening IPC socket to input thread
+    let input = context.socket(zmq::REP)
+        .map_err(|e| BootstrapError::IPCSocketError(e, IPCSocket::Input2Parser, None))?;
+    input.connect(INPUT_PARSER_SOCKET)
+        .map_err(|e| BootstrapError::IPCSocketError(e, IPCSocket::Input2Parser,
+                                                    Some(String::from(INPUT_PARSER_SOCKET))))?;
+    debug!("IPC ZMQ from Input to Parser threads is opened on Parser runtime side");
+
+    let parser_service = ParserService::init(
         config,
-        bulk_parser,
-        input,
-        stats: Stats::default(),
-    };
+        parser,
+        input
+    );
 
-    let task = tokio::spawn(async move {
-        info!("Parser thread initialized");
-        service.run_loop().inspect(|status| {
-            match status {
-                Ok(_) => panic!("Normally parser thread run loop should never return"),
-                Err(err) => error!("Got error from parser run loop: {:?}", err),
-            }
-        }).await
-    });
-
-    Ok(task)
+    Ok(vec![
+        tokio::spawn(async move {
+            info!("Parser service is running");
+            parser_service.run_or_panic("Parser service").await
+        }),
+    ])
 }
 
-struct Service {
+struct ParserService {
     config: Config,
-    bulk_parser: BulkParser,
-    input: InputChannel,
+    parser: BulkParser,
+    input: zmq::Socket,
     stats: Stats,
 }
 
-impl Service {
-    async fn run_loop(mut self) -> Result<!, Error> {
-        trace!("Parser run loop");
-        while let Some(req) = self.input.rep.recv().await {
-            trace!("Received request {}", req);
-            let rep = match req.cmd {
-                Command::Block(block) =>
-                    Reply::Block(self.proc_cmd_blocks(req.id, vec![block])),
-                Command::Blocks(blocks) =>
-                    Reply::Blocks(self.proc_cmd_blocks(req.id, blocks)),
-                // FIXME: support other IPC requests
-                _ => Reply::Block(FeedReply::Busy),
-                //Command::Status(id) => self.proc_cmd_status(req.id),
-                //Command::Statistics => self.proc_cmd_statistics(),
-            };
-            trace!("Sending {} reply back to input service", rep);
-            self.input.req.send(rep).await.map_err(|_| Error::InputThreadDropped)?;
-            trace!("Reply sent, waiting for new requests to arrive");
+#[async_trait]
+impl TryService for ParserService {
+    type ErrorType = Error;
+
+    async fn try_run_loop(mut self) -> Result<!, Error> {
+        loop {
+            self.run().await?
         }
-        Err(Error::InputThreadDropped)
+    }
+}
+
+impl ParserService {
+    pub fn init(config: Config,
+                parser: BulkParser,
+                input: zmq::Socket) -> Self {
+        Self {
+            config,
+            parser,
+            input,
+            stats: Stats::default(),
+        }
     }
 
-    fn proc_cmd_blocks(&mut self, req_id: u64, blocks: Vec<Block>) -> FeedReply {
+    async fn run(&mut self) -> Result<(), Error> {
+        let mut multipart = self.input.recv_multipart(0)?;
+
+        trace!("Incoming input API request");
+        let response = self.proc_cmd(multipart)
+            .await
+            .or::<Error>(Ok(zmq::Message::from("ERR")))
+            .into_ok();
+        trace!("Received response from command processor: {:?}", response);
+        self.input.send_msg(response, 0);
+        Ok(())
+    }
+
+    async fn proc_cmd(&mut self, multipart: Vec<Vec<u8>>) -> Result<zmq::Message, Error> {
+        use std::str;
+
+        let (command, multipart) = multipart.split_first()
+            .ok_or(Error::WrongNumberOfArgs)?;
+        let cmd = str::from_utf8(&command[..]).map_err(|_| Error::UknownRequest)?;
+        debug!("Processing {} command from input thread ...", cmd);
+        match cmd {
+            "BLOCK" => self.proc_cmd_blck(multipart, false).await,
+            "BLOCKS" => self.proc_cmd_blck(multipart, true).await,
+            // TODO: Add support for other commands
+            _ => Err(Error::UknownRequest),
+        }
+    }
+
+    async fn proc_cmd_blck(&mut self, multipart: &[Vec<u8>], multiple: bool) -> Result<zmq::Message, Error> {
+        let block_data = match (multipart.first(), multipart.len()) {
+            (Some(data), 1) => Ok(data),
+            (_, _) => Err(Error::WrongNumberOfArgs),
+        }?;
+
+        let blocks = match multiple {
+            true => self.parse_block_file(block_data)?,
+            false => vec![deserialize::<Block>(block_data)
+                .map_err(|_| Error::BlockValidationIncosistency)?],
+        };
+
         trace!("Processing received {} blocks ...", blocks.len());
-        trace!("Sending data to bulk parser ...");
-        let status = self.bulk_parser.feed(blocks);
-        trace!("Bulk parser has finished processing with {:?} status", status);
-        trace!("Returning CONSUMED status");
-        FeedReply::Consumed
+        self.parser.feed(blocks)?;
+
+        trace!("Bulk parser has finished processing");
+        Ok(zmq::Message::from("OK"))
+    }
+
+    fn parse_block_file(&self, block_data: &Vec<u8>) -> Result<Vec<Block>, Error> {
+        trace!("Parsing received block data, {} bytes", block_data.len());
+        let mut stream_reader = StreamReader::new(
+            io::BufReader::new(&block_data[..]),
+            Some(block_data.len())
+        );
+
+        let mut blocks: Vec<Block> = Vec::new();
+        loop {
+            // Checking magic number
+            match stream_reader.read_next::<u32>() {
+                Ok(0xD9B4BEF9) => Ok(()),
+                Err(_) => break,
+                _ => Err(Error::MalformedBlockFile(BlockFileMalformation::WrongMagicNumber))
+            }?;
+
+            // Skipping block length
+            let block_len = stream_reader.read_next::<u32>()
+                .map_err(|_| Error::MalformedBlockFile(BlockFileMalformation::NoBlockLen))?;
+
+            // Reading block
+            let block = stream_reader.read_next::<Block>()
+                .map_err(|_| Error::MalformedBlockFile(BlockFileMalformation::BlockDataCorrupted))?;
+
+            blocks.push(block);
+        }
+
+        Ok(blocks)
     }
 }

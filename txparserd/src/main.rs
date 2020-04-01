@@ -12,6 +12,8 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 #![feature(never_type)]
+#![feature(unwrap_infallible)]
+#![feature(in_band_lifetimes)]
 
 #[macro_use]
 extern crate diesel;
@@ -19,6 +21,8 @@ extern crate diesel;
 extern crate clap;
 #[macro_use]
 extern crate derive_wrapper;
+#[macro_use]
+extern crate async_trait;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
@@ -40,45 +44,36 @@ mod parser;
 mod input;
 mod monitor;
 mod config;
+mod traits;
+
+pub use traits::*;
 
 use std::env;
 use log::*;
+use futures::future;
 use tokio::{
     sync::mpsc,
     task::JoinHandle,
     net::{TcpListener, TcpStream}
 };
 use crate::{
+    error::*,
     config::Config,
-    error::DaemonError,
-    parser::InputChannel,
-    input::ParserChannel,
 };
 
-async fn run(config: Config) -> Result<(), DaemonError> {
-    // TODO: Take buffer size from the configuration options
-    let (mut parser_sender, mut parser_receiver) = mpsc::channel(100);
-    let (mut input_sender, mut input_receiver) = mpsc::channel(100);
-    let mut parser_channel = ParserChannel { req: parser_sender, rep: input_receiver };
-    let mut input_channel = InputChannel { req: input_sender, rep: parser_receiver };
+const INPUT_PARSER_SOCKET: &str = "inproc://input-parser";
 
-    debug!("Sending request via channel");
-    parser_channel.req.send(parser::Request{id:0, cmd:parser::Command::Statistics}).await;
-    debug!("Request sent; waiting for receiving the request");
-    match input_channel.rep.recv().await {
-        Some(rep) => debug!("Received request: {:?}", rep),
-        None => error!("Channel is broken"),
-    }
+async fn run(config: Config) -> Result<(), BootstrapError> {
+    let mut context = zmq::Context::new();
 
-    let parser_task = parser::run(config.clone().into(), input_channel)?;
-    let input_task = input::run(config.clone().into(), parser_channel)?;
-    let monitor_task = monitor::run(config.clone().into())?;
+    let parser_task = parser::run(config.clone().into(), &mut context)?;
+    let input_task = input::run(config.clone().into(), &mut context)?;
+    let monitor_task = monitor::run(config.clone().into(), &mut context)?;
 
-    tokio::join!(
-        input_task,
-        parser_task,
-        monitor_task
-    );
+    let tasks: Vec<JoinHandle<!>> = vec![
+        input_task, parser_task, monitor_task
+    ].into_iter().flatten().collect();
+    future::try_join_all(tasks).await;
 
     Ok(())
 }

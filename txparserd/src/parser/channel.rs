@@ -16,43 +16,6 @@ use txlib::lnpbp::bitcoin::Block;
 use super::Stats;
 
 
-pub struct InputChannel {
-    pub req: Sender<Reply>,
-    pub rep: Receiver<Request>,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug, Display)]
-#[display_from(Debug)]
-pub struct Request {
-    pub id: u64,
-    pub cmd: Command,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug, Display)]
-#[display_from(Debug)]
-pub enum Command {
-    Block(Block),
-    Blocks(Vec<Block>),
-    Status(u64),
-    Statistics,
-}
-
-#[derive(Clone, Debug, Display)]
-#[display_from(Debug)]
-pub enum Reply {
-    Block(FeedReply),
-    Blocks(FeedReply),
-    Status(StatusReply),
-    Statistics(Stats),
-}
-
-#[derive(Clone, PartialEq, Eq, Debug, Display)]
-#[display_from(Debug)]
-pub enum FeedReply {
-    Consumed,
-    Busy
-}
-
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
 #[display_from(Debug)]
 pub struct FeedStatus {

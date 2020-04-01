@@ -32,7 +32,7 @@ use txlib::{
     }
 };
 use crate::schema as state_schema;
-use super::*;
+use super::{*, error::Error};
 
 #[derive(Debug, Display)]
 #[display_from(Debug)]

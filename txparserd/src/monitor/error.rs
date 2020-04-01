@@ -11,10 +11,21 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-use tokio::sync::mpsc::{Sender, Receiver};
-use crate::parser;
 
-pub struct ParserChannel {
-    pub req: Sender<parser::Request>,
-    pub rep: Receiver<parser::Reply>,
+use std::io;
+
+#[derive(Debug, Display)]
+#[display_from(Debug)]
+pub(super) enum Error {
+    APIRequestError(io::Error),
+    APIResponseError(io::Error),
+    PrometheusError(prometheus::Error),
+}
+
+impl std::error::Error for Error {}
+
+impl From<prometheus::Error> for Error {
+    fn from(err: prometheus::Error) -> Self {
+        Error::PrometheusError(err)
+    }
 }

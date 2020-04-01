@@ -16,40 +16,72 @@ use tiny_http;
 use tokio::task::JoinHandle;
 use prometheus::{Opts, Registry, Counter, TextEncoder, Encoder};
 
+use crate::{
+    error::*,
+    Service
+};
 use super::*;
 
-pub fn run(config: Config) -> Result<JoinHandle<Result<!, DaemonError>>, DaemonError> {
+pub fn run(config: Config, context: &mut zmq::Context)
+           -> Result<Vec<JoinHandle<!>>, BootstrapError>
+{
+    let socket_addr = config.socket.clone();
     let http_server = tiny_http::Server::http(
-        config.socket.clone()
-    ).map_err(|_| DaemonError::HttpMonitoringPortError)?;
+        socket_addr.clone()
+    ).map_err(|err| BootstrapError::MonitorSocketError(err))?;
 
-    let service = Service {
+    let monitor_service = MonitorService::init(
+        config,
         http_server,
-    };
+    );
 
-    let task = tokio::spawn(async move {
-        service.run_loop().await
-    });
-
-    info!("Monitoring service is listening on {}", config.socket);
-
-    Ok(task)
+    Ok(vec![
+        tokio::spawn(async move {
+            info!("Monitoring service is listening on {}", socket_addr);
+            monitor_service.run_loop().await
+        }),
+    ])
 }
 
-struct Service {
+struct MonitorService {
+    config: Config,
     http_server: tiny_http::Server,
 }
 
-impl Service {
-    async fn run_loop(self) -> Result<!, DaemonError> {
+#[async_trait]
+impl Service for MonitorService {
+    async fn run_loop(mut self) -> ! {
         loop {
-            let request = self.http_server.recv().unwrap();
-            let mut buffer = vec![];
-            prometheus::TextEncoder::new()
-                .encode(&prometheus::gather(), &mut buffer)
-                .unwrap();
-            let response = tiny_http::Response::from_data(buffer);
-            request.respond(response);
+            match self.run().await {
+                Ok(_) => debug!("Monitoring client request processing completed"),
+                Err(err) => {
+                    error!("Error processing monitoring client request: {}", err)
+                },
+            }
         }
+    }
+}
+
+impl MonitorService {
+    pub fn init(config: Config,
+                http_server: tiny_http::Server) -> Self {
+        Self {
+            config,
+            http_server,
+        }
+    }
+
+    async fn run(&mut self) -> Result<(), Error> {
+        let request = self.http_server
+            .recv()
+            .map_err(|err| Error::APIRequestError(err))?;
+
+        let mut buffer = vec![];
+        prometheus::TextEncoder::new()
+            .encode(&prometheus::gather(), &mut buffer)?;
+
+        let response = tiny_http::Response::from_data(buffer);
+        request.respond(response)
+            .map_err(|err| Error::APIResponseError(err))
     }
 }

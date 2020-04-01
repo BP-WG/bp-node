@@ -24,7 +24,7 @@ use crate::schema::*;
 #[derive(Identifiable, Queryable, Insertable, AsChangeset, Clone, Debug, Display)]
 #[display_from(Debug)]
 #[table_name="state"]
-pub struct Stats {
+pub(super) struct Stats {
     pub id: i16,
     pub started_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,

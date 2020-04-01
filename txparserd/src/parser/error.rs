@@ -12,29 +12,48 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use diesel::result::Error as DbError;
+use diesel::result::Error as DBError;
 use diesel::ConnectionError;
+
+
+#[derive(Debug, Display)]
+#[display_from(Debug)]
+pub enum BlockFileMalformation {
+    WrongMagicNumber,
+    NoBlockLen,
+    BlockDataCorrupted,
+}
 
 #[derive(Debug, Display)]
 #[display_from(Debug)]
 pub enum Error {
-    IndexDbIntegrityError,
+    ParserIPCError(zmq::Error),
+    UknownRequest,
+    WrongNumberOfArgs,
+    MalformedBlockFile(BlockFileMalformation),
     BlockchainIndexesOutOfShortIdRanges,
     BlockValidationIncosistency,
-    IndexDbError(DbError),
-    StateDbError(DbError),
-    DbConnectionError(ConnectionError),
-    InputThreadDropped,
+    IndexDBIntegrityError,
+    IndexDBError(DBError),
+    StateDBError(DBError),
 }
 
-impl From<DbError> for Error {
-    fn from(err: DbError) -> Self {
-        Error::IndexDbError(err)
+impl std::error::Error for Error {}
+
+impl From<zmq::Error> for Error {
+    fn from(err: zmq::Error) -> Self {
+        Error::ParserIPCError(err)
     }
 }
 
-impl From<ConnectionError> for Error {
-    fn from(err: ConnectionError) -> Self {
-        Error::DbConnectionError(err)
+impl From<DBError> for Error {
+    fn from(err: DBError) -> Self {
+        Error::IndexDBError(err)
+    }
+}
+
+impl Into<!> for Error {
+    fn into(self) -> ! {
+        panic!("Compile-time error (2)");
     }
 }

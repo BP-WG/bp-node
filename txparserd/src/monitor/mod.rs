@@ -13,8 +13,8 @@
 
 pub mod config;
 pub mod runtime;
+pub mod error;
 
 pub use config::*;
 pub use runtime::*;
-
-use crate::error::DaemonError;
+pub use error::*;

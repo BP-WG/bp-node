@@ -59,21 +59,27 @@ fn main() -> io::Result<()> {
                     break;
                 },
                 Ok(mut block) => {
-                    client.send_multipart(vec![b"BLOCK".to_vec(), serialize(&block)], 0)
-                        .expect("Can't send data to parser daemon");
-                    let print = match client.recv_string(0)
-                        .expect("Parser response must be string")
-                        .expect("Can't receive parser daemon response")
-                        .as_str() {
-                        "ACK" => "+",
-                        "ERR" => "!",
-                        "BUSY" => ".",
-                        _ => "?"
-                    };
-                    if block_no % 80 == 0 {
-                        println!("{}", print);
-                    } else {
-                        print!("{}", print);
+                    loop {
+                        client.send_multipart(vec![b"BLOCK".to_vec(), serialize(&block)], 0)
+                            .expect("Can't send data to parser daemon");
+                        let print = match client.recv_string(0)
+                            .expect("Parser response must be string")
+                            .expect("Can't receive parser daemon response")
+                            .as_str() {
+                            "ACK" => "+",
+                            "ERR" => "!",
+                            "BUSY" => ".",
+                            _ => "?"
+                        };
+                        if (block_no + 1) % 80 == 0 {
+                            println!("{}", print);
+                        } else {
+                            print!("{}", print);
+                        }
+                        if print != "." {
+                            break;
+                        }
+                        listener.recv_string(0)?;
                     }
                 }
             }

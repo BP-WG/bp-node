@@ -12,42 +12,51 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use std::io;
+use std::{
+    io,
+    error::Error
+};
+use diesel::{
+    ConnectionError,
+    result::Error as DBError,
+};
 use txlib::lnpbp::bitcoin;
+
 use crate::parser;
 
 #[derive(Debug, Display)]
 #[display_from(Debug)]
-pub enum DaemonError {
-    IoError(io::Error),
-    ZmqError(zmq::Error),
-    MalformedMessage,
-    ConsensusEncodingError(bitcoin::consensus::encode::Error),
-    IpcSocketError,
-    ParserError(parser::Error),
-    HttpMonitoringPortError,
+pub enum BootstrapError {
+    IPCSocketError(zmq::Error, IPCSocket, Option<String>),
+    InputSocketError(zmq::Error, APISocket, Option<String>),
+    MonitorSocketError(Box<dyn Error>),
+    StateDBConnectionError(ConnectionError),
+    IndexDBConnectionError(ConnectionError),
+    IndexDBIntegrityError,
+    IndexDBError(DBError)
 }
 
-impl From<zmq::Error> for DaemonError {
-    fn from(err: zmq::Error) -> Self {
-        DaemonError::ZmqError(err)
-    }
-}
-
-impl From<io::Error> for DaemonError {
-    fn from(err: io::Error) -> Self {
-        DaemonError::IoError(err)
-    }
-}
-
-impl From<parser::Error> for DaemonError {
+impl From<parser::Error> for BootstrapError {
     fn from(err: parser::Error) -> Self {
-        DaemonError::ParserError(err)
+        match err {
+            parser::Error::IndexDBIntegrityError => BootstrapError::IndexDBIntegrityError,
+            parser::Error::IndexDBError(err) => BootstrapError::IndexDBError(err),
+            _ => panic!("Incomplete implementation: unsupported bootstrap error (1)"),
+        }
     }
 }
 
-impl From<bitcoin::consensus::encode::Error> for DaemonError {
-    fn from(err: bitcoin::consensus::encode::Error) -> Self {
-        DaemonError::ConsensusEncodingError(err)
-    }
+#[derive(Debug, Display)]
+#[display_from(Debug)]
+pub enum IPCSocket {
+    Input2Parser,
+    Monitor2Input,
+    Monitor2Parser,
+}
+
+#[derive(Debug, Display)]
+#[display_from(Debug)]
+pub enum APISocket {
+    PubSub,
+    ReqRep,
 }

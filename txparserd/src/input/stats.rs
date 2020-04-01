@@ -18,7 +18,7 @@ use chrono::NaiveDateTime;
 
 #[derive(Clone, Default, Debug, Display)]
 #[display_from(Debug)]
-pub struct Stats {
+pub(super) struct Stats {
     pub totals: StatsBlock,
     pub clients_served: u32,
     pub clients_banned: Vec<Client>,
@@ -27,7 +27,7 @@ pub struct Stats {
 
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
 #[display_from(Debug)]
-pub struct Client {
+pub(super) struct Client {
     pub address: String,
     pub connected: NaiveDateTime
 }
@@ -35,7 +35,7 @@ pub struct Client {
 
 #[derive(Clone, PartialEq, Eq, Default, Debug, Display)]
 #[display_from(Debug)]
-pub struct StatsBlock {
+pub(super) struct StatsBlock {
     pub requests_processed: u64,
     pub requests_failed: u32,
     pub blocks_processed: u32,

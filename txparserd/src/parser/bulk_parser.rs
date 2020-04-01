@@ -32,7 +32,7 @@ use txlib::{
     }
 };
 use crate::schema as state_schema;
-use super::*;
+use super::{*, error::Error};
 
 
 pub struct BulkParser {
@@ -50,7 +50,7 @@ impl BulkParser {
         let utxo = state_schema::utxo::dsl::utxo.load::<Utxo>(&state_conn)
             .or::<diesel::result::Error>(Ok(Vec::new()))?
             .into_iter().try_fold::<_, _, Result<UtxoMap, Error>>(UtxoMap::new(), |mut map, utxo| {
-                map.entry(Txid::from_slice(&utxo.txid[..]).map_err(|_| Error::IndexDbIntegrityError)?)
+                map.entry(Txid::from_slice(&utxo.txid[..]).map_err(|_| Error::IndexDBIntegrityError)?)
                     .or_insert_with(VoutMap::new)
                     .insert(utxo.output_index as u16, utxo.into());
                 Ok(map)
@@ -59,8 +59,8 @@ impl BulkParser {
             .or::<diesel::result::Error>(Ok(Vec::new()))?
             .into_iter().try_fold::<_, _, Result<BlockMap, Error>>(BlockMap::new(), |mut map, block| {
                 map.insert(
-                    BlockHash::from_slice(&block.hash[..]).map_err(|_| Error::IndexDbIntegrityError)?,
-                    deserialize(&block.block[..]).map_err(|_| Error::IndexDbIntegrityError)?
+                    BlockHash::from_slice(&block.hash[..]).map_err(|_| Error::IndexDBIntegrityError)?,
+                    deserialize(&block.block[..]).map_err(|_| Error::IndexDBIntegrityError)?
                 );
                 Ok(map)
             })?;
@@ -120,7 +120,7 @@ impl BulkParser {
                 diesel::update(state_schema::state::dsl::state.find(0))
                     .set(data.state)
                     .execute(&self.state_conn)
-                    .map_err(|err| Error::StateDbError(err))
+                    .map_err(|err| Error::StateDBError(err))
             })
         })?;
 
@@ -132,10 +132,12 @@ impl BulkParser {
         Ok(())
     }
 
+    /*
     pub fn get_state(&self) -> Stats {
         // TODO: Ensure thread safety
         self.state.clone()
     }
+    */
 }
 
 

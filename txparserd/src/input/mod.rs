@@ -14,11 +14,7 @@
 pub mod config;
 pub mod stats;
 pub mod runtime;
-pub mod channel;
 
 pub use config::*;
 pub use stats::*;
 pub use runtime::*;
-pub use channel::*;
-
-use crate::error::DaemonError;
