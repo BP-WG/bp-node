@@ -14,18 +14,11 @@
 
 pub mod error;
 pub mod config;
-pub mod data;
-pub mod stats;
-pub mod channel;
-mod bulk_parser;
-mod block_parser;
 pub mod runtime;
+pub mod stats;
+pub(self) mod processor;
 
-pub use error::*;
+pub use error::Error;
 pub use config::*;
-pub use data::*;
-pub use stats::*;
-pub use channel::*;
-pub(self) use bulk_parser::*;
-pub(self) use block_parser::*;
 pub use runtime::*;
+pub use stats::*;

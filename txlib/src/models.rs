@@ -14,7 +14,7 @@
 use chrono::NaiveDateTime;
 use lnpbp::{
     bitcoin,
-    bp::short_id
+    bp::short_id::{self, Descriptor, BlockChecksum}
 };
 use super::schema::*;
 
@@ -33,7 +33,7 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn compose(block: &bitcoin::Block, descriptor: short_id::Descriptor) -> Result<Self, short_id::Error> {
+    pub fn compose(block: &bitcoin::Block, descriptor: Descriptor) -> Result<Self, short_id::Error> {
         Ok(Self {
            id: descriptor.try_into_u64()? as i64,
            block_id: block.block_hash().to_vec(),
@@ -44,6 +44,15 @@ impl Block {
            ver: block.header.version as i32,
            tx_count: block.txdata.len() as i32
         })
+    }
+
+    #[allow(dead_code)]
+    fn from_blockchain(block: &bitcoin::Block, block_height: u32) -> Self {
+        let descriptor = Descriptor::OnchainBlock {
+            block_height,
+            block_checksum: BlockChecksum::from(block.block_hash())
+        };
+        Self::compose(block, descriptor).expect("Just generated descriptor can't fail")
     }
 }
 

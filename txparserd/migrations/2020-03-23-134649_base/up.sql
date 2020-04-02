@@ -37,7 +37,9 @@ alter table state
 
 create table cached_block
 (
-    hash bytea not null primary key,
+    hash bytea not null
+        constraint cached_block_id
+            primary key,
     prev_hash bytea not null,
     block bytea not null
 );
@@ -47,11 +49,13 @@ alter table cached_block
 
 create table utxo
 (
-    txid bytea not null primary key,
+    txid bytea not null,
     block_height integer not null,
     block_checksum smallint not null,
     tx_index smallint not null,
-    output_index smallint not null
+    output_index smallint not null,
+    constraint utxo_id
+        primary key (txid, output_index)
 );
 
 alter table utxo

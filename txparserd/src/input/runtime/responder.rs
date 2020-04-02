@@ -16,7 +16,6 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::TryService;
-use zmq::Message;
 
 
 #[derive(Clone, PartialEq, Eq, Debug, Display, Default)]

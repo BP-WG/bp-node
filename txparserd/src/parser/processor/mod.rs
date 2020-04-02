@@ -12,19 +12,17 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-#[derive(Clone, PartialEq, Eq, Debug, Display)]
-#[display_from(Debug)]
-pub struct FeedStatus {
-    pub chained: u16,
-    pub cached: u16,
-    pub known: u16,
-    pub invalid: u16,
-}
+mod data;
+mod error;
+mod state;
+mod model;
+mod bulk_parser;
+mod block_parser;
 
-#[derive(Clone, Debug, Display)]
-#[display_from(Debug)]
-pub enum StatusReply {
-    Active(FeedStatus),
-    Completed,
-    NotFound,
-}
+pub use bulk_parser::BulkParser;
+pub use error::Error;
+pub(self) use bulk_parser::*;
+pub(self) use model::*;
+pub(self) use data::*;
+pub(self) use state::*;
+pub(self) use block_parser::*;

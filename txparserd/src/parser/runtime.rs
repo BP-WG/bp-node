@@ -22,7 +22,7 @@ use txlib::lnpbp::bitcoin::{
     consensus::encode::deserialize,
     network::stream_reader::StreamReader
 };
-use super::{Config, Stats, error::*, BulkParser};
+use super::{Config, Stats, error::*, processor::BulkParser};
 use crate::{error::*, TryService, INPUT_PARSER_SOCKET, PARSER_PUB_SOCKET};
 
 pub fn run(config: Config, context: &mut zmq::Context)
@@ -37,7 +37,7 @@ pub fn run(config: Config, context: &mut zmq::Context)
     debug!("State database connected");
 
     // Initializing parser
-    let parser = BulkParser::restore_or_create(state_conn, index_conn)?;
+    let parser = BulkParser::restore(state_conn, index_conn)?;
     debug!("Parser state is restored");
 
     // Opening IPC REQ/REP communication socket with input thread

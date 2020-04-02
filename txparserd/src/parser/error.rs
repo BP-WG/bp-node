@@ -12,8 +12,8 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use diesel::result::Error as DBError;
-
+use diesel::result::Error as DieselError;
+use super::processor;
 
 #[derive(Debug, Display)]
 #[display_from(Debug)]
@@ -34,21 +34,28 @@ pub enum Error {
     BlockchainIndexesOutOfShortIdRanges,
     BlockValidationIncosistency,
     IndexDBIntegrityError,
-    IndexDBError(DBError),
-    StateDBError(DBError),
+    IndexDBError(DieselError),
+    StateDBError(DieselError),
 }
 
 impl std::error::Error for Error {}
 
-impl From<zmq::Error> for Error {
-    fn from(err: zmq::Error) -> Self {
-        Error::ParserIPCError(err)
+impl From<processor::Error> for Error {
+    fn from(err: processor::Error) -> Self {
+        use processor::Error::*;
+        match err {
+            BlockchainIndexesOutOfShortIdRanges => Error::BlockchainIndexesOutOfShortIdRanges,
+            BlockValidationIncosistency => Error::BlockValidationIncosistency,
+            IndexDBIntegrityError => Error::IndexDBIntegrityError,
+            IndexDBError(e) => Error::IndexDBError(e),
+            StateDBError(e) => Error::StateDBError(e),
+        }
     }
 }
 
-impl From<DBError> for Error {
-    fn from(err: DBError) -> Self {
-        Error::IndexDBError(err)
+impl From<zmq::Error> for Error {
+    fn from(err: zmq::Error) -> Self {
+        Error::ParserIPCError(err)
     }
 }
 

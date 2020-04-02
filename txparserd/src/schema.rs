@@ -31,7 +31,7 @@ table! {
 }
 
 table! {
-    utxo (txid) {
+    utxo (txid, output_index) {
         txid -> Bytea,
         block_height -> Int4,
         block_checksum -> Int2,
