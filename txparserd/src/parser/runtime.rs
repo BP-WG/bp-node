@@ -45,15 +45,15 @@ pub fn run(config: Config, context: &mut zmq::Context)
         .map_err(|e| BootstrapError::IPCSocketError(e, IPCSocket::Input2Parser, None))?;
     input.connect(INPUT_PARSER_SOCKET)
         .map_err(|e| BootstrapError::IPCSocketError(e, IPCSocket::Input2Parser,
-                                                    Some(String::from(INPUT_PARSER_SOCKET))))?;
+                                                    Some(INPUT_PARSER_SOCKET.into())))?;
     debug!("IPC ZMQ from Input to Parser threads is opened on Parser runtime side");
 
     // Opening IPC PUB/SUB publishing socket notifying about parser status changes
     let publisher = context.socket(zmq::PUB)
-        .map_err(|e| BootstrapError::IPCSocketError(e, IPCSocket::Input2Parser, None))?;
+        .map_err(|e| BootstrapError::IPCSocketError(e, IPCSocket::ParserPublisher, None))?;
     publisher.bind(PARSER_PUB_SOCKET)
         .map_err(|e| BootstrapError::IPCSocketError(e, IPCSocket::ParserPublisher,
-                                                    Some(String::from(PARSER_PUB_SOCKET))))?;
+                                                    Some(PARSER_PUB_SOCKET.into())))?;
     debug!("IPC ZMQ Parser PUB socket is opened");
 
     let parser_service = ParserService::init(
@@ -109,11 +109,12 @@ impl ParserService {
     async fn run(&mut self) -> Result<(), Error> {
         let multipart = self.input.recv_multipart(0)?;
 
-        trace!("Incoming input API request");
+        trace!("Input request");
         if let Some(err) = &self.error {
             trace!("Returning immediately error from previous parse operation {}", err);
-            self.input.send(zmq::Message::from("ERR"), 0)
-                .map_err(|e| Error::ParserIPCError(e))?;
+            self.error = None;
+            return self.input.send(zmq::Message::from("ERR"), 0)
+                .map_err(|e| Error::ParserIPCError(e))
         }
 
         self.proc_cmd(multipart)
@@ -146,19 +147,31 @@ impl ParserService {
             (_, _) => Err(Error::WrongNumberOfArgs),
         }?;
 
-        self.async_block_proc(block_data, multiple).await
-            .or_else(|error| {
+        // Ignoring the result
+        let _ = self.async_block_proc(block_data, multiple).await
+            .or_else(|error| -> Result<(), Error> {
+                error!("Error parsing block data: {}", error);
                 self.error = Some(error);
+
+                trace!("Sending error notification on failed parse");
+                if let Err(err) = self.publisher.send(zmq::Message::from("ERR"), 0) {
+                    // We can't gracefullt handle the error at this stage
+                    panic!("Broken IPC communications, failing: {}", err);
+                }
+
                 Ok(())
-            })
+            });
+
+        // We can't fire error here since response to the client is already sent via REQ/REP socket
+        Ok(())
     }
 
     async fn async_block_proc(&mut self, block_data: &Vec<u8>, multiple: bool) -> Result<(), Error> {
         trace!("Replying to input thread");
-        self.input.send(zmq::Message::from("OK"), 0)
+        self.input.send(zmq::Message::from("ACK"), 0)
             .map_err(|e| Error::ParserIPCError(e))?;
 
-        trace!("Deserializing received {} bytes ...", block_data.len());
+        trace!("Parsing received block data, {} bytes; deserializing", block_data.len());
         let blocks = match multiple {
             true => self.parse_block_file(block_data)?,
             false => vec![deserialize::<Block>(block_data)
@@ -179,7 +192,6 @@ impl ParserService {
     }
 
     fn parse_block_file(&self, block_data: &Vec<u8>) -> Result<Vec<Block>, Error> {
-        trace!("Parsing received block data, {} bytes", block_data.len());
         let mut stream_reader = StreamReader::new(
             io::BufReader::new(&block_data[..]),
             Some(block_data.len())

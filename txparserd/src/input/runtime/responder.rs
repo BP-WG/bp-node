@@ -70,7 +70,7 @@ impl TryService for ResponderService {
     async fn try_run_loop(mut self) -> Result<!, Error> {
         loop {
             match self.run().await {
-                Ok(_) => debug!("Client request processing completed"),
+                Ok(resp) => debug!("Client request processing completed"),
                 Err(err) => {
                     self.responder
                         .send(zmq::Message::from("ERR"), 0)
@@ -101,14 +101,15 @@ impl ResponderService {
             .recv_multipart(0)
             .map_err(|e| Error::APISocketError(e))?;
         trace!("Incoming input API request");
-        let response = self.proc_cmd(multipart)
+        self.proc_cmd(multipart)
             .await
-            .or::<Error>(Ok(Message::from("ERR")))
-            .into_ok();
-        trace!("Received response from command processor: {:?}", response);
-        self.responder
-            .send(response, 0)
-            .map_err(|err| { Error::APISocketError(err) })
+            .and_then(|response| {
+                trace!("Received response from command processor: `{}`; relaying it to client",
+                       response.as_str().expect("We know that message is always string"));
+                self.responder
+                    .send(response, 0)
+                    .map_err(|err| { Error::APISocketError(err) })
+            })
     }
 
     async fn proc_cmd(&mut self, multipart: Vec<Vec<u8>>) -> Result<zmq::Message, Error> {
@@ -141,11 +142,18 @@ impl ResponderService {
         *self.busy_flag.lock().await = true;
         self.parser
             .send_multipart(vec![
-            zmq::Message::from(if multiple { "BLOCK" } else { "BLOCKS" }),
+            zmq::Message::from(if multiple { "BLOCKS" } else { "BLOCK" }),
             zmq::Message::from(block_data)
         ], 0)
             .map_err(|err| Error::ParserIPCError(err))?;
 
-        Ok(zmq::Message::from("ACK"))
+        trace!("Reading response from parser service");
+        let msg = self.parser
+            .recv_msg(0)
+            .map_err(|err| Error::ParserIPCError(err))?;
+        if Some("ERR") == msg.as_str() {
+            *self.busy_flag.lock().await = false;
+        }
+        Ok(msg)
     }
 }

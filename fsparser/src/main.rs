@@ -26,6 +26,7 @@ fn main() -> io::Result<()> {
     let listener = context.socket(zmq::SUB).unwrap();
     client.connect("tcp://127.0.0.1:18318").expect("Can't connect to parser daemon REQ service");
     listener.connect("tcp://127.0.0.1:18319").expect("Can't connect to parser daemon PUB service");
+    listener.set_subscribe("".as_bytes()).expect("Can't subscribe to parser daemon PUB service");
     println!("Connected to txparserd daemon");
 
     loop {
@@ -39,6 +40,7 @@ fn main() -> io::Result<()> {
         block_file_no += 1;
 
         let mut block_no = 0;
+        let mut print_no = 0;
         loop {
             // Reading magick number
             match stream_reader.read_next::<u32>() {
@@ -60,27 +62,44 @@ fn main() -> io::Result<()> {
                 },
                 Ok(block) => {
                     loop {
+                        print_no += 1;
+                        let mut repeat = false;
                         client.send_multipart(vec![b"BLOCK".to_vec(), serialize(&block)], 0)
                             .expect("Can't send data to parser daemon");
-                        let print = match client.recv_string(0)
+                        let resp1 = client.recv_string(0)
                             .expect("Parser response must be string")
-                            .expect("Can't receive parser daemon response")
-                            .as_str() {
-                            "ACK" => "+",
-                            "ERR" => "!",
-                            "BUSY" => ".",
-                            _ => "?"
+                            .expect("Can't receive parser daemon response");
+                        match resp1.as_str() {
+                            "BUSY" => (),
+                            "ACK" => (),
+                            "ERR" => {
+                                // Error processing previous block data, repeating current block
+                                print_no += 1;
+                                print!("<");
+                                continue;
+                            },
+                            x => panic!("Unknown server response: {}", x),
+                        }
+                        let resp2 = listener.recv_string(0)?
+                            .expect("Unexpected binary data from server instead of response string");
+                        let print = match (resp2.as_str(), resp1.as_str()) {
+                            ("RDY", "BUSY") => {
+                                repeat = true;
+                                "."
+                            },
+                            ("RDY", "ACK") => "+",
+                            // Skipping broken block
+                            ("ERR", _) => "!",
+                            (x, _) => panic!("Unknown server notification: {}", x),
                         };
-                        if (block_no + 1) % 80 == 0 {
+                        if print_no % 80 == 0 {
                             println!("{}", print);
                         } else {
                             print!("{}", print);
                         }
-                        if print != "." {
+                        if !repeat {
                             break;
                         }
-                        listener.recv_string(0)?
-                            .expect("Unexpeted binary data from server instead of response string");
                     }
                 }
             }

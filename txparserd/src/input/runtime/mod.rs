@@ -45,7 +45,11 @@ pub fn run(config: Config, context: &mut zmq::Context)
         .map_err(|e| BootstrapError::InputSocketError(e, APISocket::PubSub, None))?;
     subscriber.connect(PARSER_PUB_SOCKET)
         .map_err(|e| BootstrapError::InputSocketError(e, APISocket::PubSub,
+                                                  Some(PARSER_PUB_SOCKET.into())))?;
+    subscriber.set_subscribe("".as_bytes())
+        .map_err(|e| BootstrapError::InputSocketError(e, APISocket::PubSub,
                                                       Some(PARSER_PUB_SOCKET.into())))?;
+
     debug!("Input thread subscribed to Parser service PUB notifications");
 
     // Opening input API Req/Rep socket

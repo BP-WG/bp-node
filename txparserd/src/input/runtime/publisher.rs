@@ -62,7 +62,7 @@ impl TryService for PublisherService {
     async fn try_run_loop(mut self) -> Result<!, Error> {
         loop {
             match self.run().await {
-                Ok(_) => debug!("Notification loop completed"),
+                Ok(_) => trace!("Notification loop completed"),
                 Err(err) => {
                     self.publisher
                         .send(zmq::Message::from("ERR"), 0)
@@ -93,7 +93,7 @@ impl PublisherService {
             .recv_string(0)
             .map_err(|err| Error::ParserIPCError(err))?
             .map_err(|data| Error::UnknownData(data))?;
-        trace!("Parser has completed with response {}", resp);
+        trace!("Parser has completed with response {}; removing BUSY status", resp);
 
         *self.busy_flag.lock().await = false;
         let reply = match resp.as_str() {
@@ -105,6 +105,6 @@ impl PublisherService {
         trace!("Sending `{}` notification to clients", reply);
         self.publisher
             .send(zmq::Message::from(reply), 0)
-            .map_err(|err| Error::ParserIPCError(err))
+            .map_err(|err| Error::APISocketError(err))
     }
 }
