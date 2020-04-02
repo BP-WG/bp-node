@@ -62,6 +62,7 @@ use crate::{
 };
 
 const INPUT_PARSER_SOCKET: &str = "inproc://input-parser";
+const PARSER_PUB_SOCKET: &str = "inproc://parser-input";
 
 async fn run(config: Config) -> Result<(), BootstrapError> {
     let mut context = zmq::Context::new();

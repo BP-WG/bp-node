@@ -99,7 +99,7 @@ impl BulkParser {
                 Ok(data)
             })?;
 
-        trace!("Per-block processing has completed; insterting data into database as a transaction ...");
+        trace!("Per-block processing has completed; inserting data into database as a transaction ...");
         self.state_conn.transaction(|| {
             self.index_conn.transaction(|| {
                 let data = data.clone();

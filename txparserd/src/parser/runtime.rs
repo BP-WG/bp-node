@@ -14,13 +14,15 @@
 use std::{
     io,
     ops::Deref,
+    sync::Arc,
 };
 use log::*;
 use tokio::{
     sync::mpsc,
-    task::JoinHandle
+    sync::Mutex,
+    task::{self, JoinHandle}
 };
-use futures::{Future, FutureExt};
+use futures::{Future, FutureExt, TryFutureExt};
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 
@@ -30,7 +32,7 @@ use txlib::lnpbp::bitcoin::{
     network::stream_reader::StreamReader
 };
 use super::{Config, Stats, error::*, BulkParser, channel::*};
-use crate::{input, error::*, TryService, INPUT_PARSER_SOCKET};
+use crate::{input, error::*, TryService, INPUT_PARSER_SOCKET, PARSER_PUB_SOCKET};
 
 pub fn run(config: Config, context: &mut zmq::Context)
            -> Result<Vec<JoinHandle<!>>, BootstrapError>
@@ -47,7 +49,7 @@ pub fn run(config: Config, context: &mut zmq::Context)
     let mut parser = BulkParser::restore_or_create(state_conn, index_conn)?;
     debug!("Parser state is restored");
 
-    // Opening IPC socket to input thread
+    // Opening IPC REQ/REP communication socket with input thread
     let input = context.socket(zmq::REP)
         .map_err(|e| BootstrapError::IPCSocketError(e, IPCSocket::Input2Parser, None))?;
     input.connect(INPUT_PARSER_SOCKET)
@@ -55,9 +57,18 @@ pub fn run(config: Config, context: &mut zmq::Context)
                                                     Some(String::from(INPUT_PARSER_SOCKET))))?;
     debug!("IPC ZMQ from Input to Parser threads is opened on Parser runtime side");
 
+    // Opening IPC PUB/SUB publishing socket notifying about parser status changes
+    let publisher = context.socket(zmq::PUB)
+        .map_err(|e| BootstrapError::IPCSocketError(e, IPCSocket::Input2Parser, None))?;
+    publisher.bind(PARSER_PUB_SOCKET)
+        .map_err(|e| BootstrapError::IPCSocketError(e, IPCSocket::ParserPublisher,
+                                                    Some(String::from(PARSER_PUB_SOCKET))))?;
+    debug!("IPC ZMQ Parser PUB socket is opened");
+
     let parser_service = ParserService::init(
         config,
         parser,
+        publisher,
         input
     );
 
@@ -73,6 +84,8 @@ struct ParserService {
     config: Config,
     parser: BulkParser,
     input: zmq::Socket,
+    publisher: zmq::Socket,
+    error: Option<Error>,
     stats: Stats,
 }
 
@@ -90,11 +103,14 @@ impl TryService for ParserService {
 impl ParserService {
     pub fn init(config: Config,
                 parser: BulkParser,
+                publisher: zmq::Socket,
                 input: zmq::Socket) -> Self {
         Self {
             config,
             parser,
             input,
+            publisher,
+            error: None,
             stats: Stats::default(),
         }
     }
@@ -103,16 +119,22 @@ impl ParserService {
         let mut multipart = self.input.recv_multipart(0)?;
 
         trace!("Incoming input API request");
-        let response = self.proc_cmd(multipart)
+        if let Some(err) = &self.error {
+            trace!("Returning immediately error from previous parse operation {}", err);
+            self.input.send(zmq::Message::from("ERR"), 0)
+                .map_err(|e| Error::ParserIPCError(e))?;
+        }
+
+        self.proc_cmd(multipart)
             .await
-            .or::<Error>(Ok(zmq::Message::from("ERR")))
-            .into_ok();
-        trace!("Received response from command processor: {:?}", response);
-        self.input.send_msg(response, 0);
-        Ok(())
+            .or_else(|err| {
+                trace!("Received error status from command processor: {}", err);
+                self.input.send(zmq::Message::from("ERR"), 0)
+                    .map_err(|e| Error::ParserIPCError(e))
+            })
     }
 
-    async fn proc_cmd(&mut self, multipart: Vec<Vec<u8>>) -> Result<zmq::Message, Error> {
+    async fn proc_cmd(&mut self, multipart: Vec<Vec<u8>>) -> Result<(), Error> {
         use std::str;
 
         let (command, multipart) = multipart.split_first()
@@ -127,23 +149,42 @@ impl ParserService {
         }
     }
 
-    async fn proc_cmd_blck(&mut self, multipart: &[Vec<u8>], multiple: bool) -> Result<zmq::Message, Error> {
+    async fn proc_cmd_blck(&mut self, multipart: &[Vec<u8>], multiple: bool) -> Result<(), Error> {
         let block_data = match (multipart.first(), multipart.len()) {
             (Some(data), 1) => Ok(data),
             (_, _) => Err(Error::WrongNumberOfArgs),
         }?;
 
+        self.async_block_proc(block_data, multiple).await
+            .or_else(|error| {
+                self.error = Some(error);
+                Ok(())
+            })
+    }
+
+    async fn async_block_proc(&mut self, block_data: &Vec<u8>, multiple: bool) -> Result<(), Error> {
+        trace!("Replying to input thread");
+        self.input.send(zmq::Message::from("OK"), 0)
+            .map_err(|e| Error::ParserIPCError(e))?;
+
+        trace!("Deserializing received {} bytes ...", block_data.len());
         let blocks = match multiple {
             true => self.parse_block_file(block_data)?,
             false => vec![deserialize::<Block>(block_data)
                 .map_err(|_| Error::BlockValidationIncosistency)?],
         };
 
-        trace!("Processing received {} blocks ...", blocks.len());
-        self.parser.feed(blocks)?;
+        trace!("Parsing received {} blocks ...", blocks.len());
+        let res = self.parser.feed(blocks);
 
-        trace!("Bulk parser has finished processing");
-        Ok(zmq::Message::from("OK"))
+        trace!("Parse task completed with {:?} result", res);
+        let reply = match res {
+            Ok(_) => "RDY",
+            Err(_) => "ERR",
+        };
+        trace!("Sending `{}` notification on complete parse", reply);
+        self.publisher.send(zmq::Message::from(reply), 0)
+            .map_err(|e| Error::PubIPCError(e))
     }
 
     fn parse_block_file(&self, block_data: &Vec<u8>) -> Result<Vec<Block>, Error> {

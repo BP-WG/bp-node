@@ -50,6 +50,7 @@ impl From<parser::Error> for BootstrapError {
 #[display_from(Debug)]
 pub enum IPCSocket {
     Input2Parser,
+    ParserPublisher,
     Monitor2Input,
     Monitor2Parser,
 }

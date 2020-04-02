@@ -28,6 +28,7 @@ pub enum BlockFileMalformation {
 #[display_from(Debug)]
 pub enum Error {
     ParserIPCError(zmq::Error),
+    PubIPCError(zmq::Error),
     UknownRequest,
     WrongNumberOfArgs,
     MalformedBlockFile(BlockFileMalformation),
