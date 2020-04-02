@@ -11,10 +11,6 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-use tokio::sync::mpsc::{Sender, Receiver};
-use txlib::lnpbp::bitcoin::Block;
-use super::Stats;
-
 
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
 #[display_from(Debug)]

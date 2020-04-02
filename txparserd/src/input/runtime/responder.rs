@@ -43,7 +43,6 @@ pub enum Error {
     APISocketError(zmq::Error),
     ParserIPCError(zmq::Error),
     UknownRequest,
-    UnknownResponse,
     MalformedRequest,
     WrongNumberOfArgs,
 }
@@ -75,7 +74,7 @@ impl TryService for ResponderService {
                 Err(err) => {
                     self.responder
                         .lock().await
-                        .send_msg(zmq::Message::from("ERR"), 0)
+                        .send(zmq::Message::from("ERR"), 0)
                         .map_err(|e| Error::APISocketError(e))?;
                     error!("Error processing client's input: {}", err)
                 },
@@ -99,7 +98,7 @@ impl ResponderService {
     }
 
     async fn run(&mut self) -> Result<(), Error> {
-        let mut multipart = self.responder
+        let multipart = self.responder
             .lock().await
             .recv_multipart(0)
             .map_err(|e| Error::APISocketError(e))?;
@@ -111,7 +110,7 @@ impl ResponderService {
         trace!("Received response from command processor: {:?}", response);
         self.responder
             .lock().await
-            .send_msg(response, 0)
+            .send(response, 0)
             .map_err(|err| { Error::APISocketError(err) })
     }
 

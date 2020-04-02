@@ -16,7 +16,6 @@ extern crate chrono;
 extern crate diesel;
 #[macro_use]
 extern crate derive_wrapper;
-#[macro_use]
 pub extern crate lnpbp;
 
 pub mod models;

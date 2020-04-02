@@ -11,6 +11,14 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
+
+// We need this since code is not completed and a lot of it is written for future functionality
+// Remove this once the first version will be complete
+#![allow(dead_code)]
+#![allow(unused_variables)]
+// In mutithread environments it's critical to capture all failures
+#![deny(unused_must_use)]
+
 #![feature(never_type)]
 #![feature(unwrap_infallible)]
 #![feature(in_band_lifetimes)]
@@ -30,10 +38,8 @@ extern crate dotenv;
 extern crate chrono;
 extern crate tiny_http;
 extern crate prometheus;
-#[macro_use]
 extern crate txlib;
 
-#[macro_use]
 extern crate tokio;
 extern crate futures;
 extern crate zmq;
@@ -51,11 +57,7 @@ pub use traits::*;
 use std::env;
 use log::*;
 use futures::future;
-use tokio::{
-    sync::mpsc,
-    task::JoinHandle,
-    net::{TcpListener, TcpStream}
-};
+use tokio::task::JoinHandle;
 use crate::{
     error::*,
     config::Config,
@@ -74,7 +76,7 @@ async fn run(config: Config) -> Result<(), BootstrapError> {
     let tasks: Vec<JoinHandle<!>> = vec![
         input_task, parser_task, monitor_task
     ].into_iter().flatten().collect();
-    future::try_join_all(tasks).await;
+    future::try_join_all(tasks).await?;
 
     Ok(())
 }

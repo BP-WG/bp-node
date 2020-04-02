@@ -58,7 +58,7 @@ fn main() -> io::Result<()> {
                     eprintln!("{}", err);
                     break;
                 },
-                Ok(mut block) => {
+                Ok(block) => {
                     loop {
                         client.send_multipart(vec![b"BLOCK".to_vec(), serialize(&block)], 0)
                             .expect("Can't send data to parser daemon");
@@ -79,7 +79,8 @@ fn main() -> io::Result<()> {
                         if print != "." {
                             break;
                         }
-                        listener.recv_string(0)?;
+                        listener.recv_string(0)?
+                            .expect("Unexpeted binary data from server instead of response string");
                     }
                 }
             }

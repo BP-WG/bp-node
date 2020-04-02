@@ -14,7 +14,7 @@
 
 use tiny_http;
 use tokio::task::JoinHandle;
-use prometheus::{Opts, Registry, Counter, TextEncoder, Encoder};
+use prometheus::Encoder;
 
 use crate::{
     error::*,

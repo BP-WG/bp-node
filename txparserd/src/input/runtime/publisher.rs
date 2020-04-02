@@ -19,7 +19,6 @@ use std::{
 use tokio::sync::Mutex;
 
 use crate::TryService;
-use zmq::Message;
 
 
 #[derive(Clone, PartialEq, Eq, Debug, Display, Default)]
@@ -110,7 +109,7 @@ impl PublisherService {
         trace!("Sending `{}` notification to clients", reply);
         self.publisher
             .lock().await
-            .send_msg(zmq::Message::from(reply), 0)
+            .send(zmq::Message::from(reply), 0)
             .map_err(|err| Error::ParserIPCError(err))
     }
 }

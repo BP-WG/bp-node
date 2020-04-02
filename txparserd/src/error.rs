@@ -12,15 +12,12 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use std::{
-    io,
-    error::Error
-};
+use std::error::Error;
+use tokio::task::JoinError;
 use diesel::{
     ConnectionError,
     result::Error as DBError,
 };
-use txlib::lnpbp::bitcoin;
 
 use crate::parser;
 
@@ -33,7 +30,8 @@ pub enum BootstrapError {
     StateDBConnectionError(ConnectionError),
     IndexDBConnectionError(ConnectionError),
     IndexDBIntegrityError,
-    IndexDBError(DBError)
+    IndexDBError(DBError),
+    MultithreadError(JoinError)
 }
 
 impl From<parser::Error> for BootstrapError {
@@ -43,6 +41,12 @@ impl From<parser::Error> for BootstrapError {
             parser::Error::IndexDBError(err) => BootstrapError::IndexDBError(err),
             _ => panic!("Incomplete implementation: unsupported bootstrap error (1)"),
         }
+    }
+}
+
+impl From<JoinError> for BootstrapError {
+    fn from(err: JoinError) -> Self {
+        BootstrapError::MultithreadError(err)
     }
 }
 

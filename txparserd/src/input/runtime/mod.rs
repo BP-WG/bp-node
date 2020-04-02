@@ -17,20 +17,11 @@ mod responder;
 use std::sync::Arc;
 use log::*;
 use tokio::{
-    sync::{mpsc::Sender, Mutex},
+    sync::Mutex,
     task::JoinHandle
 };
-use futures::{
-    FutureExt,
-    TryFutureExt
-};
-use txlib::lnpbp::bitcoin::{
-    self,
-    Block,
-    consensus::deserialize
-};
 use super::{Config, Stats};
-use crate::{parser, error::*, INPUT_PARSER_SOCKET, Service, TryService};
+use crate::{error::*, INPUT_PARSER_SOCKET, TryService};
 use publisher::*;
 use responder::*;
 

@@ -12,26 +12,17 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 use std::collections::{HashMap, hash_map::Entry};
-use diesel::{
-    prelude::*,
-    pg::PgConnection
-};
 use txlib::{
-    schema,
     models,
     lnpbp::{
         bitcoin::{
-            Txid, BlockHash, Block, Transaction, TxIn, TxOut,
-            hashes::Hash,
-            consensus::encode::deserialize
+            Txid, Block, Transaction, TxIn, TxOut
         },
         bp::short_id::{
-            Descriptor, Dimension, BlockChecksum, TxChecksum
-        },
-        common::macros::*
+            Descriptor, Dimension, BlockChecksum
+        }
     }
 };
-use crate::schema as state_schema;
 use super::{*, error::Error};
 
 #[derive(Debug, Display)]
@@ -120,7 +111,7 @@ impl BlockParser<'_> {
             });
             block_descriptor
         } else {
-            let mut txoset = self.result.utxo.get_mut(&txin.previous_output.txid)
+            let txoset = self.result.utxo.get_mut(&txin.previous_output.txid)
                 .ok_or(Error::BlockValidationIncosistency)?;
             let prev_vout: u16 = txin.previous_output.vout as u16;
             let txo_descriptor = txoset.remove(&prev_vout)
@@ -153,7 +144,7 @@ impl BlockParser<'_> {
             .upgraded(index as u16, Some(Dimension::Output))
             .expect("Descriptor upgrade for an onchain transaction does not fail");
 
-        let mut txoset = match self.result.utxo.entry(txid) {
+        let txoset = match self.result.utxo.entry(txid) {
             Entry::Vacant(entry) => entry.insert(HashMap::new()),
             Entry::Occupied(entry) => entry.into_mut(),
         };

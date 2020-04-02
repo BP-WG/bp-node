@@ -11,18 +11,9 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-use std::{
-    io,
-    ops::Deref,
-    sync::Arc,
-};
+use std::io;
 use log::*;
-use tokio::{
-    sync::mpsc,
-    sync::Mutex,
-    task::{self, JoinHandle}
-};
-use futures::{Future, FutureExt, TryFutureExt};
+use tokio::task::JoinHandle;
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 
@@ -31,8 +22,8 @@ use txlib::lnpbp::bitcoin::{
     consensus::encode::deserialize,
     network::stream_reader::StreamReader
 };
-use super::{Config, Stats, error::*, BulkParser, channel::*};
-use crate::{input, error::*, TryService, INPUT_PARSER_SOCKET, PARSER_PUB_SOCKET};
+use super::{Config, Stats, error::*, BulkParser};
+use crate::{error::*, TryService, INPUT_PARSER_SOCKET, PARSER_PUB_SOCKET};
 
 pub fn run(config: Config, context: &mut zmq::Context)
            -> Result<Vec<JoinHandle<!>>, BootstrapError>
@@ -46,7 +37,7 @@ pub fn run(config: Config, context: &mut zmq::Context)
     debug!("State database connected");
 
     // Initializing parser
-    let mut parser = BulkParser::restore_or_create(state_conn, index_conn)?;
+    let parser = BulkParser::restore_or_create(state_conn, index_conn)?;
     debug!("Parser state is restored");
 
     // Opening IPC REQ/REP communication socket with input thread
@@ -116,7 +107,7 @@ impl ParserService {
     }
 
     async fn run(&mut self) -> Result<(), Error> {
-        let mut multipart = self.input.recv_multipart(0)?;
+        let multipart = self.input.recv_multipart(0)?;
 
         trace!("Incoming input API request");
         if let Some(err) = &self.error {

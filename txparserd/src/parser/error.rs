@@ -13,7 +13,6 @@
 
 
 use diesel::result::Error as DBError;
-use diesel::ConnectionError;
 
 
 #[derive(Debug, Display)]

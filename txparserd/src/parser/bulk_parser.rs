@@ -11,24 +11,19 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-use std::collections::{HashMap, hash_map::Entry};
+use std::collections::HashMap;
 use diesel::{
     prelude::*,
     pg::PgConnection
 };
 use txlib::{
     schema,
-    models,
     lnpbp::{
         bitcoin::{
-            Txid, BlockHash, Block, Transaction, TxIn, TxOut,
+            Txid, BlockHash, Block,
             hashes::Hash,
             consensus::encode::deserialize
-        },
-        bp::short_id::{
-            Descriptor, Dimension, BlockChecksum, TxChecksum
-        },
-        common::macros::*
+        }
     }
 };
 use crate::schema as state_schema;
