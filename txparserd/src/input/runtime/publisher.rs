@@ -50,8 +50,8 @@ impl std::error::Error for Error {}
 pub(super) struct PublisherService {
     config: Config,
     stats: Stats,
-    publisher: Arc<Mutex<zmq::Socket>>,
-    subscriber: Arc<Mutex<zmq::Socket>>,
+    publisher: zmq::Socket,
+    subscriber: zmq::Socket,
     busy_flag: Arc<Mutex<bool>>,
 }
 
@@ -65,7 +65,6 @@ impl TryService for PublisherService {
                 Ok(_) => debug!("Notification loop completed"),
                 Err(err) => {
                     self.publisher
-                        .lock().await
                         .send(zmq::Message::from("ERR"), 0)
                         .map_err(|e| Error::APISocketError(e))?;
                     error!("Error during notification loop {}", err)
@@ -77,21 +76,20 @@ impl TryService for PublisherService {
 
 impl PublisherService {
     pub(super) fn init(config: Config,
-                publisher: &Arc<Mutex<zmq::Socket>>,
-                subscriber: &Arc<Mutex<zmq::Socket>>,
+                publisher: zmq::Socket,
+                subscriber: zmq::Socket,
                 flag: &Arc<Mutex<bool>>) -> Self {
         Self {
             config,
             stats: Stats::default(),
-            publisher: publisher.clone(),
-            subscriber: subscriber.clone(),
+            publisher,
+            subscriber,
             busy_flag: flag.clone()
         }
     }
 
     async fn run(&mut self) -> Result<(), Error> {
         let resp = self.subscriber
-            .lock().await
             .recv_string(0)
             .map_err(|err| Error::ParserIPCError(err))?
             .map_err(|data| Error::UnknownData(data))?;
@@ -106,7 +104,6 @@ impl PublisherService {
 
         trace!("Sending `{}` notification to clients", reply);
         self.publisher
-            .lock().await
             .send(zmq::Message::from(reply), 0)
             .map_err(|err| Error::ParserIPCError(err))
     }

@@ -58,8 +58,8 @@ impl Into<!> for Error {
 pub(super) struct ResponderService {
     config: Config,
     stats: Stats,
-    responder: Arc<Mutex<zmq::Socket>>,
-    parser: Arc<Mutex<zmq::Socket>>,
+    responder: zmq::Socket,
+    parser: zmq::Socket,
     busy_flag: Arc<Mutex<bool>>,
 }
 
@@ -73,7 +73,6 @@ impl TryService for ResponderService {
                 Ok(_) => debug!("Client request processing completed"),
                 Err(err) => {
                     self.responder
-                        .lock().await
                         .send(zmq::Message::from("ERR"), 0)
                         .map_err(|e| Error::APISocketError(e))?;
                     error!("Error processing client's input: {}", err)
@@ -85,21 +84,20 @@ impl TryService for ResponderService {
 
 impl ResponderService {
     pub(super) fn init(config: Config,
-                responder: &Arc<Mutex<zmq::Socket>>,
-                parser: &Arc<Mutex<zmq::Socket>>,
+                responder: zmq::Socket,
+                parser: zmq::Socket,
                 flag: &Arc<Mutex<bool>>) -> Self {
         Self {
             config,
             stats: Stats::default(),
-            responder: responder.clone(),
-            parser: parser.clone(),
+            responder,
+            parser,
             busy_flag: flag.clone()
         }
     }
 
     async fn run(&mut self) -> Result<(), Error> {
         let multipart = self.responder
-            .lock().await
             .recv_multipart(0)
             .map_err(|e| Error::APISocketError(e))?;
         trace!("Incoming input API request");
@@ -109,7 +107,6 @@ impl ResponderService {
             .into_ok();
         trace!("Received response from command processor: {:?}", response);
         self.responder
-            .lock().await
             .send(response, 0)
             .map_err(|err| { Error::APISocketError(err) })
     }
@@ -143,7 +140,6 @@ impl ResponderService {
         trace!("Sending block(s) data to parser service, {} bytes", block_data.len());
         *self.busy_flag.lock().await = true;
         self.parser
-            .lock().await
             .send_multipart(vec![
             zmq::Message::from(if multiple { "BLOCK" } else { "BLOCKS" }),
             zmq::Message::from(block_data)

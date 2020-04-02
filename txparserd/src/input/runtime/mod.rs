@@ -38,24 +38,7 @@ pub fn run(config: Config, context: &mut zmq::Context)
     parser.bind(INPUT_PARSER_SOCKET)
         .map_err(|e| BootstrapError::IPCSocketError(e, IPCSocket::Input2Parser,
                                                     Some(INPUT_PARSER_SOCKET.into())))?;
-    let parser = Arc::new(Mutex::new(parser));
     debug!("IPC ZMQ from Input to Parser threads is opened on Input runtime side");
-
-    // Opening input API Req/Rep socket
-    let responder = context.socket(zmq::REP)
-        .map_err(|e| BootstrapError::InputSocketError(e, APISocket::ReqRep, None))?;
-    responder.bind(req_socket_addr.as_str())
-        .map_err(|e| BootstrapError::InputSocketError(e, APISocket::ReqRep, Some(req_socket_addr.clone())))?;
-    let responder = Arc::new(Mutex::new(responder));
-    debug!("Input Req/Rep ZMQ API is opened on {}", req_socket_addr);
-
-    // Opening input API Pub/Sub socket
-    let publisher = context.socket(zmq::PUB)
-        .map_err(|e| BootstrapError::InputSocketError(e, APISocket::PubSub, None))?;
-    publisher.bind(pub_socket_addr.as_str())
-        .map_err(|e| BootstrapError::InputSocketError(e, APISocket::PubSub, Some(pub_socket_addr.clone())))?;
-    let publisher = Arc::new(Mutex::new(publisher));
-    debug!("Input Pub/Sub ZMQ API is opened on {}", pub_socket_addr);
 
     // Opening parser Sub socket
     let subscriber = context.socket(zmq::SUB)
@@ -63,14 +46,27 @@ pub fn run(config: Config, context: &mut zmq::Context)
     subscriber.connect(PARSER_PUB_SOCKET)
         .map_err(|e| BootstrapError::InputSocketError(e, APISocket::PubSub,
                                                       Some(PARSER_PUB_SOCKET.into())))?;
-    let subscriber = Arc::new(Mutex::new(subscriber));
     debug!("Input thread subscribed to Parser service PUB notifications");
+
+    // Opening input API Req/Rep socket
+    let responder = context.socket(zmq::REP)
+        .map_err(|e| BootstrapError::InputSocketError(e, APISocket::ReqRep, None))?;
+    responder.bind(req_socket_addr.as_str())
+        .map_err(|e| BootstrapError::InputSocketError(e, APISocket::ReqRep, Some(req_socket_addr.clone())))?;
+    debug!("Input Req/Rep ZMQ API is opened on {}", req_socket_addr);
+
+    // Opening input API Pub/Sub socket
+    let publisher = context.socket(zmq::PUB)
+        .map_err(|e| BootstrapError::InputSocketError(e, APISocket::PubSub, None))?;
+    publisher.bind(pub_socket_addr.as_str())
+        .map_err(|e| BootstrapError::InputSocketError(e, APISocket::PubSub, Some(pub_socket_addr.clone())))?;
+    debug!("Input Pub/Sub ZMQ API is opened on {}", pub_socket_addr);
 
     // Thread synchronization flag
     let busy = Arc::new(Mutex::new(false));
 
-    let responder_service = ResponderService::init(config.clone().into(), &responder, &parser, &busy);
-    let publisher_service = PublisherService::init(config.clone().into(), &publisher, &subscriber, &busy);
+    let responder_service = ResponderService::init(config.clone().into(), responder, parser, &busy);
+    let publisher_service = PublisherService::init(config.clone().into(), publisher, subscriber, &busy);
 
     Ok(vec![
         tokio::spawn(async move {
