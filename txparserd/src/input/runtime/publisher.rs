@@ -12,10 +12,7 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use std::{
-    str,
-    sync::Arc
-};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::TryService;
@@ -44,6 +41,7 @@ pub(super) struct Stats {
 pub enum Error {
     APISocketError(zmq::Error),
     ParserIPCError(zmq::Error),
+    UnknownData(Vec<u8>),
     UnknownResponse,
 }
 
@@ -53,7 +51,7 @@ pub(super) struct PublisherService {
     config: Config,
     stats: Stats,
     publisher: Arc<Mutex<zmq::Socket>>,
-    parser: Arc<Mutex<zmq::Socket>>,
+    subscriber: Arc<Mutex<zmq::Socket>>,
     busy_flag: Arc<Mutex<bool>>,
 }
 
@@ -80,28 +78,28 @@ impl TryService for PublisherService {
 impl PublisherService {
     pub(super) fn init(config: Config,
                 publisher: &Arc<Mutex<zmq::Socket>>,
-                parser: &Arc<Mutex<zmq::Socket>>,
+                subscriber: &Arc<Mutex<zmq::Socket>>,
                 flag: &Arc<Mutex<bool>>) -> Self {
         Self {
             config,
             stats: Stats::default(),
             publisher: publisher.clone(),
-            parser: parser.clone(),
+            subscriber: subscriber.clone(),
             busy_flag: flag.clone()
         }
     }
 
     async fn run(&mut self) -> Result<(), Error> {
-        let resp = self.parser
+        let resp = self.subscriber
             .lock().await
-            .recv_bytes(0)
-            .map_err(|err| Error::ParserIPCError(err))?;
-        trace!("Parser has completed with response {:?}", resp);
+            .recv_string(0)
+            .map_err(|err| Error::ParserIPCError(err))?
+            .map_err(|data| Error::UnknownData(data))?;
+        trace!("Parser has completed with response {}", resp);
 
         *self.busy_flag.lock().await = false;
-        let reply = match str::from_utf8(&resp[..])
-            .expect("Internal error: internal IPC can't return incorrect string (3)") {
-            "OK" => "RDY",
+        let reply = match resp.as_str() {
+            "RDY" => "RDY",
             "ERR" => "ERR",
             _ => Err(Error::UnknownResponse)?,
         };
