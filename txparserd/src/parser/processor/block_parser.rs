@@ -30,11 +30,11 @@ use super::{*, error::Error};
 pub(super) struct BlockParser<'a> {
     coinbase_amount: Option<u64>,
     descriptor: Descriptor,
-    // The difference between `data.utxo` and `utxo`: `utxo` is immutable "base" layer
-    // for all UTXO's from previous blocks, while `data.utxo` is local/empemeral mutable collector
+    // The difference between `data.utxo` and `base_utxo`: `base_utxo` is immutable "base" layer
+    // for all UTXO's from previous blocks, while `data.utxo` is local/ephemeral mutable collector
     // for new UTXOs from the currently parsed block(s)
     data: &'a mut ParseData,
-    utxo: &'a UtxoMap,
+    base_utxo: &'a UtxoMap,
 }
 
 impl<'a> BlockParser<'a> {
@@ -43,11 +43,11 @@ impl<'a> BlockParser<'a> {
         let mut parser = Self {
             coinbase_amount: None,
             descriptor: Descriptor::OnchainBlock {
-                block_height: data.known_height as u32,
+                block_height: data.state.processed_height as u32,
                 block_checksum
             },
             data,
-            utxo
+            base_utxo: utxo
         };
         parser.parse_block(&block)?;
         Ok(parser)
@@ -59,7 +59,7 @@ impl BlockParser<'_> {
         debug!("Processing block {}", block.block_hash());
 
         self.descriptor = Descriptor::OnchainBlock {
-            block_height: self.data.known_height as u32,
+            block_height: self.data.state.processed_height as u32,
             block_checksum: BlockChecksum::from(block.block_hash())
         };
 
@@ -72,7 +72,7 @@ impl BlockParser<'_> {
             .push(txlib::models::Block::compose(block, self.descriptor)
                 .map_err(|_| Error::BlockchainIndexesOutOfShortIdRanges)?);
 
-        self.data.known_height += 1;
+        self.data.state.processed_height += 1;
         // TODO: Update the rest of the state
 
         Ok(())
@@ -126,12 +126,12 @@ impl BlockParser<'_> {
             block_descriptor
         } else {
             // TODO: Update state stats
-            self.utxo.get_descriptor(&txin.previous_output)
+            self.base_utxo.get_descriptor(&txin.previous_output)
                 .map(|d| {
                     self.data.spent.push(txin.previous_output);
                     d.clone()
                 })
-                .or_else(|| self.data.utxo.extract_descriptor(&txin.previous_output))
+                .or_else(|| self.data.state.utxo.extract_descriptor(&txin.previous_output))
                 .ok_or(Error::BlockValidationIncosistency)?
                 .clone()
         };
@@ -153,7 +153,7 @@ impl BlockParser<'_> {
             .upgraded(index as u16, Some(Dimension::Output))
             .expect("Descriptor upgrade for an onchain transaction does not fail");
 
-        let txoset = match self.data.utxo.entry(txid) {
+        let txoset = match self.data.state.utxo.entry(txid) {
             Entry::Vacant(entry) => entry.insert(HashMap::new()),
             Entry::Occupied(entry) => entry.into_mut(),
         };

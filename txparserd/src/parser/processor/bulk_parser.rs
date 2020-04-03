@@ -48,7 +48,7 @@ impl BulkParser {
     }
 
     pub fn feed(&mut self, blocks: Vec<Block>) -> Result<(), Error> {
-        let mut ephemeral_state = State::default();
+        let mut ephemeral_state = State::inherit_state(&self.state);
 
         debug!("Processing {} blocks", blocks.len());
         let block_chain = ephemeral_state.order_blocks(blocks, &self.state);
@@ -57,14 +57,15 @@ impl BulkParser {
         let data = block_chain
             .into_iter()
             .try_fold(
-                ParseData::init(ephemeral_state.known_height),
+                ParseData::init(ephemeral_state),
                 |mut data, block| -> Result<ParseData, Error> {
                     BlockParser::parse(block, &mut data, &self.state.utxo)?;
                     Ok(data)
                 }
             )?;
+        trace!("{}", data);
 
-        trace!("Per-block processing has completed; inserting data into database as a transaction ...");
+        trace!("Per-block processing has completed; inserting data into database ...");
         let mut state_clone = self.state.clone();
         self.state_conn.transaction(|| {
             self.index_conn.transaction(|| {
@@ -84,13 +85,13 @@ impl BulkParser {
 
                 // Applying new state as a base state
                 trace!("Updating bulk parsing state data");
-                state_clone += ephemeral_state;
+                state_clone += data.state;
 
                 state_clone.store(&self.state_conn, &self.index_conn)
             })
         })?;
         self.state = state_clone;
-
+        trace!("{}", self.state);
 
         trace!("Returning success from the bulk parser");
         Ok(())

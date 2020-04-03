@@ -12,7 +12,10 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use std::ops::AddAssign;
+use std::{
+    fmt,
+    ops::AddAssign
+};
 use chrono::{Utc, NaiveDateTime};
 use diesel::{
     prelude::*,
@@ -25,9 +28,9 @@ use txlib::lnpbp::bitcoin::{
 };
 use super::*;
 use txlib::lnpbp::miniscript::bitcoin::OutPoint;
+use txlib::lnpbp::miniscript::bitcoin::hashes::core::fmt::Formatter;
 
-#[derive(Clone, Debug, Display, Default)]
-#[display_from(Debug)]
+#[derive(Clone, Debug, Default)]
 pub(super) struct State {
     pub utxo: UtxoMap,
     pub spent: Vec<(Txid, u16)>,
@@ -35,7 +38,7 @@ pub(super) struct State {
     pub block_cache_removal: Vec<BlockHash>,
 
     pub last_block_hash: Option<BlockHash>,
-    pub last_block_time: Option<u64>,
+    pub last_block_time: Option<u32>,
     pub known_height: u32,
     pub processed_height: u32,
     pub processed_txs: u64,
@@ -50,6 +53,29 @@ pub(super) struct State {
     pub utxo_bytes: u32,
     pub block_cache_size: u32,
     pub block_cache_bytes: u32,
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let utxo_count = self.utxo.map_size();
+        let spent_count = self.spent.len();
+        let bc_count = self.block_cache.len();
+        let bcr_count = self.block_cache_removal.len();
+
+        writeln!(f, "")?;
+        writeln!(f, "Known height: {} | Processed height: {} | Last block hash: {:x}",
+                 self.known_height,
+                 self.processed_height,
+                 self.last_block_hash.unwrap_or(BlockHash::default()))?;
+        writeln!(f, "")?;
+        writeln!(f, "{:<10}  {:^10} | {:^10} | {:^10} | {:^10}", "", "UTXO", "sUTXO", "BLCK_CACHE", "-BLCK_CACHE")?;
+        writeln!(f, "{:<10}: {:>10} | {:>10} | {:>10} | {:>10}", "Actuals", utxo_count, spent_count, bc_count, bcr_count)?;
+        writeln!(f, "{:<10}: {:>10} | {:>10} | {:>10} | {:>10}", "Statistics", self.utxo_size, "-", self.block_cache_size, "-")?;
+        writeln!(f, "")?;
+        writeln!(f, "{:<10}  {:^10} | {:^10} | {:^10} | {:^10} | {:^10}", "", "Block", "Tx", "TxIn", "TxOut", "Value")?;
+        writeln!(f, "{:<10}: {:>10} | {:>10} | {:>10} | {:>10}", "Statistics",
+                self.processed_blocks, self.processed_txs, self.processed_txins, self.processed_txouts)
+    }
 }
 
 impl From<State> for model::State {
@@ -80,6 +106,15 @@ impl From<State> for model::State {
 }
 
 impl State {
+    pub(super) fn inherit_state(state: &State) -> Self {
+        let mut me = Self::default();
+        me.known_height = state.known_height;
+        me.processed_height = state.processed_height;
+        me.last_block_hash = state.last_block_hash;
+        me.last_block_time = state.last_block_time;
+        me
+    }
+
     pub(super) fn restore(state_conn: &PgConnection, index_conn: &PgConnection) -> Result<Self, Error> {
         let state_model = state_table.find(0)
             .first(state_conn)
@@ -112,7 +147,7 @@ impl State {
             block_cache,
             block_cache_removal: vec![],
             last_block_hash: Some(BlockHash::from_slice(&state_model.last_block_hash[..])?),
-            last_block_time: Some(state_model.last_block_time.timestamp() as u64),
+            last_block_time: Some(state_model.last_block_time.timestamp() as u32),
             known_height:  state_model.known_height as u32,
             processed_height:  state_model.processed_height as u32,
             processed_txs:  state_model.processed_txs as u64,
@@ -247,36 +282,41 @@ impl State {
         // TODO: Update state for block cache parameters
 
         trace!("Ordering blocks into chain; adding the rest to cache");
-        let mut prev_blockhash = base_state.last_block_hash.unwrap_or(BlockHash::default());
+        let mut prev_block_hash = base_state.last_block_hash.unwrap_or(BlockHash::default());
+        let mut prev_block_time = base_state.last_block_time.unwrap_or(0);
         let mut block_height = base_state.known_height;
-        let mut block_chain = Vec::<Block>::with_capacity(blocks.len());
+        let mut blockchain = Vec::<Block>::with_capacity(blocks.len());
         blocks.into_iter().for_each(|block | {
-            if block_height != 0 && block.header.prev_blockhash != prev_blockhash {
+            if block_height != 0 && block.header.prev_blockhash != prev_block_hash {
                 trace!("Block out of order {}, must follow {}. Cache size {}",
                        block.block_hash(), block.header.prev_blockhash,
                        base_state.block_cache.len() + self.block_cache.len() + 1);
                 self.block_cache.insert(block.header.prev_blockhash, block.clone());
-                match base_state.block_cache.get(&prev_blockhash) {
+                match base_state.block_cache.get(&prev_block_hash) {
                     Some(b) => {
-                        block_chain.push(b.clone());
-                        prev_blockhash = block.block_hash();
-                        self.block_cache_removal.push(prev_blockhash);
+                        blockchain.push(b.clone());
+                        prev_block_hash = block.block_hash();
+                        prev_block_time = block.header.time;
+                        self.block_cache_removal.push(prev_block_hash);
                     }
-                    None => match self.block_cache.remove(&prev_blockhash) {
+                    None => match self.block_cache.remove(&prev_block_hash) {
                         Some(b) => {
-                            block_chain.push(b);
-                            prev_blockhash = block.block_hash();
+                            blockchain.push(b);
+                            prev_block_hash = block.block_hash();
+                            prev_block_time = block.header.time;
                         },
                         None => block_height += 1,
                     }
                 }
             } else {
-                prev_blockhash = block.block_hash();
-                block_chain.push(block);
+                prev_block_hash = block.block_hash();
+                prev_block_time = block.header.time;
+                blockchain.push(block);
             }
         });
-        self.last_block_hash = Some(prev_blockhash);
+        self.last_block_hash = Some(prev_block_hash);
+        self.last_block_time = Some(prev_block_time);
         self.known_height = block_height;
-        block_chain
+        blockchain
     }
 }
