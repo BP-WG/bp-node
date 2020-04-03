@@ -136,9 +136,20 @@ impl ParserService {
         match cmd {
             "BLOCK" => self.proc_cmd_blck(multipart, false).await,
             "BLOCKS" => self.proc_cmd_blck(multipart, true).await,
+            "CLEAR" => self.proc_cmd_clear(multipart).await,
             // TODO: Add support for other commands
             _ => Err(Error::UknownRequest),
         }
+    }
+
+    async fn proc_cmd_clear(&mut self, multipart: &[Vec<u8>]) -> Result<(), Error> {
+        if !multipart.is_empty() {
+            return Err(Error::WrongNumberOfArgs);
+        }
+        self.parser.clear_database()?;
+        trace!("Database clearing operation successfully complete");
+        self.input.send(zmq::Message::from("DONE"), 0)
+            .map_err(|e| Error::ParserIPCError(e))
     }
 
     async fn proc_cmd_blck(&mut self, multipart: &[Vec<u8>], multiple: bool) -> Result<(), Error> {

@@ -29,6 +29,13 @@ fn main() -> io::Result<()> {
     listener.set_subscribe("".as_bytes()).expect("Can't subscribe to parser daemon PUB service");
     println!("Connected to txparserd daemon");
 
+    println!("Clearing database");
+    client.send_multipart(vec![b"CLEAR".to_vec()], 0)
+        .expect("Can't send data to parser daemon");
+    if client.recv_string(0).expect("Can't read data from parser daemon") != Ok("DONE".to_string()) {
+        panic!("Failed clearing database");
+    }
+
     loop {
         let blockchain_path = "/var/lib/bitcoin/blocks";
         let block_file_name = format!("{}/blk{:05}.dat", blockchain_path, block_file_no);

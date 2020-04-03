@@ -96,6 +96,33 @@ impl BulkParser {
         Ok(())
     }
 
+    pub fn clear_database(&mut self) -> Result<(), Error> {
+        debug!("Deleting all data from the index database");
+
+        self.index_conn.transaction(|| {
+            trace!("Deleting all data from blocks table");
+            diesel::delete(schema::block::table)
+                .execute(&self.index_conn)?;
+
+            trace!("Deleting all data from transactions table");
+            diesel::delete(schema::tx::table)
+                .execute(&self.index_conn)?;
+
+            trace!("Deleting all data from transaction outputs table");
+            diesel::delete(schema::txout::table)
+                .execute(&self.index_conn)?;
+
+            trace!("Deleting all data from transaction inputs table");
+            diesel::delete(schema::txin::table)
+                .execute(&self.index_conn)
+        })?;
+
+        trace!("Clearing state & cache data");
+        self.state = State::default();
+
+        Ok(())
+    }
+
     /*
     pub fn get_stats(&self) -> State {
         self.state.clone()

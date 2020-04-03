@@ -119,6 +119,7 @@ impl ResponderService {
         let cmd = str::from_utf8(&command[..]).map_err(|_| Error::MalformedRequest)?;
         debug!("Processing {} command from client ...", cmd);
         match cmd {
+            "CLEAR" => self.proc_cmd_clear(multipart).await,
             "BLOCK" => self.proc_cmd_blck(multipart, false).await,
             "BLOCKS" => self.proc_cmd_blck(multipart, true).await,
             // TODO: Add support for other commands
@@ -153,6 +154,23 @@ impl ResponderService {
         if Some("ERR") == msg.as_str() {
             *self.busy_flag.lock().await = false;
         }
+        Ok(msg)
+    }
+
+    async fn proc_cmd_clear(&mut self, multipart: &[Vec<u8>]) -> Result<zmq::Message, Error> {
+        if !multipart.is_empty() {
+            Err(Error::WrongNumberOfArgs)?
+        }
+
+        self.parser
+            .send_multipart(vec![zmq::Message::from("CLEAR")], 0)
+            .map_err(|err| Error::ParserIPCError(err))?;
+
+        trace!("Reading response from parser service");
+        let msg = self.parser
+            .recv_msg(0)
+            .map_err(|err| Error::ParserIPCError(err))?;
+
         Ok(msg)
     }
 }
