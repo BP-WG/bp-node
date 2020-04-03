@@ -8,5 +8,6 @@ edition = "2018"
 
 [dependencies]
 diesel = { version = "~1.4", features = ["postgres", "uuid", "numeric", "chrono"] }
+derive_wrapper = "~0.1"
 chrono = "~0.4"
 lnpbp = { git = "https://github.com/lnp-bp/rust-lnpbp", branch = "feat-lnpbp5" }

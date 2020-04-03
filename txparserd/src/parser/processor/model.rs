@@ -11,15 +11,25 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-use chrono::{NaiveDateTime, NaiveDate};
-use diesel::sql_types::Interval;
-use diesel::pg::data_types::PgInterval;
-use super::schema::*;
-use std::time::SystemTime;
 
-#[derive(Identifiable, Queryable, Insertable)]
+use txlib::lnpbp::{
+    bitcoin::{self, consensus::encode::serialize, BlockHash},
+    bp::{short_id, BlockChecksum}
+};
+use chrono::{NaiveDateTime, Utc};
+use diesel::pg::data_types::PgInterval;
+
+pub(super) use crate::schema as state_schema;
+pub(super) use state_schema::state::dsl::state as state_table;
+pub(super) use state_schema::utxo::dsl::utxo as utxo_table;
+pub(super) use state_schema::cached_block::dsl::cached_block as cache_table;
+
+use state_schema::*;
+
+#[derive(Identifiable, Queryable, Insertable, AsChangeset, Clone, Debug, Display)]
+#[display_from(Debug)]
 #[table_name="state"]
-pub struct State {
+pub(super) struct State {
     pub id: i16,
     pub started_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -43,12 +53,12 @@ pub struct State {
 
 impl Default for State {
     fn default() -> Self {
-        let now = NaiveDateTime::from_timestamp(SystemTime::now().into(), 0);
+        let now = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0);
         Self {
             id: 0,
             started_at: now,
             updated_at: now,
-            last_block_hash: vec![],
+            last_block_hash: BlockHash::default().to_vec(),
             last_block_time: NaiveDateTime::from_timestamp(0, 0),
             known_height: 0,
             processed_height: 0,
@@ -74,18 +84,39 @@ impl Default for State {
 
 #[derive(Queryable, Insertable)]
 #[table_name="cached_block"]
-pub struct CachedBlock {
+pub(super) struct CachedBlock {
     pub hash: Vec<u8>,
     pub prev_hash: Vec<u8>,
     pub block: Vec<u8>,
 }
 
+impl From<bitcoin::Block> for CachedBlock {
+    fn from(block: bitcoin::Block) -> Self {
+        Self {
+            hash: block.block_hash().to_vec(),
+            prev_hash: block.header.prev_blockhash.to_vec(),
+            block: serialize(&block)
+        }
+    }
+}
+
 #[derive(Queryable, Insertable)]
 #[table_name="utxo"]
-pub struct Utxo {
+pub(super) struct Utxo {
     pub txid: Vec<u8>,
     pub block_height: i32,
     pub block_checksum: i16,
     pub tx_index: i16,
     pub output_index: i16,
+}
+
+impl From<Utxo> for short_id::Descriptor {
+    fn from(utxo: Utxo) -> Self {
+        short_id::Descriptor::OnchainTxOutput {
+            block_height: utxo.block_height as u32,
+            block_checksum: BlockChecksum::from_inner(utxo.block_checksum as u8),
+            tx_index: utxo.tx_index as u16,
+            output_index: utxo.output_index as u16
+        }
+    }
 }

@@ -11,5 +11,13 @@ dotenv = "~0.15"
 clap = "~2.33"
 chrono = "~0.4"
 derive_wrapper = "~0.1"
+async-trait = "~0.1"
+log = { version = "~0.4", features = ["max_level_trace", "release_max_level_debug"] }
+env_logger = "~0.7"
 diesel = { version = "~1.4", features = ["postgres", "numeric", "chrono"] }
 txlib = { path = "../txlib" }
+tokio = { version = "~0.2", features = ["full"] }
+futures = "~0.3"
+zmq = "~0.9"
+tiny_http = "~0.6"
+prometheus = "~0.8"

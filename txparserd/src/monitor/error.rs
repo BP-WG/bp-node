@@ -1,4 +1,4 @@
-// Bitcoin transaction processing & database indexing rust library
+// Bitcoin transaction processing & database indexing daemon
 // Written in 2020 by
 //     Dr. Maxim Orlovsky <orlovsky@pandoracore.com>
 //
@@ -11,14 +11,21 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-extern crate chrono;
-#[macro_use]
-extern crate diesel;
-#[macro_use]
-extern crate derive_wrapper;
-pub extern crate lnpbp;
 
-pub mod models;
-pub mod schema;
+use std::io;
 
-pub use lnpbp::common::macros::*;
+#[derive(Debug, Display)]
+#[display_from(Debug)]
+pub(super) enum Error {
+    APIRequestError(io::Error),
+    APIResponseError(io::Error),
+    PrometheusError(prometheus::Error),
+}
+
+impl std::error::Error for Error {}
+
+impl From<prometheus::Error> for Error {
+    fn from(err: prometheus::Error) -> Self {
+        Error::PrometheusError(err)
+    }
+}

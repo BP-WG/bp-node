@@ -1,4 +1,4 @@
-// Bitcoin transaction processing & database indexing rust library
+// Bitcoin transaction processing & database indexing daemon
 // Written in 2020 by
 //     Dr. Maxim Orlovsky <orlovsky@pandoracore.com>
 //
@@ -11,14 +11,14 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-extern crate chrono;
-#[macro_use]
-extern crate diesel;
-#[macro_use]
-extern crate derive_wrapper;
-pub extern crate lnpbp;
 
-pub mod models;
-pub mod schema;
+pub mod error;
+pub mod config;
+pub mod runtime;
+pub mod stats;
+pub(self) mod processor;
 
-pub use lnpbp::common::macros::*;
+pub use error::Error;
+pub use config::*;
+pub use runtime::*;
+pub use stats::*;
