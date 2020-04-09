@@ -50,3 +50,4 @@ pub mod error;
 pub use error::*;
 
 pub mod cli;
+pub mod indexer;
