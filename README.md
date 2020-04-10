@@ -1,23 +1,48 @@
-# Bitcoin Transaction Services
+# bpd: Bitcoin protocol daemon written in Rust
 
-This repository holds the source code for building the daemons and tools that 
-parse bitcoin blockchain blocks into a compact database based on 
-[LNPBP-5 standard](https://github.com/LNP-BP/lnpbps/blob/master/lnpbp-0005.md) 
-and provides a query API for data that can't be provided by either Bitcoin Core 
-and Electrum Server (like getting transaction spending particular output, 
-querying transactions by their script/miniscript code etc).
+`bpd` replaces Bitcoin Core in parts of it's outdated JSON API and
+different indexing servers (like Electrum) for an efficient and extended
+queries against bitcoin blockchain (see the drawing below).
 
-This project contains the following components:
+The daemon is made with focuse on:
+* non-blocking/async IO and APIs
+* ZMQ APIs for the clients
+* efficient indexing with
+  [LNPBP-5 standard](https://github.com/LNP-BP/lnpbps/blob/master/lnpbp-0005.md)
+* native miniscript support
+* arbitrary complex queries agains bitcoin transactions and their parts
+* layer 2/3 protocols in mind
+* native support for the new rust 
+  [Lightning network node](https://github.com/LNP-BP/lnp-node) `lnp-node`
 
-* `txparserd`: daemon that feeds with blocks from Bitcoin database, parses them
-  and stores transaction & block information in indexed database
-* `txqueryd`: daemon that provides API to external clients to query transaction
-  indexes
-* `txlib`: library with database models and schemata used by the above daemons
-* `fsparser`: a tool that parses the content of Bitcoin Core `blocks` directory
-  and feeds it to the `txparserd` for initial database population with the data
-* `zmqnotifier`: a service that can run together with Bitcoin Core instance
-  monitoring new blocks via ZeroMQ interface and feeds them to the `txparserd`
-  for maintaining the database updated
-  
+The repository also contains a tool for building initial blockchain index.
+
+NB: This is (not yet) a full validating node!
+
 ![Software architecture](doc/architecture.jpeg)
+
+## Installation
+
+You need to install nightly rust version and have PostgreSQL with
+default access settings
+
+```shell script
+rustup install nightly
+rustup default nightly
+git clone https://github.com/LNP-BP/bp-node
+cd bp-node
+./setup.sh
+cargo build
+```
+
+## Usage
+
+Assuming your bitcoin core directory is `/var/lib/bitcoin` you may
+simply run
+
+```shell script
+./target/debug/bp-index -v -v -v -v
+```
+
+otherwise you may provide custom location & database settings with
+specific flags.
