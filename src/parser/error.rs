@@ -1,4 +1,4 @@
-// Bitcoin transaction processing & database indexing daemon
+// Bitcoin protocol (BP) daemon node
 // Written in 2020 by
 //     Dr. Maxim Orlovsky <orlovsky@pandoracore.com>
 //
@@ -14,7 +14,7 @@
 
 use std::error;
 use diesel::result::Error as DieselError;
-use txlib::lnpbp::bitcoin;
+use lnpbp::bitcoin;
 
 
 #[derive(PartialEq, Debug, Display)]

@@ -1,4 +1,4 @@
-// Bitcoin transaction processing & database indexing daemon
+// Bitcoin protocol (BP) daemon node
 // Written in 2020 by
 //     Dr. Maxim Orlovsky <orlovsky@pandoracore.com>
 //
@@ -11,19 +11,20 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
+
 use std::collections::{HashMap, hash_map::Entry};
-use txlib::{
-    models,
-    lnpbp::{
-        bitcoin::{
-            Txid, Block, Transaction, TxIn, TxOut
-        },
-        bp::short_id::{
-            Descriptor, Dimension, BlockChecksum
-        }
+use lnpbp::{
+    bitcoin::{
+        Txid, Block, Transaction, TxIn, TxOut
+    },
+    bp::short_id::{
+        Descriptor, Dimension, BlockChecksum
     }
 };
+
+use crate::db::models as index_models;
 use super::{*, error::Error};
+
 
 #[derive(Debug, Display)]
 #[display_from(Debug)]
@@ -69,7 +70,7 @@ impl BlockParser<'_> {
             .try_for_each(|(index, tx)| self.parse_tx(index, tx))?;
 
         self.data.blocks
-            .push(txlib::models::Block::compose(block, self.descriptor)
+            .push(index_models::Block::compose(block, self.descriptor)
                 .map_err(|_| Error::BlockchainIndexesOutOfShortIdRanges)?);
 
         self.data.state.processed_height += 1;
@@ -103,7 +104,7 @@ impl BlockParser<'_> {
             .downgraded()
             .expect("Descriptor downgrade from an onchain transaction can't fail");
 
-        self.data.txs.push(txlib::models::Tx::compose(tx, self.descriptor)
+        self.data.txs.push(index_models::Tx::compose(tx, self.descriptor)
             .map_err(|_| Error::BlockchainIndexesOutOfShortIdRanges)?);
 
         // TODO: Update state stats
@@ -116,7 +117,7 @@ impl BlockParser<'_> {
             .expect("Transaction to block descriptor downgrade can't fail");
 
         let txo_descriptor = if let Some(coinbase_amount) = self.coinbase_amount {
-            self.data.txouts.push(models::Txout {
+            self.data.txouts.push(index_models::Txout {
                 id: block_descriptor.try_into_u64()
                     .expect("Block descriptor is generated from other already used descriptor, so can't fail")
                     as i64,
@@ -140,7 +141,7 @@ impl BlockParser<'_> {
             .upgraded(index as u16, Some(Dimension::Input))
             .expect("Descriptor upgrade for an onchain transaction does not fail");
 
-        self.data.txins.push(txlib::models::Txin::compose(txin, descriptor, txo_descriptor)
+        self.data.txins.push(index_models::Txin::compose(txin, descriptor, txo_descriptor)
             .map_err(|_| Error::BlockchainIndexesOutOfShortIdRanges)?);
 
         // TODO: Update state stats
@@ -159,7 +160,7 @@ impl BlockParser<'_> {
         };
         txoset.insert(index as u16, self.descriptor);
 
-        self.data.txouts.push(txlib::models::Txout::compose(txout, descriptor)
+        self.data.txouts.push(index_models::Txout::compose(txout, descriptor)
             .map_err(|_| Error::BlockchainIndexesOutOfShortIdRanges)?);
 
         // TODO: Update state stats

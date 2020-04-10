@@ -1,4 +1,4 @@
-// Bitcoin transaction processing & database indexing daemon
+// Bitcoin protocol (BP) daemon node
 // Written in 2020 by
 //     Dr. Maxim Orlovsky <orlovsky@pandoracore.com>
 //
@@ -16,29 +16,20 @@ use diesel::{
     prelude::*,
     pg::PgConnection
 };
-use txlib::{
-    schema,
-    lnpbp::bitcoin::Block
-};
-use crate::parser;
+use lnpbp::bitcoin::Block;
+
+use crate::db::schema;
 use super::*;
 
 
 pub struct BulkParser {
-    state: State,
-    state_conn: PgConnection,
-    index_conn: PgConnection,
+    pub state: State,
+    pub state_conn: PgConnection,
+    pub index_conn: PgConnection,
 }
 
 impl BulkParser {
-    pub fn restore(state_conn: PgConnection, index_conn: PgConnection) -> Result<Self, parser::Error> {
-        Ok(Self {
-            state: State::restore(&state_conn, &index_conn)?,
-            state_conn,
-            index_conn,
-        })
-    }
-
+    // TODO: Remove state connection
     pub fn init_from_scratch(state_conn: PgConnection, index_conn: PgConnection) -> Self {
         Self {
             state: State::default(),
@@ -79,15 +70,17 @@ impl BulkParser {
                 diesel::insert_into(schema::txout::table)
                     .values(data.txouts)
                     .execute(&self.index_conn)?;
-                diesel::insert_into(schema::txin::table)
+                let r = diesel::insert_into(schema::txin::table)
                     .values(data.txins)
-                    .execute(&self.index_conn)?;
+                    .execute(&self.index_conn);
 
                 // Applying new state as a base state
                 trace!("Updating bulk parsing state data");
                 state_clone += data.state;
 
-                state_clone.store(&self.state_conn, &self.index_conn)
+                // TODO: Move state storage transaction to indexer module
+                // state_clone.store(&self.state_conn, &self.index_conn)
+                r
             })
         })?;
         self.state = state_clone;

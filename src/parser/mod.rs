@@ -1,4 +1,4 @@
-// Bitcoin transaction processing & database indexing daemon
+// Bitcoin protocol (BP) daemon node
 // Written in 2020 by
 //     Dr. Maxim Orlovsky <orlovsky@pandoracore.com>
 //
@@ -12,17 +12,14 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-mod data;
 mod error;
-mod state;
-mod model;
 mod bulk_parser;
 mod block_parser;
+mod state;
+pub mod data;
 
 pub use bulk_parser::BulkParser;
 pub use error::Error;
-pub(self) use bulk_parser::*;
-pub(self) use model::*;
-pub(self) use data::*;
-pub(self) use state::*;
 pub(self) use block_parser::*;
+pub(self) use data::*;
+pub use state::*;

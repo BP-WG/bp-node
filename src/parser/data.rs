@@ -1,4 +1,4 @@
-// Bitcoin transaction processing & database indexing daemon
+// Bitcoin protocol (BP) daemon node
 // Written in 2020 by
 //     Dr. Maxim Orlovsky <orlovsky@pandoracore.com>
 //
@@ -17,21 +17,19 @@ use std::{
         HashMap, hash_map::Entry
     }
 };
-use txlib::{
-    models,
-    lnpbp::{
-        bitcoin::{Txid, BlockHash, Block, OutPoint},
-        bp::short_id::Descriptor
-    },
+use lnpbp::{
+    bitcoin::{Txid, BlockHash, Block, OutPoint},
+    bp::short_id::Descriptor
 };
 
+use crate::db::models;
 use super::state::State;
 
-pub(super) type VoutMap = HashMap<u16, Descriptor>;
-pub(super) type UtxoMap = HashMap<Txid, VoutMap>;
-pub(super) type BlockMap = HashMap<BlockHash, Block>;
+pub type VoutMap = HashMap<u16, Descriptor>;
+pub type UtxoMap = HashMap<Txid, VoutMap>;
+pub type BlockMap = HashMap<BlockHash, Block>;
 
-pub(super) trait UtxoAccess {
+pub trait UtxoAccess {
     fn get_descriptor(&self, outpoint: &OutPoint) -> Option<&Descriptor>;
     fn extract_descriptor(&mut self, outpoint: &OutPoint) -> Option<Descriptor>;
     fn remove_utxo(&mut self, outpoint: &OutPoint) -> bool;

@@ -11,12 +11,5 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
-pub mod config;
-pub mod runtime;
-pub mod db;
-pub(in crate::indexer) mod state;
-
-pub use config::*;
-pub use runtime::*;
-
+pub mod model;
+pub mod schema;

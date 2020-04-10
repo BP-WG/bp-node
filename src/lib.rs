@@ -28,6 +28,7 @@
 extern crate tokio;
 extern crate futures;
 extern crate zmq;
+#[macro_use]
 extern crate diesel;
 extern crate clap;
 #[macro_use]
@@ -47,7 +48,10 @@ pub mod msgbus;
 pub mod queryd;
 pub mod error;
 
-pub use error::*;
-
 pub mod cli;
 pub mod indexer;
+
+pub mod db;
+pub mod parser;
+
+pub use error::*;

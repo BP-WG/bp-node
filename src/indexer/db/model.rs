@@ -12,24 +12,27 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use txlib::lnpbp::{
+use lnpbp::{
     bitcoin::{self, consensus::encode::serialize, BlockHash},
     bp::{short_id, BlockChecksum}
 };
 use chrono::{NaiveDateTime, Utc};
 use diesel::pg::data_types::PgInterval;
 
-pub(super) use crate::schema as state_schema;
-pub(super) use state_schema::state::dsl::state as state_table;
-pub(super) use state_schema::utxo::dsl::utxo as utxo_table;
-pub(super) use state_schema::cached_block::dsl::cached_block as cache_table;
+pub(in crate::indexer) use crate::indexer::db::schema as state_schema;
+pub(in crate::indexer) use state_schema::state::dsl::state as state_table;
+pub(in crate::indexer) use state_schema::utxo::dsl::utxo as utxo_table;
+pub(in crate::indexer) use state_schema::cached_block::dsl::cached_block as cache_table;
 
 use state_schema::*;
+
+use crate::parser;
+
 
 #[derive(Identifiable, Queryable, Insertable, AsChangeset, Clone, Debug, Display)]
 #[display_from(Debug)]
 #[table_name="state"]
-pub(super) struct State {
+pub(in crate::indexer) struct State {
     pub id: i16,
     pub started_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -82,9 +85,37 @@ impl Default for State {
     }
 }
 
+impl From<parser::State> for State {
+    fn from(state: parser::State) -> Self {
+        // TODO: Fix id and started_at
+        Self {
+            id: 0,
+            started_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+            last_block_hash: state.last_block_hash.unwrap_or(BlockHash::default()).to_vec(),
+            last_block_time: NaiveDateTime::from_timestamp(state.last_block_time.unwrap_or(0) as i64, 0),
+            known_height: state.known_height as i32,
+            processed_height: state.processed_height as i32,
+            processed_txs: state.processed_txs as i64,
+            processed_txins: state.processed_txins as i64,
+            processed_txouts: state.processed_txouts as i64,
+            processed_blocks: state.processed_blocks as i64,
+            processed_volume: state.processed_volume as i64,
+            processed_bytes: state.processed_bytes as i64,
+            processed_time: PgInterval::from_microseconds(state.processed_time as i64),
+            utxo_size: state.utxo_size as i32,
+            utxo_volume: state.utxo_volume as i64,
+            utxo_bytes: state.utxo_bytes as i32,
+            block_cache_size: state.block_cache_size as i32,
+            block_cache_bytes: state.block_cache_size as i32,
+        }
+    }
+}
+
+
 #[derive(Queryable, Insertable)]
 #[table_name="cached_block"]
-pub(super) struct CachedBlock {
+pub(in crate::indexer) struct CachedBlock {
     pub hash: Vec<u8>,
     pub prev_hash: Vec<u8>,
     pub block: Vec<u8>,
@@ -102,7 +133,7 @@ impl From<bitcoin::Block> for CachedBlock {
 
 #[derive(Queryable, Insertable)]
 #[table_name="utxo"]
-pub(super) struct Utxo {
+pub(in crate::indexer) struct Utxo {
     pub txid: Vec<u8>,
     pub block_height: i32,
     pub block_checksum: i16,
