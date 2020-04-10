@@ -47,6 +47,7 @@ extern crate lnpbp;
 pub mod msgbus;
 pub mod queryd;
 pub mod error;
+pub mod util;
 
 pub mod cli;
 pub mod indexer;
