@@ -73,7 +73,7 @@ impl Runtime {
     }
 
     fn parse_block_file(&mut self) -> Result<(), Error> {
-        let blckfile_name = format!("{}/blk{:05}.dat", self.config.data_dir, self.blckfile_no);
+        let blckfile_name = format!("{}/blocks/blk{:05}.dat", self.config.data_dir, self.blckfile_no);
         info!("Reading blocks from {} ...", blckfile_name);
 
         let blckfile = fs::File::open(blckfile_name)?;

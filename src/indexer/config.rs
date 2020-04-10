@@ -41,7 +41,7 @@ pub struct Opts {
     pub index_db: String,
 
     /// Connection string to state storing database
-    #[clap(global = true, short = "s", long = "state-db", default_value = "postgresql://postgres:example@localhost:5432/bp-parser")]
+    #[clap(global = true, short = "s", long = "state-db", default_value = "postgresql://postgres:example@localhost:5432/bp-indexer")]
     pub state_db: String,
 }
 

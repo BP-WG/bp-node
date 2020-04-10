@@ -1,7 +1,5 @@
 -- Your SQL goes here
 
-create user txparserd password 'txparserd';
-
 create table state
 (
     id smallserial  not null
@@ -32,9 +30,6 @@ create table state
     block_cache_bytes integer not null default 0
 );
 
-alter table state
-    owner to txparserd;
-
 create table cached_block
 (
     hash bytea not null
@@ -43,9 +38,6 @@ create table cached_block
     prev_hash bytea not null,
     block bytea not null
 );
-
-alter table cached_block
-    owner to txparserd;
 
 create table utxo
 (
@@ -57,6 +49,3 @@ create table utxo
     constraint utxo_id
         primary key (txid, output_index)
 );
-
-alter table utxo
-    owner to txparserd;

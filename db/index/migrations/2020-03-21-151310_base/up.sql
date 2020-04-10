@@ -14,9 +14,6 @@ create table block
     tx_count    integer   not null
 );
 
-alter table block
-    owner to postgres;
-
 create unique index block_blockid_uindex
     on block (block_id);
 
@@ -44,9 +41,6 @@ create table tx
     fee       bigint
 );
 
-alter table tx
-    owner to postgres;
-
 create unique index tx_id_uindex
     on tx (id);
 
@@ -58,9 +52,6 @@ create table txout
     amount bigint not null,
     script bytea  not null
 );
-
-alter table txout
-    owner to postgres;
 
 create index txout_amount_index
     on txout (amount);
@@ -82,9 +73,6 @@ create table txin
             references txout
             on update cascade on delete cascade
 );
-
-alter table txin
-    owner to postgres;
 
 create unique index txin_id_uindex
     on txin (id);
