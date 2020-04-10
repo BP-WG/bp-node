@@ -11,22 +11,21 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-pub mod config;
-pub mod service;
-pub mod constants;
-mod error;
-mod command;
-pub mod proc;
-
-pub use config::*;
-pub use service::*;
-pub use error::*;
-pub use command::*;
-pub use proc::*;
+mod connect;
+pub use connect::*;
+pub(self) use super::*;
 
 
-use std::convert::{TryFrom, TryInto};
+pub(super) const MSGID_OKAY: u16 = 0x0001;
+pub(super) const MSGID_ACK: u16 = 0x0002;
+pub(super) const MSGID_SUCCESS: u16 = 0x0003;
+pub(super) const MSGID_DONE: u16 = 0x0004;
+pub(super) const MSGID_FAILURE: u16 = 0x0005;
+pub(super) const MSGID_QUERY: u16 = 0x0010;
 
 
-pub type Multipart = Vec<zmq::Message>;
-
+pub trait Procedure<'a>: TryFrom<&'a [zmq::Message]> + Into<Multipart> {
+    fn into_multipart(self) -> Multipart {
+        self.into()
+    }
+}

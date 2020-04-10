@@ -55,7 +55,7 @@ pub enum Command {
     ClearIndex,
 
     /// Reports on current Bitcoin blockchain parse status
-    StatusReport {
+    Status {
         /// Output formatting to use
         #[clap(short = "f", long = "formatting", default_value="pretty-print",
                possible_values = &Formatting::variants())]

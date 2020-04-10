@@ -20,7 +20,6 @@ use lnpbp::internet::InetSocketAddrExt;
 
 use crate::BootstrapError;
 use super::*;
-use crate::msgbus::*;
 
 
 pub struct ApiService {

@@ -51,7 +51,7 @@ async fn main() -> Result<(), Error> {
         Command::IndexBlockchain { clear, .. } => {
             if clear.unwrap_or(false) { runtime.clear_db()?; }
             runtime.run_or_panic("Indexer runtime").await
-        }
+        },
         _ => unimplemented!()
     }
 }

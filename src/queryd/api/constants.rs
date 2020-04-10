@@ -11,22 +11,6 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-pub mod config;
-pub mod service;
-pub mod constants;
-mod error;
-mod command;
-pub mod proc;
 
-pub use config::*;
-pub use service::*;
-pub use error::*;
-pub use command::*;
-pub use proc::*;
-
-
-use std::convert::{TryFrom, TryInto};
-
-
-pub type Multipart = Vec<zmq::Message>;
-
+pub const MSGBUS_PEER_API_ADDR: &str = "ipc://bp.queryd.api";
+pub const MSGBUS_PEER_PUSH_ADDR: &str = "ipc://bp.queryd.push";
