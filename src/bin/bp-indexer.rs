@@ -21,11 +21,10 @@ use clap::derive::Clap;
 use lnpbp::TryService;
 
 use bp_node::indexer::*;
-use bp_node::BootstrapError;
 
 
 #[tokio::main]
-async fn main() -> Result<(), BootstrapError> {
+async fn main() -> Result<(), Error> {
     // TODO: Parse config file as well
     let opts: Opts = Opts::parse();
     let config: Config = opts.clone().into();
@@ -43,7 +42,7 @@ async fn main() -> Result<(), BootstrapError> {
     env_logger::init();
     log::set_max_level(LevelFilter::Trace);
 
-    let runtime = Runtime::init(config).await?;
+    let runtime = Runtime::init(config)?;
 
     // TODO: Run parsing procedure
     runtime.run_or_panic("Indexer runtime").await

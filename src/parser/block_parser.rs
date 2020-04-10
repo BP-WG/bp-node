@@ -71,7 +71,7 @@ impl BlockParser<'_> {
 
         self.data.blocks
             .push(index_models::Block::compose(block, self.descriptor)
-                .map_err(|_| Error::BlockchainIndexesOutOfShortIdRanges)?);
+                .map_err(|_| Error::CorruptedShortId)?);
 
         self.data.state.processed_height += 1;
         // TODO: Update the rest of the state
@@ -105,7 +105,7 @@ impl BlockParser<'_> {
             .expect("Descriptor downgrade from an onchain transaction can't fail");
 
         self.data.txs.push(index_models::Tx::compose(tx, self.descriptor)
-            .map_err(|_| Error::BlockchainIndexesOutOfShortIdRanges)?);
+            .map_err(|_| Error::CorruptedShortId)?);
 
         // TODO: Update state stats
 
@@ -142,7 +142,7 @@ impl BlockParser<'_> {
             .expect("Descriptor upgrade for an onchain transaction does not fail");
 
         self.data.txins.push(index_models::Txin::compose(txin, descriptor, txo_descriptor)
-            .map_err(|_| Error::BlockchainIndexesOutOfShortIdRanges)?);
+            .map_err(|_| Error::CorruptedShortId)?);
 
         // TODO: Update state stats
 
@@ -161,7 +161,7 @@ impl BlockParser<'_> {
         txoset.insert(index as u16, self.descriptor);
 
         self.data.txouts.push(index_models::Txout::compose(txout, descriptor)
-            .map_err(|_| Error::BlockchainIndexesOutOfShortIdRanges)?);
+            .map_err(|_| Error::CorruptedShortId)?);
 
         // TODO: Update state stats
 

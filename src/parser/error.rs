@@ -12,7 +12,6 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use std::error;
 use diesel::result::Error as DieselError;
 use lnpbp::bitcoin;
 
@@ -20,23 +19,22 @@ use lnpbp::bitcoin;
 #[derive(PartialEq, Debug, Display)]
 #[display_from(Debug)]
 pub enum Error {
-    BlockchainIndexesOutOfShortIdRanges,
+    IndexIntegrityError,
+    IndexError(DieselError),
+    CorruptedShortId,
     BlockValidationIncosistency,
-    IndexDBIntegrityError,
-    IndexDBError(DieselError),
-    StateDBError(DieselError),
 }
 
-impl error::Error for Error {}
+impl std::error::Error for Error {}
 
 impl From<DieselError> for Error {
     fn from(err: DieselError) -> Self {
-        Error::IndexDBError(err)
+        Error::IndexError(err)
     }
 }
 
 impl From<bitcoin::hashes::Error> for Error {
     fn from(_: bitcoin::hashes::Error) -> Self {
-        Error::IndexDBIntegrityError
+        Error::IndexIntegrityError
     }
 }

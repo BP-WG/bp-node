@@ -21,8 +21,9 @@ use lnpbp::bitcoin::{
     BlockHash, Txid, hashes::Hash, consensus::deserialize
 };
 
+use super::Error;
 use super::db::model::{self, *};
-use crate::parser::{State as ParserState, data::*, Error, BulkParser};
+use crate::parser::{State as ParserState, data::*, BulkParser};
 
 
 impl BulkParser {

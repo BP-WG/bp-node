@@ -31,6 +31,18 @@ pub struct Opts {
     /// Sets verbosity level; can be used multiple times to increase verbosity
     #[clap(global = true, short = "v", long = "verbose", min_values = 0, max_values = 4, parse(from_occurrences))]
     pub verbose: u8,
+
+    /// Bitcoin core data directory
+    #[clap(global = true, short = "d", long = "data-dir", default_value = "/var/lib/bitcoin")]
+    pub data_dir: String,
+
+    /// Connection string to index database
+    #[clap(global = true, short = "i", long = "index-db", default_value = "postgresql://postgres:example@localhost:5432/bp")]
+    pub index_db: String,
+
+    /// Connection string to state storing database
+    #[clap(global = true, short = "s", long = "state-db", default_value = "postgresql://postgres:example@localhost:5432/bp-parser")]
+    pub state_db: String,
 }
 
 
@@ -41,21 +53,18 @@ pub struct Opts {
 #[display_from(Debug)]
 pub struct Config {
     pub verbose: u8,
+    pub data_dir: String,
+    pub index_db: String,
+    pub state_db: String,
 }
 
 impl From<Opts> for Config {
     fn from(opts: Opts) -> Self {
         Self {
             verbose: opts.verbose,
-            ..Config::default()
-        }
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            verbose: 0,
+            data_dir: opts.data_dir,
+            index_db: opts.index_db,
+            state_db: opts.state_db,
         }
     }
 }
