@@ -63,7 +63,7 @@ pub enum Command {
     },
 
     /// Sends command to a wired daemon to connect to the new peer
-    ParseBlockchain {
+    IndexBlockchain {
         // TODO: Relace string with `PathBuf`; use #[clap(parse(from_os_str))]
         /// Bitcoin core data directory
         #[clap(short = "b", long = "bitcoin-dir", default_value = BITCOIN_DIR)]
@@ -159,12 +159,16 @@ pub struct Config {
 
 impl From<Opts> for Config {
     fn from(opts: Opts) -> Self {
-        Self {
+        let mut me = Self {
             verbose: opts.verbose,
             index_db: opts.index_db,
             state_db: opts.state_db,
             ..Config::default()
+        };
+        if let Command::IndexBlockchain { bitcoin_dir, .. } = opts.command {
+            me.bitcoin_dir = bitcoin_dir;
         }
+        me
     }
 }
 

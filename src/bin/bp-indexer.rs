@@ -42,8 +42,16 @@ async fn main() -> Result<(), Error> {
     env_logger::init();
     log::set_max_level(LevelFilter::Trace);
 
-    let runtime = Runtime::init(config)?;
+    let mut runtime = Runtime::init(config)?;
 
-    // TODO: Run parsing procedure
-    runtime.run_or_panic("Indexer runtime").await
+    match opts.command {
+        Command::ClearIndex => {
+            runtime.clear_db()
+        },
+        Command::IndexBlockchain { clear, .. } => {
+            if clear.unwrap_or(false) { runtime.clear_db()?; }
+            runtime.run_or_panic("Indexer runtime").await
+        }
+        _ => unimplemented!()
+    }
 }

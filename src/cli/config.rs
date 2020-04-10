@@ -74,6 +74,7 @@ impl From<Opts> for Config {
             verbose: opts.verbose,
             msgbus_peer_api_addr: opts.queryd_api_socket_str,
             msgbus_peer_sub_addr: opts.queryd_push_socket_str,
+
             ..Config::default()
         }
     }
