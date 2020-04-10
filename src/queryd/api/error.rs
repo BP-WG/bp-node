@@ -19,11 +19,21 @@ use lnpbp::bitcoin::secp256k1;
 #[derive(Debug, Display)]
 #[display_from(Debug)]
 pub enum Error {
-    MessageBusError(zmq::Error),
+    /// Transport-level error
+    SocketError(zmq::Error),
+
+    // Request-specific errors
     MalformedRequest,
     MalformedCommand,
-    MalformedArgument,
     UnknownCommand,
+
+    // Reply-specific errors
+    MalformedReply,
+    MalformedStatus,
+    UnknownStatus,
+
+    // General API errors that may happen with both requests and replies
+    MalformedArgument,
     WrongNumberOfArguments
 }
 
@@ -35,7 +45,7 @@ impl From<Error> for String {
 
 impl From<zmq::Error> for Error {
     fn from(err: zmq::Error) -> Self {
-        Error::MessageBusError(err)
+        Error::SocketError(err)
     }
 }
 

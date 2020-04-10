@@ -16,12 +16,13 @@ pub use connect::*;
 pub(self) use super::*;
 
 
-pub(super) const MSGID_OKAY: u16 = 0x0001;
-pub(super) const MSGID_ACK: u16 = 0x0002;
-pub(super) const MSGID_SUCCESS: u16 = 0x0003;
-pub(super) const MSGID_DONE: u16 = 0x0004;
-pub(super) const MSGID_FAILURE: u16 = 0x0005;
-pub(super) const MSGID_QUERY: u16 = 0x0010;
+pub(super) const REQID_QUERY: u16 = 0x0010;
+
+pub(super) const REPID_OKAY: u16 = 0x0001;
+pub(super) const REPID_ACK: u16 = 0x0002;
+pub(super) const REPID_SUCCESS: u16 = 0x0003;
+pub(super) const REPID_DONE: u16 = 0x0004;
+pub(super) const REPID_FAILURE: u16 = 0x0005;
 
 
 pub trait Procedure<'a>: TryFrom<&'a [zmq::Message]> + Into<Multipart> {

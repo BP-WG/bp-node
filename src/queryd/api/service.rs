@@ -69,29 +69,29 @@ impl ApiService {
     async fn run(&mut self) -> Result<(), Error> {
         let req: Multipart = self.subscriber
             .recv_multipart(0)
-            .map_err(|err| Error::MessageBusError(err))?
+            .map_err(|err| Error::SocketError(err))?
             .into_iter()
             .map(zmq::Message::from)
             .collect();
         trace!("New API request");
 
         trace!("Received API request {:x?}, processing ... ", req[0]);
-        let resp = self.proc_command(req)
+        let reply = self.proc_command(req)
             .inspect_err(|err| error!("Error processing request: {}", err))
             .await
-            .unwrap_or(Command::Failure);
+            .unwrap_or(Reply::Failure);
 
-        trace!("Received response from command processor: `{}`; replying to client", resp);
-        self.subscriber.send_multipart(Multipart::from(Command::Success), 0)?;
-        debug!("Sent reply {}", Command::Success);
+        trace!("Received response from command processor: `{}`; replying to client", reply);
+        self.subscriber.send_multipart(Multipart::from(Reply::Success), 0)?;
+        debug!("Sent reply {}", Reply::Success);
 
         Ok(())
     }
 
-    async fn proc_command(&mut self, req: Multipart) -> Result<Command, Error> {
-        use Command::*;
+    async fn proc_command(&mut self, req: Multipart) -> Result<Reply, Error> {
+        use Request::*;
 
-        let command = Command::try_from(req)?;
+        let command = Request::try_from(req)?;
 
         match command {
             Query(query) => self.command_query(query).await,
@@ -99,11 +99,11 @@ impl ApiService {
         }
     }
 
-    async fn command_query(&mut self, query: Query) -> Result<Command, Error> {
+    async fn command_query(&mut self, query: Query) -> Result<Reply, Error> {
         debug!("Got QUERY {}", query);
 
         // TODO: Do query processing
 
-        Ok(Command::Success)
+        Ok(Reply::Success)
     }
 }

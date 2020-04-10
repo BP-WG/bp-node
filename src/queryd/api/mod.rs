@@ -13,15 +13,16 @@
 
 pub mod config;
 pub mod service;
-pub mod constants;
 mod error;
-mod command;
+mod request;
+mod reply;
 pub mod proc;
 
 pub use config::*;
 pub use service::*;
 pub use error::*;
-pub use command::*;
+pub use request::*;
+pub use reply::*;
 pub use proc::*;
 
 
