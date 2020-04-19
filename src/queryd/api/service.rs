@@ -15,6 +15,7 @@
 use std::convert::TryFrom;
 use futures::TryFutureExt;
 
+use lnpbp::api::{Multipart, Error};
 use lnpbp::service::*;
 use lnpbp::internet::InetSocketAddrExt;
 

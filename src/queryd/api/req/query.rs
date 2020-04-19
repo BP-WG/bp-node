@@ -14,6 +14,8 @@
 
 use std::convert::TryFrom;
 
+use lnpbp::api::{Multipart, Error};
+
 use super::*;
 
 
@@ -22,8 +24,6 @@ use super::*;
 pub struct Query {
     pub query: String,
 }
-
-impl Procedure<'_> for Query { }
 
 impl TryFrom<&[zmq::Message]> for Query {
     type Error = Error;

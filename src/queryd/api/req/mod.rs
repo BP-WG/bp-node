@@ -11,10 +11,19 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-mod connect;
-pub use connect::*;
+mod query;
+pub use query::*;
+
 pub(self) use super::*;
 
+
+use core::slice::Iter;
+use std::marker::PhantomData;
+
+use lnpbp::wrapper;
+use lnpbp::bp::short_id::ShortId;
+use lnpbp::bitcoin;
+use zmq::Message;
 
 pub(super) const REQID_QUERY: u16 = 0x0010;
 
@@ -24,9 +33,3 @@ pub(super) const REPID_SUCCESS: u16 = 0x0003;
 pub(super) const REPID_DONE: u16 = 0x0004;
 pub(super) const REPID_FAILURE: u16 = 0x0005;
 
-
-pub trait Procedure<'a>: TryFrom<&'a [zmq::Message]> + Into<Multipart> {
-    fn into_multipart(self) -> Multipart {
-        self.into()
-    }
-}

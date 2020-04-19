@@ -12,13 +12,16 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
+use lnpbp::api::*;
+use lnpbp::bp::short_id::ShortId;
+
 use super::*;
 
 
-#[derive(Clone, Debug, Display)]
-#[display_from(Debug)]
 #[non_exhaustive]
 pub enum Request {
+    Txid(VecEncoding<ShortId>),
+    SpendingTxin(VecEncoding<ShortId>),
     Query(Query),
 }
 
@@ -54,6 +57,7 @@ impl From<Request> for Multipart {
             ].into_iter()
                 .chain(Multipart::from(query))
                 .collect::<Multipart>(),
+            _ => unimplemented!()
         }
     }
 }

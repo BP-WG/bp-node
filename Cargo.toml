@@ -23,6 +23,7 @@ prometheus = "~0.8"
 
 [dependencies.lnpbp]
 git = "https://github.com/lnp-bp/rust-lnpbp"
+branch = "feat-api"
 features = ["use-tor", "use-tokio", "use-log", "use-daemons"]
 
 # lnpbp requires custom version of bitcoin, so to maintain type compatibility

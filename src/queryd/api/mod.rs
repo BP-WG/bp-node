@@ -13,21 +13,15 @@
 
 pub mod config;
 pub mod service;
-mod error;
 mod request;
 mod reply;
-pub mod proc;
+pub mod req;
 
 pub use config::*;
 pub use service::*;
-pub use error::*;
 pub use request::*;
 pub use reply::*;
-pub use proc::*;
+pub use req::*;
 
 
 use std::convert::{TryFrom, TryInto};
-
-
-pub type Multipart = Vec<zmq::Message>;
-
