@@ -95,7 +95,7 @@ impl ApiService {
         let command = Request::try_from(req)?;
 
         match command {
-            Query(query) => self.command_query(query).await,
+            Utxo(query) => self.command_query(query).await,
             _ => Err(Error::UnknownCommand)
         }
     }

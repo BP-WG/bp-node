@@ -32,7 +32,7 @@ impl TryFrom<Multipart> for Request {
         let (cmd, args) = split_cmd_args(&multipart)?;
 
         Ok(match cmd {
-            REQID_QUERY => Request::Query(args.try_into()?),
+            REQID_UTXO => Request::Utxo(args.try_into()?),
             _ => Err(Error::UnknownCommand)?,
         })
     }
@@ -43,8 +43,8 @@ impl From<Request> for Multipart {
         use Request::*;
 
         match command {
-            Query(query) => vec![
-                zmq::Message::from(&REQID_QUERY.to_be_bytes()[..]),
+            Utxo(query) => vec![
+                zmq::Message::from(&REQID_UTXO.to_be_bytes()[..]),
             ].into_iter()
                 .chain(Multipart::from(query))
                 .collect::<Multipart>(),

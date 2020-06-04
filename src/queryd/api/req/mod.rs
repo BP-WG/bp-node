@@ -25,7 +25,7 @@ use lnpbp::bp::short_id::ShortId;
 use lnpbp::bitcoin;
 use zmq::Message;
 
-pub(super) const REQID_QUERY: u16 = 0x0010;
+pub(super) const REQID_UTXO: u16 = 0x0010;
 
 pub(super) const REPID_OKAY: u16 = 0x0001;
 pub(super) const REPID_ACK: u16 = 0x0002;

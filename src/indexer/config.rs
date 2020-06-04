@@ -12,7 +12,7 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use clap::{Clap, arg_enum};
+use clap::{Clap};
 
 use lnpbp::bitcoin::{Block, Transaction, BlockHash, Txid, hashes::hex::FromHex};
 
@@ -57,8 +57,7 @@ pub enum Command {
     /// Reports on current Bitcoin blockchain parse status
     Status {
         /// Output formatting to use
-        #[clap(short = "f", long = "formatting", default_value="pretty-print",
-               possible_values = &Formatting::variants())]
+        #[clap(short = "f", long = "formatting", default_value="pretty-print", arg_enum)]
         formatting: Formatting,
     },
 
@@ -79,8 +78,8 @@ pub enum Command {
     /// Adds custom off-chain block to the index
     IndexBlock {
         /// Format of the provided data.
-        #[clap(short = "f", long = "format", possible_values = &DataFormat::variants(),
-               conflicts_with("block"), default_value = "auto")]
+        #[clap(short = "f", long = "format",
+               conflicts_with("block"), default_value = "auto", arg_enum)]
         format: DataFormat,
 
         // TODO: Move `parse_block_str` implementation into `bitcoin::Block::FromStr`
@@ -95,8 +94,8 @@ pub enum Command {
     /// Adds custom off-chain transaction to the index
     IndexTransaction {
         /// Format of the provided data.
-        #[clap(short = "f", long = "format", possible_values = &DataFormat::variants(),
-               conflicts_with("block"), default_value = "auto")]
+        #[clap(short = "f", long = "format",
+               conflicts_with("block"), default_value = "auto", arg_enum)]
         format: DataFormat,
 
         // TODO: Move `parse_tx_str` implementation into `bitcoin::Transaction::FromStr`
@@ -125,24 +124,20 @@ pub enum Command {
     },
 }
 
-arg_enum! {
-    #[derive(Clap, Clone, Debug)]
-    pub enum Formatting {
-        PrettyPrint,
-        Json,
-        Yaml,
-        Xml,
-        AwkFriendly,
-    }
+#[derive(Clap, Clone, Debug)]
+pub enum Formatting {
+    PrettyPrint,
+    Json,
+    Yaml,
+    Xml,
+    AwkFriendly,
 }
 
-arg_enum! {
-    #[derive(Clone, Debug)]
-    pub enum DataFormat {
-        Auto,
-        Binary,
-        Hex,
-    }
+#[derive(Clap, Clone, Debug)]
+pub enum DataFormat {
+    Auto,
+    Binary,
+    Hex,
 }
 
 // We need config structure since not all of the parameters can be specified
