@@ -22,23 +22,14 @@ use super::*;
 pub enum Request {
     Txid(VecEncoding<ShortId>),
     SpendingTxin(VecEncoding<ShortId>),
-    Query(Query),
+    Utxo(Query),
 }
 
 impl TryFrom<Multipart> for Request {
     type Error = Error;
 
     fn try_from(multipart: Multipart) -> Result<Self, Self::Error> {
-        let (cmd, args) = multipart.split_first()
-            .ok_or(Error::MalformedRequest)
-            .and_then(|(cmd_data, args)| {
-                if cmd_data.len() != 2 {
-                    Err(Error::MalformedCommand)?
-                }
-                let mut buf = [0u8; 2];
-                buf.clone_from_slice(&cmd_data[0..2]);
-                Ok((u16::from_be_bytes(buf), args))
-            })?;
+        let (cmd, args) = split_cmd_args(&multipart)?;
 
         Ok(match cmd {
             REQID_QUERY => Request::Query(args.try_into()?),

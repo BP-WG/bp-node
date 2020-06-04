@@ -3,12 +3,14 @@ name = "bp_node"
 description = "Bitcoin protocol node"
 version = "0.1.0"
 authors = ["Dr. Maxim Orlovsky <orlovsky@pandoracore.com>"]
+keywords = ["bitcoin", "node"]
 license = "MIT"
 edition = "2018"
+readme = "README.md"
 
 [dependencies]
 dotenv = "~0.15"
-clap = { git = "https://github.com/clap-rs/clap.git" }
+clap = "=3.0.0-beta.1"
 chrono = "~0.4"
 derive_wrapper = "~0.1"
 async-trait = "~0.1"
