@@ -14,7 +14,8 @@
 
 use lnpbp::{
     bitcoin::{self, consensus::encode::serialize, BlockHash},
-    bp::{short_id, BlockChecksum}
+    bp::{short_id, BlockChecksum},
+    Wrapper
 };
 use chrono::{NaiveDateTime, Utc};
 use diesel::pg::data_types::PgInterval;

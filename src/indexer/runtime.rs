@@ -15,7 +15,7 @@
 use std::{io, fs};
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
-use lnpbp::service::*;
+use lnpbp::TryService;
 use lnpbp::bitcoin::{
     Block,
     network::stream_reader::StreamReader

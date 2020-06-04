@@ -12,7 +12,7 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use lnpbp::api::*;
+use lnpbp::rpc::*;
 use lnpbp::bp::short_id::ShortId;
 
 use super::*;

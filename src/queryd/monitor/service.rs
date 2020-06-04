@@ -15,7 +15,7 @@
 use tiny_http;
 use prometheus::Encoder;
 
-use lnpbp::service::*;
+use lnpbp::Service;
 
 use crate::error::*;
 use super::{*, error::Error};

@@ -17,7 +17,7 @@ use std::env;
 use log::*;
 use clap::derive::Clap;
 
-use lnpbp::common::service::TryService;
+use lnpbp::TryService;
 
 use bp_node::BootstrapError;
 use bp_node::queryd::*;

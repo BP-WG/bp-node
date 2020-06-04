@@ -14,7 +14,7 @@
 
 use std::convert::TryFrom;
 
-use lnpbp::api::{Multipart, Error};
+use lnpbp::rpc::{Multipart, Error};
 
 use super::*;
 

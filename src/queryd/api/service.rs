@@ -15,8 +15,8 @@
 use std::convert::TryFrom;
 use futures::TryFutureExt;
 
-use lnpbp::api::{Multipart, Error};
-use lnpbp::service::*;
+use lnpbp::rpc::{Multipart, Error};
+use lnpbp::TryService;
 use lnpbp::internet::InetSocketAddrExt;
 
 use crate::BootstrapError;

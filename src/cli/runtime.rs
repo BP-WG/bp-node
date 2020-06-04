@@ -14,7 +14,7 @@
 
 use std::convert::TryFrom;
 
-use lnpbp::service::*;
+use lnpbp::TryService;
 
 use super::*;
 use crate::error::BootstrapError;

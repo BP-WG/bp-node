@@ -12,10 +12,10 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use lnpbp::service::*;
+use lnpbp::{TryService, Service};
 
 use crate::BootstrapError;
-use super::*;
+use super::{Config, ApiService};
 use crate::queryd::MonitorService;
 
 

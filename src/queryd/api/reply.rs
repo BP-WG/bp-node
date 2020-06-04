@@ -12,7 +12,7 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use lnpbp::api::{Multipart, Error};
+use lnpbp::rpc::{Multipart, Error};
 
 use super::*;
 
