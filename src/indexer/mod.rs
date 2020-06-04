@@ -18,6 +18,6 @@ mod error;
 mod db;
 mod state;
 
-pub use config::*;
-pub use runtime::*;
-pub use error::*;
+pub use config::{Config, Command, Opts, DataFormat, Formatting};
+pub use runtime::Runtime;
+pub use error::Error;

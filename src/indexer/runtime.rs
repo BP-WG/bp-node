@@ -21,7 +21,7 @@ use lnpbp::bitcoin::{
     network::stream_reader::StreamReader
 };
 
-use super::*;
+use super::{Config, Error};
 use crate::parser::BulkParser;
 
 
