@@ -9,8 +9,9 @@ edition = "2018"
 readme = "README.md"
 
 [dependencies]
+amplify = "~1.2.0"
 dotenv = "~0.15"
-clap = "=3.0.0-beta.1"
+clap = "=3.0.0-beta.2"
 chrono = "~0.4"
 derive_wrapper = "~0.1"
 async-trait = "~0.1"
@@ -25,10 +26,15 @@ prometheus = "~0.8"
 
 [dependencies.lnpbp]
 git = "https://github.com/lnp-bp/rust-lnpbp"
-tag = "v0.1.0-alpha.3"
-features = ["tor", "tokio", "log", "daemons", "serde"]
+branch = "master"
+features = ["tor", "tokio", "serde"]
 
-# lnpbp requires custom version of bitcoin, so to maintain type compatibility
-# we have to use library through lnpbp::bitcoin handle and not via direct
-# dependency
-#bitcoin = "~0.23"
+[patch.crates-io]
+# We need this b/c of breaking change in tagged hash type generation
+bitcoin_hashes = { git = "https://github.com/LNP-BP/bitcoin_hashes", tag = "lnpbp-v0.1.0-rc1" }
+bitcoin = { git = "https://github.com/LNP-BP/rust-bitcoin", tag = "lnpbp-v0.1.0-rc1" }
+# We need custom branches here just to depend on the same bitcoin master and do
+# not have secp256k1 version conflict
+miniscript = { git = "https://github.com/LNP-BP/rust-miniscript", tag = "lnpbp-v0.1.0-rc1" }
+# Remove this once https://github.com/jean-airoldie/zeromq-src-rs/pull/15 got merged
+zeromq-src = { git = "https://github.com/LNP-BP/zeromq-src-rs", branch = "fix/cmake" }

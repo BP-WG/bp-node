@@ -17,7 +17,7 @@ use futures::TryFutureExt;
 
 use lnpbp::rpc::{Multipart, Error};
 use lnpbp::TryService;
-use lnpbp::internet::InetSocketAddrExt;
+use amplify::internet::InetSocketAddrExt;
 
 use crate::BootstrapError;
 use super::*;

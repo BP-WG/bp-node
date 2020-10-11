@@ -15,7 +15,7 @@
 use std::net::SocketAddr;
 use clap::Clap;
 
-use lnpbp::internet::{InetSocketAddr, InetAddr};
+use amplify::internet::{InetSocketAddr, InetAddr};
 
 
 const MONITOR_ADDR_DEFAULT: &str = "0.0.0.0:9665";

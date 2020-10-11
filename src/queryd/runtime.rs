@@ -12,7 +12,7 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use lnpbp::{TryService, Service};
+use amplify::{TryService, Service};
 
 use crate::BootstrapError;
 use super::{Config, ApiService};

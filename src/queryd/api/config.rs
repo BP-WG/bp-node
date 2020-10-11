@@ -12,7 +12,7 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 
-use lnpbp::internet::InetSocketAddr;
+use amplify::internet::InetSocketAddr;
 
 use crate::queryd::config::Config as MainConfig;
 
