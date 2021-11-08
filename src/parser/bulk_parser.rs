@@ -16,7 +16,7 @@ use diesel::{
     prelude::*,
     pg::PgConnection
 };
-use lnpbp::bitcoin::Block;
+use bitcoin::Block;
 
 use crate::db::schema;
 use super::*;

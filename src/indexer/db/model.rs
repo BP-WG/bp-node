@@ -11,28 +11,24 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
-use lnpbp::{
-    bitcoin::{self, consensus::encode::serialize, BlockHash},
-    bp::{short_id, BlockChecksum},
-    Wrapper
-};
+use bitcoin::{consensus::encode::serialize, Block, BlockHash};
+use bp::short_id::{BlockChecksum, Descriptor};
 use chrono::{NaiveDateTime, Utc};
 use diesel::pg::data_types::PgInterval;
+use amplify::Wrapper;
 
 pub(in crate::indexer) use crate::indexer::db::schema as state_schema;
+pub(in crate::indexer) use state_schema::cached_block::dsl::cached_block as cache_table;
 pub(in crate::indexer) use state_schema::state::dsl::state as state_table;
 pub(in crate::indexer) use state_schema::utxo::dsl::utxo as utxo_table;
-pub(in crate::indexer) use state_schema::cached_block::dsl::cached_block as cache_table;
 
 use state_schema::*;
 
 use crate::parser;
 
-
 #[derive(Identifiable, Queryable, Insertable, AsChangeset, Clone, Debug, Display)]
 #[display_from(Debug)]
-#[table_name="state"]
+#[table_name = "state"]
 pub(in crate::indexer) struct State {
     pub id: i16,
     pub started_at: NaiveDateTime,
@@ -75,13 +71,13 @@ impl Default for State {
             processed_time: PgInterval {
                 microseconds: 0,
                 days: 0,
-                months: 0
+                months: 0,
             },
             utxo_size: 0,
             utxo_volume: 0,
             utxo_bytes: 0,
             block_cache_size: 0,
-            block_cache_bytes: 0
+            block_cache_bytes: 0,
         }
     }
 }
@@ -93,8 +89,14 @@ impl From<parser::State> for State {
             id: 0,
             started_at: Utc::now().naive_utc(),
             updated_at: Utc::now().naive_utc(),
-            last_block_hash: state.last_block_hash.unwrap_or(BlockHash::default()).to_vec(),
-            last_block_time: NaiveDateTime::from_timestamp(state.last_block_time.unwrap_or(0) as i64, 0),
+            last_block_hash: state
+                .last_block_hash
+                .unwrap_or(BlockHash::default())
+                .to_vec(),
+            last_block_time: NaiveDateTime::from_timestamp(
+                state.last_block_time.unwrap_or(0) as i64,
+                0,
+            ),
             known_height: state.known_height as i32,
             processed_height: state.processed_height as i32,
             processed_txs: state.processed_txs as i64,
@@ -113,27 +115,26 @@ impl From<parser::State> for State {
     }
 }
 
-
 #[derive(Queryable, Insertable)]
-#[table_name="cached_block"]
+#[table_name = "cached_block"]
 pub(in crate::indexer) struct CachedBlock {
     pub hash: Vec<u8>,
     pub prev_hash: Vec<u8>,
     pub block: Vec<u8>,
 }
 
-impl From<bitcoin::Block> for CachedBlock {
-    fn from(block: bitcoin::Block) -> Self {
+impl From<Block> for CachedBlock {
+    fn from(block: Block) -> Self {
         Self {
             hash: block.block_hash().to_vec(),
             prev_hash: block.header.prev_blockhash.to_vec(),
-            block: serialize(&block)
+            block: serialize(&block),
         }
     }
 }
 
 #[derive(Queryable, Insertable)]
-#[table_name="utxo"]
+#[table_name = "utxo"]
 pub(in crate::indexer) struct Utxo {
     pub txid: Vec<u8>,
     pub block_height: i32,
@@ -142,13 +143,13 @@ pub(in crate::indexer) struct Utxo {
     pub output_index: i16,
 }
 
-impl From<Utxo> for short_id::Descriptor {
+impl From<Utxo> for Descriptor {
     fn from(utxo: Utxo) -> Self {
-        short_id::Descriptor::OnchainTxOutput {
+        Descriptor::OnchainTxOutput {
             block_height: utxo.block_height as u32,
             block_checksum: BlockChecksum::from_inner(utxo.block_checksum as u8),
             tx_index: utxo.tx_index as u16,
-            output_index: utxo.output_index as u16
+            output_index: utxo.output_index as u16,
         }
     }
 }

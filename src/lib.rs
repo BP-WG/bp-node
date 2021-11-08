@@ -11,42 +11,34 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
 // We need this since code is not completed and a lot of it is written
 // for future functionality
 // Remove this once the first version will be complete
 #![allow(dead_code)]
 #![allow(unused_variables)]
+#![allow(non_snake_case)]
+#![allow(unreachable_patterns)]
 // In mutithread environments it's critical to capture all failures
 #![deny(unused_must_use)]
-
-#![feature(never_type)]
 #![feature(unwrap_infallible)]
 #![feature(in_band_lifetimes)]
 
-#[macro_use]
-extern crate tokio;
-extern crate futures;
 extern crate zmq;
 #[macro_use]
 extern crate diesel;
-extern crate clap;
 #[macro_use]
 extern crate derive_wrapper;
-#[macro_use]
-extern crate async_trait;
+extern crate chrono;
+extern crate dotenv;
+extern crate env_logger;
 #[macro_use]
 extern crate log;
-extern crate env_logger;
-extern crate dotenv;
-extern crate chrono;
-extern crate tiny_http;
 extern crate prometheus;
-extern crate lnpbp;
+extern crate tiny_http;
 
+pub mod error;
 pub mod msgbus;
 pub mod queryd;
-pub mod error;
 pub mod util;
 
 pub mod cli;

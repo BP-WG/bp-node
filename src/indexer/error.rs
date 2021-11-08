@@ -16,7 +16,7 @@ use std::io;
 use diesel::ConnectionError;
 use diesel::result::Error as DieselError;
 
-use lnpbp::bitcoin;
+use bitcoin::{consensus, hashes};
 
 use crate::parser;
 
@@ -49,14 +49,14 @@ impl From<DieselError> for Error {
     }
 }
 
-impl From<bitcoin::consensus::encode::Error> for Error {
-    fn from(err: bitcoin::consensus::encode::Error) -> Self {
+impl From<consensus::encode::Error> for Error {
+    fn from(err: consensus::encode::Error) -> Self {
         Error::CurruptBlockFile
     }
 }
 
-impl From<bitcoin::hashes::Error> for Error {
-    fn from(_: bitcoin::hashes::Error) -> Self {
+impl From<hashes::Error> for Error {
+    fn from(_: hashes::Error) -> Self {
         Error::IndexDBIntegrityError
     }
 }

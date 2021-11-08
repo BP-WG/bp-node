@@ -11,44 +11,64 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
-use clap::{Clap};
-
-use lnpbp::bitcoin::{Block, Transaction, BlockHash, Txid, hashes::hex::FromHex};
-
+use bitcoin::hashes::hex::FromHex;
+use bitcoin::{Block, BlockHash, Transaction, Txid};
+use clap::{ArgEnum, Parser};
 
 const BITCOIN_DIR: &str = "/var/lib/bitcoin";
 
-#[derive(Clap, Clone, Debug, Display)]
+#[derive(Parser, Clone, Debug, Display)]
 #[display_from(Debug)]
 #[clap(
     name = "bp-indexer",
     version = "0.0.1",
     author = "Dr Maxim Orlovsky <orlovsky@pandoracore.com>",
-    about =  "BP blockchain indexing utility; part of Bitcoin protocol node"
+    about = "BP blockchain indexing utility; part of Bitcoin protocol node"
 )]
 pub struct Opts {
     /// Path and name of the configuration file
-    #[clap(global = true, short = "c", long = "config", default_value = "./indexer.toml")]
+    #[clap(
+        global = true,
+        short = 'c',
+        long = "config",
+        default_value = "./indexer.toml"
+    )]
     pub config: String,
 
     /// Sets verbosity level; can be used multiple times to increase verbosity
-    #[clap(global = true, short = "v", long = "verbose", min_values = 0, max_values = 4, parse(from_occurrences))]
+    #[clap(
+        global = true,
+        short = 'v',
+        long = "verbose",
+        min_values = 0,
+        max_values = 4,
+        parse(from_occurrences)
+    )]
     pub verbose: u8,
 
     /// Connection string to index database
-    #[clap(global = true, short = "i", long = "index-db", default_value = "postgresql://postgres:example@localhost:5432/bp")]
+    #[clap(
+        global = true,
+        short = 'i',
+        long = "index-db",
+        default_value = "postgresql://postgres:example@localhost:5432/bp"
+    )]
     pub index_db: String,
 
     /// Connection string to state storing database
-    #[clap(global = true, short = "s", long = "state-db", default_value = "postgresql://postgres:example@localhost:5432/bp-indexer")]
+    #[clap(
+        global = true,
+        short = 's',
+        long = "state-db",
+        default_value = "postgresql://postgres:example@localhost:5432/bp-indexer"
+    )]
     pub state_db: String,
 
     #[clap(subcommand)]
-    pub command: Command
+    pub command: Command,
 }
 
-#[derive(Clap, Clone, Debug, Display)]
+#[derive(Parser, ArgEnum, Clone, Debug, Display)]
 #[display_from(Debug)]
 pub enum Command {
     /// Clear parsing status and index data
@@ -57,7 +77,12 @@ pub enum Command {
     /// Reports on current Bitcoin blockchain parse status
     Status {
         /// Output formatting to use
-        #[clap(short = "f", long = "formatting", default_value="pretty-print", arg_enum)]
+        #[clap(
+            short = 'f',
+            long = "formatting",
+            default_value = "pretty-print",
+            arg_enum
+        )]
         formatting: Formatting,
     },
 
@@ -65,7 +90,7 @@ pub enum Command {
     IndexBlockchain {
         // TODO: Relace string with `PathBuf`; use #[clap(parse(from_os_str))]
         /// Bitcoin core data directory
-        #[clap(short = "b", long = "bitcoin-dir", default_value = BITCOIN_DIR)]
+        #[clap(short = 'b', long = "bitcoin-dir", default_value = BITCOIN_DIR)]
         bitcoin_dir: String,
 
         /// Clears the existing index data and starts parsing from scratch.
@@ -78,8 +103,13 @@ pub enum Command {
     /// Adds custom off-chain block to the index
     IndexBlock {
         /// Format of the provided data.
-        #[clap(short = "f", long = "format",
-               conflicts_with("block"), default_value = "auto", arg_enum)]
+        #[clap(
+            short = 'f',
+            long = "format",
+            conflicts_with("block"),
+            default_value = "auto",
+            arg_enum
+        )]
         format: DataFormat,
 
         // TODO: Move `parse_block_str` implementation into `bitcoin::Block::FromStr`
@@ -94,8 +124,13 @@ pub enum Command {
     /// Adds custom off-chain transaction to the index
     IndexTransaction {
         /// Format of the provided data.
-        #[clap(short = "f", long = "format",
-               conflicts_with("block"), default_value = "auto", arg_enum)]
+        #[clap(
+            short = 'f',
+            long = "format",
+            conflicts_with("block"),
+            default_value = "auto",
+            arg_enum
+        )]
         format: DataFormat,
 
         // TODO: Move `parse_tx_str` implementation into `bitcoin::Transaction::FromStr`
@@ -111,7 +146,7 @@ pub enum Command {
     RemoveBlock {
         /// Block hash (block id) to remove from database. If matches on-chain
         /// block the parameter is ignored and program fails.
-        #[clap(parse(try_from_str = ::lnpbp::bitcoin::BlockHash::from_hex))]
+        #[clap(parse(try_from_str = BlockHash::from_hex))]
         block_hash: BlockHash,
     },
 
@@ -119,12 +154,12 @@ pub enum Command {
     RemoveTransaction {
         /// Transaction id to remove from database. If matches on-chain
         /// transaction the parameter is ignored and program fails.
-        #[clap(parse(try_from_str = ::lnpbp::bitcoin::Txid::from_hex))]
+        #[clap(parse(try_from_str = Txid::from_hex))]
         txid: Txid,
     },
 }
 
-#[derive(Clap, Clone, Debug)]
+#[derive(Parser, ArgEnum, Clone, Debug)]
 pub enum Formatting {
     PrettyPrint,
     Json,
@@ -133,7 +168,7 @@ pub enum Formatting {
     AwkFriendly,
 }
 
-#[derive(Clap, Clone, Debug)]
+#[derive(Parser, ArgEnum, Clone, Debug)]
 pub enum DataFormat {
     Auto,
     Binary,
@@ -173,7 +208,7 @@ impl Default for Config {
             verbose: 1,
             bitcoin_dir: BITCOIN_DIR.to_string(),
             index_db: "".to_string(),
-            state_db: "".to_string()
+            state_db: "".to_string(),
         }
     }
 }

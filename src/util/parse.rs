@@ -11,22 +11,20 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
-use lnpbp::bitcoin::{self, Block, Transaction};
-use lnpbp::bitcoin::hashes::hex::FromHex;
+use bitcoin::hashes::hex::FromHex;
+use bitcoin::{consensus, Block, Transaction};
 
 // TODO: Move `parse_block_str` implementation into `bitcoin::Block::FromStr`
-pub fn parse_block_str(data: &str) -> Result<Block, bitcoin::consensus::encode::Error> {
-    // TODO: Fix `itcoin::consensus::encode::Error::ParseFailed` `&str` type to String
+pub fn parse_block_str(data: &str) -> Result<Block, consensus::encode::Error> {
+    // TODO: Fix `consensus::encode::Error::ParseFailed` `&str` type to String
     let vec = Vec::from_hex(data)
-        .map_err(|err| bitcoin::consensus::encode::Error::ParseFailed("Not a hexadecimal string"))?;
-    bitcoin::consensus::deserialize(&vec)
+        .map_err(|err| consensus::encode::Error::ParseFailed("Not a hexadecimal string"))?;
+    consensus::deserialize(&vec)
 }
 
-
 // TODO: Move `parse_tx_str` implementation into `bitcoin::Transaction::FromStr`
-pub fn parse_tx_str(data: &str) -> Result<Transaction, bitcoin::consensus::encode::Error> {
+pub fn parse_tx_str(data: &str) -> Result<Transaction, consensus::encode::Error> {
     let vec = Vec::from_hex(data)
-        .map_err(|err| bitcoin::consensus::encode::Error::ParseFailed("Not a hexadecimal string"))?;
-    bitcoin::consensus::deserialize(&vec)
+        .map_err(|err| consensus::encode::Error::ParseFailed("Not a hexadecimal string"))?;
+    consensus::deserialize(&vec)
 }

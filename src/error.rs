@@ -11,10 +11,7 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
 use std::io;
-use tokio::task::JoinError;
-
 
 #[derive(Debug, Display)]
 #[display_from(Debug)]
@@ -24,14 +21,15 @@ pub enum BootstrapError {
     ArgParseError(String),
     SubscriptionError(zmq::Error),
     PublishingError(zmq::Error),
-    MultithreadError(JoinError),
     MonitorSocketError(Box<dyn std::error::Error>),
 }
 
-impl std::error::Error for BootstrapError { }
+impl std::error::Error for BootstrapError {}
 
 impl From<BootstrapError> for String {
-    fn from(err: BootstrapError) -> Self { format!("{}", err) }
+    fn from(err: BootstrapError) -> Self {
+        format!("{}", err)
+    }
 }
 
 impl From<&str> for BootstrapError {
@@ -49,11 +47,5 @@ impl From<String> for BootstrapError {
 impl From<io::Error> for BootstrapError {
     fn from(err: io::Error) -> Self {
         BootstrapError::IoError(err)
-    }
-}
-
-impl From<JoinError> for BootstrapError {
-    fn from(err: JoinError) -> Self {
-        BootstrapError::MultithreadError(err)
     }
 }

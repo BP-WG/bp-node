@@ -13,14 +13,14 @@
 
 
 use std::net::SocketAddr;
-use clap::Clap;
+use clap::{Parser};
 
-use lnpbp::internet::{InetSocketAddr, InetAddr};
+use internet2::addr::{InetSocketAddr, InetAddr};
 
 
 const MONITOR_ADDR_DEFAULT: &str = "0.0.0.0:9665";
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(
     name = "queryd",
     version = "0.0.1",
@@ -29,28 +29,28 @@ const MONITOR_ADDR_DEFAULT: &str = "0.0.0.0:9665";
 )]
 pub struct Opts {
     /// Path and name of the configuration file
-    #[clap(short = "c", long = "config", default_value = "wired.toml")]
+    #[clap(short = 'c', long = "config", default_value = "wired.toml")]
     pub config: String,
 
     /// Sets verbosity level; can be used multiple times to increase verbosity
-    #[clap(global = true, short = "v", long = "verbose", min_values = 0, max_values = 4, parse(from_occurrences))]
+    #[clap(global = true, short = 'v', long = "verbose", min_values = 0, max_values = 4, parse(from_occurrences))]
     pub verbose: u8,
 
     /// IPv4, IPv6 or Tor address to listen for incoming API requests
-    #[clap(short = "i", long = "inet-addr", default_value = "0.0.0.0", env="BP_QUERYD_INET_ADDR",
+    #[clap(short = 'i', long = "inet-addr", default_value = "0.0.0.0", env="BP_QUERYD_INET_ADDR",
            parse(try_from_str))]
     address: InetAddr,
 
     /// Use custom port to listen for incoming API requests
-    #[clap(short = "a", long = "api-port", default_value = "9713", env="BP_QUERYD_API_PORT")]
+    #[clap(short = 'a', long = "api-port", default_value = "9713", env="BP_QUERYD_API_PORT")]
     api_port: u16,
 
     /// Use custom port to listen for incoming API requests
-    #[clap(short = "p", long = "push-port", default_value = "9716", env="BP_QUERYD_PUSH_PORT")]
+    #[clap(short = 'p', long = "push-port", default_value = "9716", env="BP_QUERYD_PUSH_PORT")]
     push_port: u16,
 
     /// Address for Prometheus monitoring information exporter
-    #[clap(short = "m", long = "monitor", default_value = MONITOR_ADDR_DEFAULT, env="BP_QUERYD_MONITOR",
+    #[clap(short = 'm', long = "monitor", default_value = MONITOR_ADDR_DEFAULT, env="BP_QUERYD_MONITOR",
            parse(try_from_str))]
     monitor: SocketAddr,
 }

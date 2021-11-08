@@ -11,19 +11,14 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
-use std::{io, fs};
-use diesel::prelude::*;
+use bitcoin::{network::stream_reader::StreamReader, Block};
 use diesel::pg::PgConnection;
-use lnpbp::TryService;
-use lnpbp::bitcoin::{
-    Block,
-    network::stream_reader::StreamReader
-};
+use diesel::prelude::*;
+use microservices::node::TryService;
+use std::{fs, io};
 
 use super::{Config, Error};
 use crate::parser::BulkParser;
-
 
 pub struct Runtime {
     config: Config,
@@ -49,16 +44,15 @@ impl Runtime {
         Ok(Self {
             config,
             parser,
-            blckfile_no: 0
+            blckfile_no: 0,
         })
     }
 }
 
-#[async_trait]
 impl TryService for Runtime {
     type ErrorType = Error;
 
-    async fn try_run_loop(mut self) -> Result<!, Self::ErrorType> {
+    fn try_run_loop(mut self) -> Result<(), Self::ErrorType> {
         loop {
             self.parse_block_file()?;
         }
@@ -73,7 +67,10 @@ impl Runtime {
     }
 
     fn parse_block_file(&mut self) -> Result<(), Error> {
-        let blckfile_name = format!("{}/blocks/blk{:05}.dat", self.config.bitcoin_dir, self.blckfile_no);
+        let blckfile_name = format!(
+            "{}/blocks/blk{:05}.dat",
+            self.config.bitcoin_dir, self.blckfile_no
+        );
         info!("Reading blocks from {} ...", blckfile_name);
 
         let blckfile = fs::File::open(blckfile_name)?;

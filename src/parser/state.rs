@@ -16,9 +16,7 @@ use std::{
     fmt,
     ops::AddAssign
 };
-use lnpbp::bitcoin::{
-    Block, BlockHash, Txid, OutPoint
-};
+use bitcoin::{Block, BlockHash, Txid, OutPoint};
 
 use super::*;
 

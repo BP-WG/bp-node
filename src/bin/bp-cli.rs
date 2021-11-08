@@ -11,41 +11,52 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-#![feature(never_type)]
+#![recursion_limit = "256"]
+// Coding conventions
+#![deny(
+    non_upper_case_globals,
+    non_camel_case_types,
+    non_snake_case,
+    unused_mut,
+    unused_imports,
+    dead_code,
+    // missing_docs
+)]
 
-use std::env;
+use clap::Parser;
 use log::*;
-use clap::derive::Clap;
+use std::env;
 
-use bp_node::cli::*;
+use bp_node::cli::{Command, Config, Opts, Runtime};
 
-
-#[tokio::main]
-async fn main() -> Result<(), String> {
+fn main() -> Result<(), String> {
     // TODO: Parse config file as well
     let opts: Opts = Opts::parse();
     let config: Config = opts.clone().into();
 
     if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", match config.verbose {
-            0 => "error",
-            1 => "warn",
-            2 => "info",
-            3 => "debug",
-            4 => "trace",
-            _ => "trace",
-        });
+        env::set_var(
+            "RUST_LOG",
+            match config.verbose {
+                0 => "error",
+                1 => "warn",
+                2 => "info",
+                3 => "debug",
+                4 => "trace",
+                _ => "trace",
+            },
+        );
     }
     env_logger::init();
     log::set_max_level(LevelFilter::Trace);
 
-    let runtime = Runtime::init(config).await?;
+    let runtime = Runtime::init(config)?;
 
     // Non-interactive command processing:
     debug!("Parsing and processing a command");
     match opts.command {
-        Command::Query { query } => runtime.command_query(query).await?,
-        _ => unimplemented!()
+        Command::Query { query } => runtime.command_query(query)?,
+        _ => unimplemented!(),
     }
 
     Ok(())

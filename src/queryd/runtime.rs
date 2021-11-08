@@ -11,13 +11,11 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
-use lnpbp::{TryService, Service};
-
-use crate::BootstrapError;
-use super::{Config, ApiService};
+use super::{ApiService, Config};
 use crate::queryd::MonitorService;
-
+use crate::BootstrapError;
+use microservices::node::{Service, TryService};
+use std::thread;
 
 pub struct Runtime {
     config: Config,
@@ -27,18 +25,12 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    pub async fn init(config: Config) -> Result<Self, BootstrapError> {
+    pub fn init(config: Config) -> Result<Self, BootstrapError> {
         let context = zmq::Context::new();
 
-        let api_service = ApiService::init(
-            config.clone().into(),
-            context.clone()
-        )?;
+        let api_service = ApiService::init(config.clone().into(), context.clone())?;
         // TODO: Add push notification service
-        let monitor_service = MonitorService::init(
-            config.clone().into(),
-            context.clone()
-        )?;
+        let monitor_service = MonitorService::init(config.clone().into(), context.clone())?;
 
         Ok(Self {
             config,
@@ -49,29 +41,29 @@ impl Runtime {
     }
 }
 
-#[async_trait]
 impl TryService for Runtime {
-    type ErrorType = tokio::task::JoinError;
+    type ErrorType = BootstrapError;
 
-    async fn try_run_loop(self) -> Result<!, Self::ErrorType> {
+    fn try_run_loop(self) -> Result<(), Self::ErrorType> {
         let api_addr = self.config.msgbus_peer_api_addr.clone();
         let monitor_addr = self.config.monitor_addr.clone();
 
         let api_service = self.api_service;
         let monitor_service = self.monitor_service;
 
-        try_join!(
-            tokio::spawn(async move {
-                info!("API service is listening on {}", api_addr);
-                api_service.run_or_panic("API service").await
-            }),
-            // TODO: Add push notification service
-            tokio::spawn(async move {
-                info!("Monitoring (Prometheus) exporter service is listening on {}", monitor_addr);
-                monitor_service.run_loop().await
-            })
-        )?;
+        let handler = thread::spawn(move || {
+            info!("API service is listening on {}", api_addr);
+            api_service.run_or_panic("API service")
+        });
+        // TODO: Add push notification service
+        thread::spawn(move || {
+            info!(
+                "Monitoring (Prometheus) exporter service is listening on {}",
+                monitor_addr
+            );
+            monitor_service.run_loop()
+        });
 
-        loop { }
+        loop {}
     }
 }

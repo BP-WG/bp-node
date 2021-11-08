@@ -11,11 +11,9 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
-use lnpbp::rpc::{Multipart, Error};
-
 use super::*;
 
+use crate::msgbus::{proc, Error, Multipart};
 
 #[derive(Clone, Debug, Display)]
 #[display_from(Debug)]
@@ -32,7 +30,8 @@ impl TryFrom<Multipart> for Reply {
     type Error = Error;
 
     fn try_from(multipart: Multipart) -> Result<Self, Self::Error> {
-        let (cmd, args) = multipart.split_first()
+        let (cmd, args) = multipart
+            .split_first()
             .ok_or(Error::MalformedReply)
             .and_then(|(cmd_data, args)| {
                 if cmd_data.len() != 2 {
@@ -59,11 +58,11 @@ impl From<Reply> for Multipart {
         use Reply::*;
 
         match reply {
-            Okay => vec![zmq::Message::from(&REPID_OKAY.to_be_bytes()[..])],
-            Ack => vec![zmq::Message::from(&REPID_ACK.to_be_bytes()[..])],
-            Success => vec![zmq::Message::from(&REPID_SUCCESS.to_be_bytes()[..])],
-            Done => vec![zmq::Message::from(&REPID_DONE.to_be_bytes()[..])],
-            Failure => vec![zmq::Message::from(&REPID_FAILURE.to_be_bytes()[..])],
+            Okay => vec![zmq::Message::from(&proc::REPID_OKAY.to_be_bytes()[..])],
+            Ack => vec![zmq::Message::from(&proc::REPID_ACK.to_be_bytes()[..])],
+            Success => vec![zmq::Message::from(&proc::REPID_SUCCESS.to_be_bytes()[..])],
+            Done => vec![zmq::Message::from(&proc::REPID_DONE.to_be_bytes()[..])],
+            Failure => vec![zmq::Message::from(&proc::REPID_FAILURE.to_be_bytes()[..])],
         }
     }
 }
