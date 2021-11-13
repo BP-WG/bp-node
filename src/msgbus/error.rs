@@ -11,26 +11,34 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
-use lnpbp::bitcoin;
-use lnpbp::bitcoin::secp256k1;
-
+use bitcoin::{consensus, secp256k1};
 
 #[derive(Debug, Display)]
 #[display_from(Debug)]
 pub enum Error {
     MessageBusError(zmq::Error),
+    
+    // Request-specific errors
     MalformedRequest,
     MalformedCommand,
-    MalformedArgument,
     UnknownCommand,
-    WrongNumberOfArguments
+
+    // Reply-specific errors
+    MalformedReply,
+    MalformedStatus,
+    UnknownStatus,
+
+    // General API errors that may happen with both requests and replies
+    MalformedArgument,
+    WrongNumberOfArguments,
 }
 
 impl std::error::Error for Error {}
 
 impl From<Error> for String {
-    fn from(err: Error) -> Self { format!("{}", err) }
+    fn from(err: Error) -> Self {
+        format!("{}", err)
+    }
 }
 
 impl From<zmq::Error> for Error {
@@ -39,8 +47,8 @@ impl From<zmq::Error> for Error {
     }
 }
 
-impl From<bitcoin::consensus::encode::Error> for Error {
-    fn from(_: bitcoin::consensus::encode::Error) -> Self {
+impl From<consensus::encode::Error> for Error {
+    fn from(_: consensus::encode::Error) -> Self {
         Error::MalformedArgument
     }
 }

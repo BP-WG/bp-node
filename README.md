@@ -5,7 +5,6 @@ different indexing servers (like Electrum) for efficient and extended
 queries against bitcoin blockchain (see the drawing below).
 
 The daemon is made with focus on:
-* non-blocking/async IO and APIs
 * ZMQ APIs for the clients
 * efficient indexing with
   [LNPBP-5 standard](https://github.com/LNP-BP/lnpbps/blob/master/lnpbp-0005.md)

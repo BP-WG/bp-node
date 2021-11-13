@@ -11,19 +11,32 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
-pub mod constants;
-mod error;
 mod command;
+pub mod constants;
+pub mod encode;
+mod error;
 pub mod proc;
 
-pub use error::*;
 pub use command::*;
+pub use error::*;
 pub use proc::*;
-
+pub use encode::*;
 
 use std::convert::{TryFrom, TryInto};
 
-
 pub type Multipart = Vec<zmq::Message>;
+pub type CommandId = u16;
 
+pub fn split_cmd_args(multipart: &Multipart) -> Result<(CommandId, &[zmq::Message]), Error> {
+    Ok(multipart
+        .split_first()
+        .ok_or(Error::MalformedRequest)
+        .and_then(|(cmd_data, args)| {
+            if cmd_data.len() != 2 {
+                Err(Error::MalformedCommand)?
+            }
+            let mut buf = [0u8; 2];
+            buf.clone_from_slice(&cmd_data[0..2]);
+            Ok((u16::from_be_bytes(buf), args))
+        })?)
+}

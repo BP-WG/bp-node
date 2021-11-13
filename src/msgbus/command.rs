@@ -43,12 +43,12 @@ impl TryFrom<Multipart> for Command {
             })?;
 
         Ok(match cmd {
-            MSGID_OKAY => Command::Okay,
-            MSGID_ACK => Command::Ack,
-            MSGID_SUCCESS => Command::Success,
-            MSGID_DONE => Command::Done,
-            MSGID_FAILURE => Command::Failure,
-            MSGID_QUERY => Command::Query(args.try_into()?),
+            REPID_OKAY => Command::Okay,
+            REPID_ACK => Command::Ack,
+            REPID_SUCCESS => Command::Success,
+            REPID_DONE => Command::Done,
+            REPID_FAILURE => Command::Failure,
+            REQID_UTXO => Command::Query(args.try_into()?),
             _ => Err(Error::UnknownCommand)?,
         })
     }
@@ -59,13 +59,13 @@ impl From<Command> for Multipart {
         use Command::*;
 
         match command {
-            Okay => vec![zmq::Message::from(&MSGID_OKAY.to_be_bytes()[..])],
-            Ack => vec![zmq::Message::from(&MSGID_ACK.to_be_bytes()[..])],
-            Success => vec![zmq::Message::from(&MSGID_SUCCESS.to_be_bytes()[..])],
-            Done => vec![zmq::Message::from(&MSGID_DONE.to_be_bytes()[..])],
-            Failure => vec![zmq::Message::from(&MSGID_FAILURE.to_be_bytes()[..])],
+            Okay => vec![zmq::Message::from(&REPID_OKAY.to_be_bytes()[..])],
+            Ack => vec![zmq::Message::from(&REPID_ACK.to_be_bytes()[..])],
+            Success => vec![zmq::Message::from(&REPID_SUCCESS.to_be_bytes()[..])],
+            Done => vec![zmq::Message::from(&REPID_DONE.to_be_bytes()[..])],
+            Failure => vec![zmq::Message::from(&REPID_FAILURE.to_be_bytes()[..])],
             Query(query) => vec![
-                zmq::Message::from(&MSGID_QUERY.to_be_bytes()[..]),
+                zmq::Message::from(&REQID_UTXO.to_be_bytes()[..]),
             ].into_iter()
                 .chain(Multipart::from(query))
                 .collect::<Multipart>(),

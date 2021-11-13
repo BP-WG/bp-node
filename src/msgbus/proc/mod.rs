@@ -12,17 +12,15 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 mod connect;
-pub use connect::*;
 pub(self) use super::*;
+pub use connect::*;
 
-
-pub(super) const MSGID_OKAY: u16 = 0x0001;
-pub(super) const MSGID_ACK: u16 = 0x0002;
-pub(super) const MSGID_SUCCESS: u16 = 0x0003;
-pub(super) const MSGID_DONE: u16 = 0x0004;
-pub(super) const MSGID_FAILURE: u16 = 0x0005;
-pub(super) const MSGID_QUERY: u16 = 0x0010;
-
+pub const REQID_UTXO: u16 = 0x0010;
+pub const REPID_OKAY: u16 = 0x0001;
+pub const REPID_ACK: u16 = 0x0002;
+pub const REPID_SUCCESS: u16 = 0x0003;
+pub const REPID_DONE: u16 = 0x0004;
+pub const REPID_FAILURE: u16 = 0x0005;
 
 pub trait Procedure<'a>: TryFrom<&'a [zmq::Message]> + Into<Multipart> {
     fn into_multipart(self) -> Multipart {

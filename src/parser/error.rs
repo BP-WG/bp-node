@@ -13,7 +13,7 @@
 
 
 use diesel::result::Error as DieselError;
-use lnpbp::bitcoin;
+use bitcoin::hashes;
 
 
 #[derive(PartialEq, Debug, Display)]
@@ -33,8 +33,8 @@ impl From<DieselError> for Error {
     }
 }
 
-impl From<bitcoin::hashes::Error> for Error {
-    fn from(_: bitcoin::hashes::Error) -> Self {
+impl From<hashes::Error> for Error {
+    fn from(_: hashes::Error) -> Self {
         Error::IndexIntegrityError
     }
 }

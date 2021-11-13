@@ -11,15 +11,11 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
 use std::convert::TryFrom;
-
-use lnpbp::TryService;
 
 use super::*;
 use crate::error::BootstrapError;
 use crate::msgbus::{self, Multipart};
-
 
 pub struct Runtime {
     config: Config,
@@ -29,21 +25,32 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    pub async fn init(config: Config) -> Result<Self, BootstrapError> {
+    pub fn init(config: Config) -> Result<Self, BootstrapError> {
         let context = zmq::Context::new();
 
-        debug!("Opening API socket to wired on {} ...", config.msgbus_peer_api_addr);
-        let api_socket = context.socket(zmq::REQ)
+        debug!(
+            "Opening API socket to wired on {} ...",
+            config.msgbus_peer_api_addr
+        );
+        let api_socket = context
+            .socket(zmq::REQ)
             .map_err(|e| BootstrapError::PublishingError(e))?;
-        api_socket.bind(&config.msgbus_peer_api_addr)
+        api_socket
+            .bind(&config.msgbus_peer_api_addr)
             .map_err(|e| BootstrapError::PublishingError(e))?;
 
-        debug!("Opening push notification socket to wired on {} ...", config.msgbus_peer_sub_addr);
-        let sub_socket = context.socket(zmq::SUB)
+        debug!(
+            "Opening push notification socket to wired on {} ...",
+            config.msgbus_peer_sub_addr
+        );
+        let sub_socket = context
+            .socket(zmq::SUB)
             .map_err(|e| BootstrapError::SubscriptionError(e))?;
-        sub_socket.connect(&config.msgbus_peer_sub_addr)
+        sub_socket
+            .connect(&config.msgbus_peer_sub_addr)
             .map_err(|e| BootstrapError::SubscriptionError(e))?;
-        sub_socket.set_subscribe("".as_bytes())
+        sub_socket
+            .set_subscribe("".as_bytes())
             .map_err(|e| BootstrapError::SubscriptionError(e))?;
 
         debug!("Console is launched");
@@ -55,12 +62,14 @@ impl Runtime {
         })
     }
 
-    pub async fn command_query(&self, query: String) -> Result<(), msgbus::Error> {
+    pub fn command_query(&self, query: String) -> Result<(), msgbus::Error> {
         info!("Performing QUERY command {} ...", query);
         let multipart: msgbus::Multipart = msgbus::Command::Query(msgbus::Query { query }).into();
         self.api_socket.send_multipart(multipart, 0)?;
         trace!("Request sent, awaiting response ...");
-        let rep: Multipart = self.api_socket.recv_multipart(0)?
+        let rep: Multipart = self
+            .api_socket
+            .recv_multipart(0)?
             .iter()
             .map(|vec| zmq::Message::from(vec))
             .collect();
@@ -69,23 +78,14 @@ impl Runtime {
     }
 }
 
-#[async_trait]
-impl TryService for Runtime {
-    type ErrorType = tokio::task::JoinError;
-
-    async fn try_run_loop(self) -> Result<!, Self::ErrorType> {
-        loop {
-
-        }
-    }
-}
-
 impl Drop for Runtime {
     fn drop(&mut self) {
         trace!("Shutting down sockets");
-        self.api_socket.disconnect(&self.config.msgbus_peer_api_addr)
+        self.api_socket
+            .disconnect(&self.config.msgbus_peer_api_addr)
             .unwrap_or_else(|err| error!("Error disconnecting message bus API socket: {}", err));
-        self.sub_socket.disconnect(&self.config.msgbus_peer_sub_addr)
+        self.sub_socket
+            .disconnect(&self.config.msgbus_peer_sub_addr)
             .unwrap_or_else(|err| error!("Error disconnecting message bus push socket: {}", err));
     }
 }

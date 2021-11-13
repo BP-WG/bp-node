@@ -12,16 +12,13 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 pub mod config;
-pub mod service;
-mod request;
 mod reply;
-pub mod req;
+mod request;
+pub mod service;
 
 pub use config::*;
-pub use service::*;
-pub use request::*;
 pub use reply::*;
-pub use req::*;
+pub use request::*;
+pub use service::*;
 
-
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;

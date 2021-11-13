@@ -5,30 +5,48 @@ version = "0.1.0"
 authors = ["Dr. Maxim Orlovsky <orlovsky@pandoracore.com>"]
 keywords = ["bitcoin", "node"]
 license = "MIT"
-edition = "2018"
+edition = "2021"
 readme = "README.md"
+
+[lib]
+name = "bp_node"
+
+[[bin]]
+name = "queryd"
+path = "src/bin/queryd.rs"
+
+[[bin]]
+name = "bp-cli"
+path = "src/bin/bp-cli.rs"
+
+[[bin]]
+name = "bp-indexer"
+path = "src/bin/bp-indexer.rs"
 
 [dependencies]
 dotenv = "~0.15"
-clap = "=3.0.0-beta.1"
+clap = "=3.0.0-beta.5"
 chrono = "~0.4"
 derive_wrapper = "~0.1"
-async-trait = "~0.1"
 log = { version = "~0.4", features = ["max_level_trace", "release_max_level_debug"] }
 env_logger = "~0.7"
 diesel = { version = "~1.4", features = ["postgres", "uuid", "numeric", "chrono"] }
-tokio = { version = "~0.2", features = ["full"] }
-futures = "~0.3"
 zmq = "~0.9"
 tiny_http = "~0.6"
 prometheus = "~0.8"
+amplify = "~3.9.1"
+bp-core = "0.5.0-rc.1"
+microservices = { version = "0.5.0-beta.1", default-features = false, features = ["peer"] }
+internet2 = "0.5.0-alpha.2"
+bitcoin = "0.27.1"
+bitcoin_hashes = "0.10.0"
+miniscript = "6.0.1"
 
 [dependencies.lnpbp]
 git = "https://github.com/lnp-bp/rust-lnpbp"
-tag = "v0.1.0-alpha.3"
-features = ["tor", "tokio", "log", "daemons", "serde"]
+branch = "master"
 
-# lnpbp requires custom version of bitcoin, so to maintain type compatibility
-# we have to use library through lnpbp::bitcoin handle and not via direct
-# dependency
-#bitcoin = "~0.23"
+[patch.crates-io]
+# Remove this once https://github.com/jean-airoldie/zeromq-src-rs/pull/15 got merged
+zeromq-src = { git = "https://github.com/LNP-BP/zeromq-src-rs", branch = "fix/cmake" }
+bp-core = { git = "https://github.com/xn3cr0nx/bp-core", branch = "pub-short-id" }

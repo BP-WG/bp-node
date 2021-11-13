@@ -11,18 +11,18 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
+use bp::short_id::ShortId;
 
-use lnpbp::rpc::*;
-use lnpbp::bp::short_id::ShortId;
+use crate::msgbus::{proc, VecEncoding};
+use std::convert::{TryFrom, TryInto};
 
-use super::*;
-
+use crate::msgbus::{split_cmd_args, Error, Multipart};
 
 #[non_exhaustive]
 pub enum Request {
     Txid(VecEncoding<ShortId>),
     SpendingTxin(VecEncoding<ShortId>),
-    Utxo(Query),
+    Utxo(proc::Query),
 }
 
 impl TryFrom<Multipart> for Request {
@@ -43,12 +43,11 @@ impl From<Request> for Multipart {
         use Request::*;
 
         match command {
-            Utxo(query) => vec![
-                zmq::Message::from(&REQID_UTXO.to_be_bytes()[..]),
-            ].into_iter()
+            Utxo(query) => vec![zmq::Message::from(&proc::REQID_UTXO.to_be_bytes()[..])]
+                .into_iter()
                 .chain(Multipart::from(query))
                 .collect::<Multipart>(),
-            _ => unimplemented!()
+            _ => unimplemented!(),
         }
     }
 }

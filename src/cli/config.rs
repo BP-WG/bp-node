@@ -11,51 +11,60 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
-use clap::Clap;
+use clap::Parser;
 
 use crate::msgbus::constants::*;
 
-
-#[derive(Clap, Clone, Debug, Display)]
+#[derive(Parser, Clone, Debug, Display)]
 #[display_from(Debug)]
 #[clap(
     name = "bp-cli",
     version = "0.0.1",
     author = "Dr Maxim Orlovsky <orlovsky@pandoracore.com>",
-    about =  "BP node command-line interface; part of Bitcoin protocol node"
+    about = "BP node command-line interface; part of Bitcoin protocol node"
 )]
 pub struct Opts {
     /// Path and name of the configuration file
-    #[clap(global = true, short = "c", long = "config", default_value = "./cli.toml")]
+    #[clap(
+        global = true,
+        short = 'c',
+        long = "config",
+        default_value = "./cli.toml"
+    )]
     pub config: String,
 
     /// Sets verbosity level; can be used multiple times to increase verbosity
-    #[clap(global = true, short = "v", long = "verbose", min_values = 0, max_values = 4, parse(from_occurrences))]
+    #[clap(
+        global = true,
+        short = 'v',
+        long = "verbose",
+        min_values = 0,
+        max_values = 4,
+        parse(from_occurrences)
+    )]
     pub verbose: u8,
 
     /// IPC connection string for queryd daemon API
-    #[clap(global = true, short = "w", long = "queryd-api", default_value = MSGBUS_PEER_API_ADDR, env="BP_CLI_QUERYD_API_ADDR")]
+    #[clap(global = true, short = 'w', long = "queryd-api", default_value = MSGBUS_PEER_API_ADDR, env="BP_CLI_QUERYD_API_ADDR")]
     pub queryd_api_socket_str: String,
 
     /// IPC connection string for queryd daemon push notifications on perr status updates
-    #[clap(global = true, short = "W", long = "queryd-push", default_value = MSGBUS_PEER_PUSH_ADDR, env="BP_CLI_QUERYD_PUSH_ADDR")]
+    #[clap(global = true, short = 'W', long = "queryd-push", default_value = MSGBUS_PEER_PUSH_ADDR, env="BP_CLI_QUERYD_PUSH_ADDR")]
     pub queryd_push_socket_str: String,
 
     #[clap(subcommand)]
-    pub command: Command
+    pub command: Command,
 }
 
-#[derive(Clap, Clone, Debug, Display)]
+#[derive(Parser, Clone, Debug, Display)]
 #[display_from(Debug)]
 pub enum Command {
     /// Sends command to a wired daemon to connect to the new peer
     Query {
         /// Query to run against Bitcoin blockchain & transaction index
-        query: String
+        query: String,
     },
 }
-
 
 // We need config structure since not all of the parameters can be specified
 // via environment and command-line arguments. Thus we need a config file and
@@ -85,7 +94,7 @@ impl Default for Config {
         Self {
             verbose: 0,
             msgbus_peer_api_addr: MSGBUS_PEER_API_ADDR.to_string(),
-            msgbus_peer_sub_addr: MSGBUS_PEER_PUSH_ADDR.to_string()
+            msgbus_peer_sub_addr: MSGBUS_PEER_PUSH_ADDR.to_string(),
         }
     }
 }

@@ -11,11 +11,9 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-
 use std::convert::TryFrom;
 
 use super::*;
-
 
 #[derive(Clone, Debug, Display)]
 #[display_from(Debug)]
@@ -23,27 +21,25 @@ pub struct Query {
     pub query: String,
 }
 
-impl Procedure<'_> for Query { }
+impl Procedure<'_> for Query {}
 
 impl TryFrom<&[zmq::Message]> for Query {
     type Error = Error;
 
     fn try_from(args: &[zmq::Message]) -> Result<Self, Self::Error> {
-        if args.len() != 1 { Err(Error::WrongNumberOfArguments)? }
+        if args.len() != 1 {
+            Err(Error::WrongNumberOfArguments)?
+        }
 
-        let query = String::from_utf8(args[0][..].to_vec())
-            .map_err(|_| Error::MalformedArgument)?;
+        let query =
+            String::from_utf8(args[0][..].to_vec()).map_err(|_| Error::MalformedArgument)?;
 
-        Ok(Self {
-            query
-        })
+        Ok(Self { query })
     }
 }
 
 impl From<Query> for Multipart {
     fn from(proc: Query) -> Self {
-        vec![
-            zmq::Message::from(&proc.query),
-        ]
+        vec![zmq::Message::from(&proc.query)]
     }
 }

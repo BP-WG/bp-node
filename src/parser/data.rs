@@ -17,10 +17,8 @@ use std::{
         HashMap, hash_map::Entry
     }
 };
-use lnpbp::{
-    bitcoin::{Txid, BlockHash, Block, OutPoint},
-    bp::short_id::Descriptor
-};
+use bitcoin::{Txid, BlockHash, Block, OutPoint};
+use bp::short_id::Descriptor;
 
 use crate::db::models;
 use super::state::State;
