@@ -35,12 +35,12 @@ zmq = "~0.9"
 tiny_http = "~0.6"
 prometheus = "~0.8"
 amplify = "~3.9.1"
-bp-core = "0.5.0-rc.1"
-microservices = { version = "0.5.0-beta.1", default-features = false, features = ["peer"] }
+bp-core = "0.5.0"
 internet2 = "0.5.0-alpha.2"
 bitcoin = "0.27.1"
 bitcoin_hashes = "0.10.0"
 miniscript = "6.0.1"
+microservices = { version = "0.6.0-beta.1", features=["peer"] }
 
 [dependencies.lnpbp]
 git = "https://github.com/lnp-bp/rust-lnpbp"
@@ -49,4 +49,5 @@ branch = "master"
 [patch.crates-io]
 # Remove this once https://github.com/jean-airoldie/zeromq-src-rs/pull/15 got merged
 zeromq-src = { git = "https://github.com/LNP-BP/zeromq-src-rs", branch = "fix/cmake" }
-bp-core = { git = "https://github.com/xn3cr0nx/bp-core", branch = "pub-short-id" }
+# Remove after create a release tag
+microservices = { git = "https://github.com/internet2-org/rust-microservices", commit = "d0e0ba" }
