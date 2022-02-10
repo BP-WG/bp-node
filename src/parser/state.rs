@@ -92,7 +92,7 @@ impl AddAssign for State {
             vout_map.into_iter().for_each(|(vout, descriptor)| {
                 if entry.contains_key(&vout) {
                     error!("Duplicate UTXO entry found while merging UTXO set with new block data; \
-                           this should not happen. UTXO: {}:{}, Descriptor: {}",
+                           this should not happen. UTXO: {}:{}, Descriptor: {:?}",
                            txid, vout, descriptor);
                 }
                 entry.insert(vout, descriptor);
