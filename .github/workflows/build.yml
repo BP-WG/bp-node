@@ -23,14 +23,14 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
+          args: --workspace
   features:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         feature:
-          - server
-          - embedded
+          - serde
     steps:
       - uses: actions/checkout@v2
       - name: Install rust stable
@@ -53,12 +53,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-20.04, ubuntu-latest, macos-11.0, windows-latest ]
+        os: [ ubuntu-20.04, ubuntu-22.04, macos-11, macos-12, windows-2019, windows-2022 ]
     steps:
       - uses: actions/checkout@v2
-      - name: Install macos dependencies
-        if: startsWith(matrix.os, 'macos')
-        run: brew install pkg-config
       - name: Install rust stable
         uses: actions-rs/toolchain@v1
         with:
@@ -68,13 +65,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --all-features
+          args: --workspace --all-targets --all-features
   toolchains:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        toolchain: [ nightly, beta, stable, 1.56.0 ]
+        toolchain: [ nightly, beta, stable, 1.59.0 ]
     steps:
       - uses: actions/checkout@v2
       - name: Install rust ${{ matrix.toolchain }}
@@ -99,7 +96,7 @@ jobs:
       - name: Create dependency
         run: |
           cargo new dep_test
-          cp test/depCargo.toml dep_test/Cargo.toml
+          cp contrib/depCargo.toml dep_test/Cargo.toml
           cd dep_test
       - name: Build dependency
         uses: actions-rs/cargo@v1
