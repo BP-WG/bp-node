@@ -19,7 +19,7 @@ use clap_complete::generate_to;
 use clap_complete::shells::*;
 
 pub mod bpd {
-    include!("src/bin/bpd/opts.rs");
+    include!("src/opts.rs");
 }
 pub mod cli {
     include!("cli/src/opts.rs");

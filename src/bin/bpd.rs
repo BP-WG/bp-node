@@ -15,14 +15,10 @@
 #[macro_use]
 extern crate log;
 
-mod opts;
-
-use bp_node::{bpd, Config, LaunchError};
+use bp_node::{bpd, Config, LaunchError, Opts};
 use clap::Parser;
 use microservices::error::BootstrapError;
 use microservices::shell::LogLevel;
-
-use crate::opts::Opts;
 
 fn main() -> Result<(), BootstrapError<LaunchError>> {
     println!("bpd: managin bp node daemon");

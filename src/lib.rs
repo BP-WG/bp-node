@@ -20,6 +20,10 @@ extern crate log;
 mod config;
 mod error;
 pub mod bpd;
+#[cfg(feature = "server")]
+mod opts;
 
 pub use config::Config;
 pub use error::{DaemonError, LaunchError};
+#[cfg(feature = "server")]
+pub use opts::Opts;
