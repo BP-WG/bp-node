@@ -1,51 +1,41 @@
-// Lightning network protocol (LNP) daemon node
-// Written in 2020 by
-//     Dr. Maxim Orlovsky <orlovsky@pandoracore.com>
+// BP Node: bitcoin blockchain indexing and notification service
 //
-// To the extent possible under law, the author(s) have dedicated all
-// copyright and related and neighboring rights to this software to
-// the public domain worldwide. This software is distributed without
-// any warranty.
+// Written in 2020-2022 by
+//     Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>
 //
-// You should have received a copy of the MIT License
-// along with this software.
+// Copyright (C) 2020-2022 by LNP/BP Standards Association, Switzerland.
+//
+// You should have received a copy of the MIT License along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-use std::io;
+use microservices::rpc;
+use bp_rpc::{FailureCode, Reply};
 
-#[derive(Debug, Display)]
-#[display_from(Debug)]
-pub enum BootstrapError {
-    TorNotYetSupported,
-    IoError(io::Error),
-    ArgParseError(String),
-    SubscriptionError(zmq::Error),
-    PublishingError(zmq::Error),
-    MonitorSocketError(Box<dyn std::error::Error>),
+#[derive(Clone, PartialEq, Eq, Debug, Display, Error, From)]
+#[display(doc_comments)]
+pub enum LaunchError {
 }
 
-impl std::error::Error for BootstrapError {}
+impl microservices::error::Error for LaunchError {}
 
-impl From<BootstrapError> for String {
-    fn from(err: BootstrapError) -> Self {
-        format!("{}", err)
-    }
+#[derive(Clone, PartialEq, Eq, Debug, Display, Error, From)]
+#[display(doc_comments)]
+pub enum DaemonError {
+    #[from]
+    #[display(inner)]
+    Encoding(strict_encoding::Error),
 }
 
-impl From<&str> for BootstrapError {
-    fn from(err: &str) -> Self {
-        BootstrapError::ArgParseError(err.to_string())
-    }
-}
+impl microservices::error::Error for DaemonError {}
 
-impl From<String> for BootstrapError {
-    fn from(err: String) -> Self {
-        BootstrapError::ArgParseError(err)
-    }
-}
-
-impl From<io::Error> for BootstrapError {
-    fn from(err: io::Error) -> Self {
-        BootstrapError::IoError(err)
+impl From<DaemonError> for Reply {
+    fn from(err: DaemonError) -> Self {
+        let code = match err {
+            DaemonError::Encoding(_) => FailureCode::Encoding,
+        };
+        Reply::Failure(rpc::Failure {
+            code: code.into(),
+            info: err.to_string(),
+        })
     }
 }

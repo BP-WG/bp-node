@@ -1,0 +1,36 @@
+[package]
+name = "bp_rpc"
+description = "BP Node RPC API"
+version = "0.3.0"
+authors = ["Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>"]
+license = "MIT"
+keywords = ["bitcoin", "lightning-network", "lnp-bp", "distributed-computing"]
+categories = ["cryptography::cryptocurrencies", "network-programming"]
+edition = "2021"
+rust-version = "1.56.0"
+readme = "../README.md"
+
+[lib]
+name = "bp_rpc"
+
+[dependencies]
+amplify = "3.12.0"
+strict_encoding = "1.8.1"
+commit_verify = "0.7.0" # TODO: Update to 0.8
+internet2 = "0.8.0-beta.1"
+microservices = { version = "0.8.0-rc.2", default-features = false, features = ["client"] }
+rand = "0.8"
+serde_crate = { package = "serde", version = "1", features = ["derive"], optional = true }
+serde_with = { version = "1.8", optional = true }
+serde_yaml = { version = "0.8.23", optional = true }
+log = "0.4.14"
+colored = "2.0.0"
+zmq = { package = "zmq2", version = "0.5.0" }
+
+[features]
+default = ["serde"]
+all = ["serde"]
+serde = [
+    "serde_crate", "serde_with", "serde_yaml",
+    "amplify/serde", "internet2/serde", "microservices/serde",
+]

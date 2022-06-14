@@ -1,53 +1,71 @@
+[workspace]
+default-members = [".", "rpc", "cli"]
+members = [".", "rpc", "cli"]
+
 [package]
 name = "bp_node"
-description = "Bitcoin protocol node"
-version = "0.1.0"
-authors = ["Dr. Maxim Orlovsky <orlovsky@pandoracore.com>"]
-keywords = ["bitcoin", "node"]
+description = "BP Node: bitcoin blockchain indexing and notification service"
+version = "0.3.0"
+authors = ["Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>"]
 license = "MIT"
+keywords = ["bitcoin", "lightning-network", "lnp-bp", "distributed-computing"]
+categories = ["cryptography::cryptocurrencies", "network-programming"]
 edition = "2021"
+rust-version = "1.56.0"
 readme = "README.md"
+build = "build.rs"
+exclude = [".github", "Dockerfile", ".dockerignore", "contrib", "doc", "shell"]
 
 [lib]
 name = "bp_node"
 
 [[bin]]
-name = "queryd"
-path = "src/bin/queryd.rs"
-
-[[bin]]
-name = "bp-cli"
-path = "src/bin/bp-cli.rs"
-
-[[bin]]
-name = "bp-indexer"
-path = "src/bin/bp-indexer.rs"
+name = "bpd"
+required-features = ["server"]
 
 [dependencies]
-dotenv = "~0.15"
-clap = "=3.0.0-beta.5"
-chrono = "~0.4"
-derive_wrapper = "~0.1"
-log = { version = "~0.4", features = ["max_level_trace", "release_max_level_debug"] }
-env_logger = "~0.7"
-diesel = { version = "~1.4", features = ["postgres", "uuid", "numeric", "chrono"] }
-zmq = "~0.9"
-tiny_http = "~0.6"
-prometheus = "~0.8"
-amplify = "~3.9.1"
-bp-core = "0.5.0"
-internet2 = "0.5.0-alpha.2"
-bitcoin = "0.27.1"
-bitcoin_hashes = "0.10.0"
-miniscript = "6.0.1"
-microservices = { version = "0.6.0-beta.1", features=["peer"] }
+# LNP/BP crates
+amplify = "3.12.0"
+strict_encoding = "1.8.8"
+commit_verify = "0.7.0" # TODO: Update to 0.8
+internet2 = { version = "0.8.0-beta.1", features = ["keygen", "zmq"] }
+microservices = { version = "0.8.0-rc.2", default-features = false, features = ["node", "peer"] }
+bp_rpc = { version = "0.3.0", path = "rpc" }
+# OS
+zmq = { package = "zmq2", version = "0.5.0" }
+chrono = "0.4"
+nix = "0.19"
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_debug"] }
+env_logger = "0.7"
+clap = { version = "~3.1.18", optional = true, features = ["env", "derive"] }
+settings = { version = "0.10", package = "config", optional = true }
+configure_me = { version = "0.4", optional = true }
+dotenv = { version = "0.15", optional = true }
+colored = "2.0.0"
+shellexpand = { version = "2", optional = true }
 
-[dependencies.lnpbp]
-git = "https://github.com/lnp-bp/rust-lnpbp"
-branch = "master"
+[build-dependencies]
+amplify = "3.12.0"
+internet2 = "0.8.0-beta.1"
+microservices = { version = "0.8.0-rc.2", default-features = false, features = ["peer"] }
+bp_rpc = { version = "0.3.0", path = "rpc" }
+clap = { version = "~3.1.18", features = ["env"] }
+clap_complete = "~3.1.4"
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_debug"] }
+shellexpand = "2"
+configure_me_codegen = "0.4"
 
-[patch.crates-io]
-# Remove this once https://github.com/jean-airoldie/zeromq-src-rs/pull/15 got merged
-zeromq-src = { git = "https://github.com/LNP-BP/zeromq-src-rs", branch = "fix/cmake" }
-# Remove after create a release tag
-microservices = { git = "https://github.com/internet2-org/rust-microservices", commit = "d0e0ba" }
+[features]
+default = ["server"]
+
+# Server is a standalone application that runs daemons.
+# Required for all apps that can be launched from command-line shell as binaries
+# (i.e. both servers and cli)
+server = ["microservices/server", "dotenv", "clap", "settings", "configure_me",
+          "amplify/parse_arg", "shellexpand"]
+# Embedded is an app that contains embedded node and that talks to it through
+# integration layer
+embedded = ["microservices/embedded"]
+
+[package.metadata.configure_me]
+spec = "config_spec.toml"

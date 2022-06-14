@@ -1,0 +1,24 @@
+[package]
+name = "bp-cli"
+description = "BP node command-line interface"
+version = "0.3.0"
+authors = ["Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>"]
+license = "MIT"
+keywords = ["bitcoin", "lightning-network", "lnp-bp", "distributed-computing"]
+categories = ["cryptography::cryptocurrencies", "network-programming", "command-line-tools"]
+edition = "2021"
+rust-version = "1.56.0"
+readme = "../README.md"
+
+[[bin]]
+path = "src/main.rs"
+name = "bp-cli"
+
+[dependencies]
+amplify = "3.12.0"
+internet2 = "0.8.0-beta.1"
+microservices = { version = "0.8.0-rc.2", default-features = false, features = ["cli"] }
+bp_rpc = { version = "0.3.0", path = "../rpc" }
+clap = { version = "~3.1.18", features = ["derive", "env"] }
+log = "0.4.14"
+colored = "2"
