@@ -1,9 +1,9 @@
-ARG BUILDER_DIR=/srv/lnp
+ARG BUILDER_DIR=/srv/bp
 
 
 FROM rust:1.59.0-slim-bullseye as builder
 
-ARG SRC_DIR=/usr/local/src/stored
+ARG SRC_DIR=/usr/local/src/bp
 ARG BUILDER_DIR
 
 WORKDIR "$SRC_DIR"
@@ -12,7 +12,7 @@ COPY doc ${SRC_DIR}/doc
 COPY shell ${SRC_DIR}/shell
 COPY src ${SRC_DIR}/src
 COPY build.rs Cargo.lock Cargo.toml codecov.yml config_spec.toml \
-     LICENSE license_header.txt README.md ${SRC_DIR}/
+     LICENSE license_header README.md ${SRC_DIR}/
 
 WORKDIR ${SRC_DIR}
 
@@ -25,8 +25,8 @@ FROM debian:bullseye-slim
 
 ARG BUILDER_DIR
 ARG BIN_DIR=/usr/local/bin
-ARG DATA_DIR=/var/lib/lnp
-ARG USER=lnpd
+ARG DATA_DIR=/var/lib/bp
+ARG USER=bp
 
 RUN adduser --home "${DATA_DIR}" --shell /bin/bash --disabled-login \
         --gecos "${USER} user" ${USER}
@@ -39,7 +39,7 @@ USER ${USER}
 
 VOLUME "$DATA_DIR"
 
-EXPOSE 9735
+EXPOSE 61961
 
 ENTRYPOINT ["bpd"]
 
