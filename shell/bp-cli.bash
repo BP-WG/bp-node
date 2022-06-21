@@ -25,17 +25,17 @@ _bp-cli() {
 
     case "${cmd}" in
         bp__cli)
-            opts="-h -V -r -v --help --version --rpc-endpoint --verbose none help"
+            opts="-h -V -R -v --help --version --rpc --verbose none help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
-                --rpc-endpoint)
+                --rpc)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
-                -r)
+                -R)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -47,17 +47,17 @@ _bp-cli() {
             return 0
             ;;
         bp__cli__help)
-            opts="-r -v --rpc-endpoint --verbose <SUBCOMMAND>..."
+            opts="-R -v --rpc --verbose <SUBCOMMAND>..."
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
-                --rpc-endpoint)
+                --rpc)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
-                -r)
+                -R)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -69,17 +69,17 @@ _bp-cli() {
             return 0
             ;;
         bp__cli__none)
-            opts="-h -r -v --help --rpc-endpoint --verbose"
+            opts="-h -R -v --help --rpc --verbose"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
-                --rpc-endpoint)
+                --rpc)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
-                -r)
+                -R)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

@@ -11,10 +11,6 @@
 #[macro_use]
 extern crate amplify;
 #[macro_use]
-extern crate strict_encoding;
-#[macro_use]
-extern crate internet2;
-#[macro_use]
 extern crate log;
 
 mod config;

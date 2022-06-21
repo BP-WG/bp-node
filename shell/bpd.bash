@@ -19,7 +19,7 @@ _bpd() {
 
     case "${cmd}" in
         bpd)
-            opts="-h -V -v -d -x --help --version --verbose --data-dir --rpc-endpoint"
+            opts="-h -V -v -d -S -X -n -R -t --help --version --verbose --data-dir --store --ctl --chain --electrum-server --electrum-port --rpc --threaded"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -33,11 +33,43 @@ _bpd() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
-                --rpc-endpoint)
+                --store)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
-                -x)
+                -S)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --ctl)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -X)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --chain)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -n)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --electrum-server)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --electrum-port)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --rpc)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -R)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

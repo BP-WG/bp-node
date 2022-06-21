@@ -9,19 +9,19 @@
 // You should have received a copy of the MIT License along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-#[macro_use]
-extern crate clap;
-#[macro_use]
-extern crate amplify;
-
 use std::fs;
 
 use clap::IntoApp;
 use clap_complete::generate_to;
 use clap_complete::shells::*;
 
-pub mod bpd {
+pub mod opts {
     include!("src/opts.rs");
+}
+
+pub mod bpd {
+    pub use super::opts;
+    include!("src/bpd/opts.rs");
 }
 
 fn main() -> Result<(), configure_me_codegen::Error> {

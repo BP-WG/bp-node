@@ -10,29 +10,32 @@
 
 use std::path::PathBuf;
 
-use bp_rpc::BPD_RPC_ENDPOINT;
 use clap::{Parser, ValueHint};
 use internet2::addr::ServiceAddr;
+use lnpbp::chain::Chain;
+use microservices::shell::shell_setup;
+use store_rpc::STORED_RPC_ENDPOINT;
 
 #[cfg(any(target_os = "linux"))]
-pub const BPD_DATA_DIR: &str = "~/.bp";
+pub const BP_NODE_DATA_DIR: &str = "~/.bp";
 #[cfg(any(target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
-pub const BPD_DATA_DIR: &str = "~/.bp";
+pub const BP_NODE_DATA_DIR: &str = "~/.bp";
 #[cfg(target_os = "macos")]
-pub const BPD_DATA_DIR: &str = "~/Library/Application Support/BP Node";
+pub const BP_NODE_DATA_DIR: &str = "~/Library/Application Support/BP Node";
 #[cfg(target_os = "windows")]
-pub const BPD_DATA_DIR: &str = "~\\AppData\\Local\\BP Node";
+pub const BP_NODE_DATA_DIR: &str = "~\\AppData\\Local\\BP Node";
 #[cfg(target_os = "ios")]
-pub const BPD_DATA_DIR: &str = "~/Documents";
+pub const BP_NODE_DATA_DIR: &str = "~/Documents";
 #[cfg(target_os = "android")]
-pub const BPD_DATA_DIR: &str = ".";
+pub const BP_NODE_DATA_DIR: &str = ".";
 
-pub const BPD_CONFIG: &str = "{data_dir}/bpd.toml";
+pub const RGB_NODE_CTL_ENDPOINT: &str = "{data_dir}/ctl";
+
+pub const BP_NODE_CONFIG: &str = "{data_dir}/bp_node.toml";
 
 /// Command-line arguments
 #[derive(Parser)]
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
-#[clap(author, version, name = "bpd", about = "bp node managing service")]
 pub struct Opts {
     /// Set verbosity level.
     ///
@@ -48,21 +51,78 @@ pub struct Opts {
         short,
         long,
         global = true,
-        default_value = BPD_DATA_DIR,
-        env = "BPD_DATA_DIR",
+        default_value = BP_NODE_DATA_DIR,
+        env = "BP_NODE_DATA_DIR",
         value_hint = ValueHint::DirPath
     )]
     pub data_dir: PathBuf,
 
-    /// ZMQ socket name/address for bp node RPC interface.
-    ///
-    /// Internal interface for control PRC protocol communications.
+    /// ZMQ socket for connecting storage daemon.
     #[clap(
-        short = 'x',
-        long,
-        env = "BPD_RPC_ENDPOINT",
-        value_hint = ValueHint::FilePath,
-        default_value = BPD_RPC_ENDPOINT
+        short = 'S',
+        long = "store",
+        global = true,
+        env = "STORED_RPC_ENDPOINT",
+        default_value = STORED_RPC_ENDPOINT,
+        value_hint = ValueHint::FilePath
     )]
-    pub rpc_endpoint: ServiceAddr,
+    pub store_endpoint: ServiceAddr,
+
+    /// ZMQ socket for internal service bus.
+    ///
+    /// A user needs to specify this socket usually if it likes to distribute daemons
+    /// over different server instances. In this case all daemons within the same node
+    /// must use the same socket address.
+    ///
+    /// Socket can be either TCP address in form of `<ipv4 | ipv6>:<port>` – or a path
+    /// to an IPC file.
+    ///
+    /// Defaults to `ctl` file inside `--data-dir` directory, unless `--threaded-daemons`
+    /// is specified; in that cases uses in-memory communication protocol.
+    #[clap(
+        short = 'X',
+        long = "ctl",
+        global = true,
+        env = "RGB_NODE_CTL_ENDPOINT",
+        default_value = RGB_NODE_CTL_ENDPOINT,
+        value_hint = ValueHint::FilePath
+    )]
+    pub ctl_endpoint: ServiceAddr,
+
+    /// Blockchain to use
+    #[clap(
+        short = 'n',
+        long,
+        global = true,
+        alias = "network",
+        default_value = "signet",
+        env = "BP_NODE_NETWORK"
+    )]
+    pub chain: Chain,
+
+    /// Electrum server to use.
+    #[clap(
+        long,
+        global = true,
+        default_value("pandora.network"),
+        env = "BP_NODE_ELECTRUM_SERVER",
+        value_hint = ValueHint::Hostname
+    )]
+    pub electrum_server: String,
+
+    /// Customize Electrum server port number. By default the wallet will use port
+    /// matching the selected network.
+    #[clap(long, global = true, env = "BP_NODE_ELECTRUM_PORT")]
+    pub electrum_port: Option<u16>,
+}
+
+impl Opts {
+    pub fn process(&mut self) {
+        shell_setup(
+            self.verbose,
+            [&mut self.ctl_endpoint, &mut self.store_endpoint],
+            &mut self.data_dir,
+            &[("{chain}", self.chain.to_string())],
+        );
+    }
 }

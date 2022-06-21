@@ -8,7 +8,7 @@
 // You should have received a copy of the MIT License along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-use bp_rpc::BPD_RPC_ENDPOINT;
+use bp_rpc::BP_NODE_RPC_ENDPOINT;
 use internet2::addr::ServiceAddr;
 
 /// Command-line tool for working with store daemon
@@ -20,15 +20,15 @@ pub struct Opts {
     /// Socket can be either TCP address in form of `<ipv4 | ipv6>:<port>` – or a path
     /// to an IPC file.
     ///
-    /// Defaults to `127.0.0.1:62962`.
+    /// Defaults to `0.0.0.0:61961`.
     #[clap(
-        short,
-        long,
+        short = 'R',
+        long = "rpc",
         global = true,
-        default_value = BPD_RPC_ENDPOINT,
-        env = "BPD_RPC_ENDPOINT"
+        default_value = BP_NODE_RPC_ENDPOINT,
+        env = "BP_NODE_RPC_ENDPOINT"
     )]
-    pub rpc_endpoint: ServiceAddr,
+    pub connect: ServiceAddr,
 
     /// Set verbosity level.
     ///

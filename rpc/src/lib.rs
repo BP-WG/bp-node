@@ -13,8 +13,6 @@
 #[macro_use]
 extern crate amplify;
 #[macro_use]
-extern crate strict_encoding;
-#[macro_use]
 extern crate internet2;
 #[macro_use]
 extern crate log;
@@ -35,5 +33,4 @@ pub use error::FailureCode;
 pub use reply::Reply;
 pub use request::Request;
 
-// TODO: Change port
-pub const BPD_RPC_ENDPOINT: &str = "0.0.0.0:61399";
+pub const BP_NODE_RPC_ENDPOINT: &str = "0.0.0.0:61961";

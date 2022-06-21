@@ -8,10 +8,16 @@
 // You should have received a copy of the MIT License along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-use std::fs;
 use std::path::PathBuf;
 
+use bp_rpc::BP_NODE_RPC_ENDPOINT;
 use internet2::addr::ServiceAddr;
+use lnpbp::chain::Chain;
+
+#[cfg(feature = "server")]
+use crate::bpd;
+#[cfg(feature = "server")]
+use crate::opts::Opts;
 
 /// Final configuration resulting from data contained in config file environment
 /// variables and command-line options. For security reasons node key is kept
@@ -22,34 +28,63 @@ pub struct Config {
     /// ZMQ socket for RPC API
     pub rpc_endpoint: ServiceAddr,
 
+    /// ZMQ socket for RPC API.
+    pub ctl_endpoint: ServiceAddr,
+
+    /// ZMQ socket for Store service RPC.
+    pub store_endpoint: ServiceAddr,
+
     /// Data location
     pub data_dir: PathBuf,
 
-    /// Verbosity level
-    pub verbose: u8,
+    /// URL for the electrum server connection
+    pub electrum_url: String,
+
+    /// Indicates whether deamons should be spawned as threads (true) or as child processes (false)
+    pub threaded: bool,
+}
+
+// TODO: Move to descriptor wallet
+fn default_electrum_port(chain: &Chain) -> u16 {
+    match chain {
+        Chain::Mainnet => 50001,
+        Chain::Testnet3 | Chain::Regtest(_) => 60001,
+        Chain::Signet | Chain::SignetCustom(_) => 60601,
+        Chain::LiquidV1 => 50501,
+        Chain::Other(_) => 60001,
+        _ => 60001,
+    }
+}
+
+#[cfg(feature = "server")]
+impl From<Opts> for Config {
+    fn from(opts: Opts) -> Self {
+        let electrum_url = format!(
+            "{}:{}",
+            opts.electrum_server,
+            opts.electrum_port.unwrap_or_else(|| default_electrum_port(&opts.chain))
+        );
+
+        Config {
+            data_dir: opts.data_dir,
+            rpc_endpoint: BP_NODE_RPC_ENDPOINT.parse().expect("error in constant value"),
+            ctl_endpoint: opts.ctl_endpoint,
+            store_endpoint: opts.store_endpoint,
+            electrum_url,
+            threaded: true,
+        }
+    }
+}
+
+impl From<bpd::Opts> for Config {
+    fn from(opts: bpd::Opts) -> Config {
+        let mut config = Config::from(opts.shared);
+        config.set_rpc_endpoint(opts.rpc_endpoint);
+        config.threaded = opts.threaded_daemons;
+        config
+    }
 }
 
 impl Config {
-    pub fn process(&mut self) {
-        self.data_dir =
-            PathBuf::from(shellexpand::tilde(&self.data_dir.display().to_string()).to_string());
-
-        let me = self.clone();
-        let mut data_dir = self.data_dir.to_string_lossy().into_owned();
-        self.process_dir(&mut data_dir);
-        self.data_dir = PathBuf::from(data_dir);
-
-        fs::create_dir_all(&self.data_dir).expect("Unable to access data directory");
-
-        for dir in vec![&mut self.rpc_endpoint] {
-            if let ServiceAddr::Ipc(ref mut path) = dir {
-                me.process_dir(path);
-            }
-        }
-    }
-
-    pub fn process_dir(&self, path: &mut String) {
-        *path = path.replace("{data_dir}", &self.data_dir.to_string_lossy());
-        *path = shellexpand::tilde(path).to_string();
-    }
+    pub fn set_rpc_endpoint(&mut self, endpoint: ServiceAddr) { self.rpc_endpoint = endpoint; }
 }

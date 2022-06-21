@@ -29,9 +29,6 @@ pub fn run(config: Config) -> Result<(), BootstrapError<LaunchError>> {
 }
 
 pub struct Runtime {
-    /// Original configuration object
-    pub(crate) config: Config,
-
     /// Stored sessions
     pub(crate) session_rpc: LocalSession,
 
@@ -56,7 +53,6 @@ impl Runtime {
         info!("bpd runtime started successfully");
 
         Ok(Self {
-            config,
             session_rpc,
             unmarshaller: Request::create_unmarshaller(),
         })

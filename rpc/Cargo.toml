@@ -17,7 +17,7 @@ name = "bp_rpc"
 amplify = "3.12.0"
 strict_encoding = "1.8.1"
 internet2 = "0.8.0-beta.1"
-microservices = { version = "0.8.0-rc.2", default-features = false, features = ["client"] }
+microservices = { version = "0.8.0-rc.2", default-features = false, features = ["client"], git = "https://github.com/Internet2-WG/rust-microservices" }
 serde_crate = { package = "serde", version = "1", features = ["derive"], optional = true }
 serde_with = { version = "1.8", optional = true }
 serde_yaml = { version = "0.8.23", optional = true }

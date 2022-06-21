@@ -32,26 +32,19 @@ pub struct Config {
 }
 
 pub struct Client {
-    config: Config,
     // TODO: Replace with RpcSession once its implementation is completed
     session_rpc: LocalSession,
     unmarshaller: Unmarshaller<Reply>,
 }
 
 impl Client {
-    pub fn with(config: Config) -> Result<Self, ServerError<FailureCode>> {
+    pub fn with(connect: &ServiceAddr) -> Result<Self, ServerError<FailureCode>> {
         debug!("Initializing runtime");
 
-        trace!("Connecting to xenginge daemon at {}", config.rpc_endpoint);
-        let session_rpc = LocalSession::connect(
-            ZmqSocketType::Req,
-            &config.rpc_endpoint,
-            None,
-            None,
-            &ZMQ_CONTEXT,
-        )?;
+        trace!("Connecting to bpd daemon at {}", connect);
+        let session_rpc =
+            LocalSession::connect(ZmqSocketType::Req, connect, None, None, &ZMQ_CONTEXT)?;
         Ok(Self {
-            config,
             session_rpc,
             unmarshaller: Reply::create_unmarshaller(),
         })

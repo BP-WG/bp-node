@@ -14,12 +14,20 @@ use microservices::shell::Exec;
 
 use crate::{Command, Opts};
 
+impl Command {
+    pub fn action_string(&self) -> String {
+        match self {
+            Command::None => s!(""),
+        }
+    }
+}
+
 impl Exec for Opts {
     type Client = Client;
     type Error = ServerError<FailureCode>;
 
     fn exec(self, _runtime: &mut Self::Client) -> Result<(), Self::Error> {
-        debug!("Performing {:?}", self.command);
+        println!("{}...", self.command.action_string());
         match self.command {
             Command::None => {}
         }

@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "adler32"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
+
+[[package]]
 name = "aead"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -187,6 +193,7 @@ dependencies = [
  "internet2",
  "log",
  "microservices",
+ "shellexpand",
 ]
 
 [[package]]
@@ -206,10 +213,12 @@ dependencies = [
  "dotenv",
  "env_logger",
  "internet2",
+ "lnpbp",
  "log",
  "microservices",
- "nix",
+ "nix 0.19.1",
  "shellexpand",
+ "store_rpc",
  "strict_encoding",
 ]
 
@@ -383,9 +392,9 @@ dependencies = [
 
 [[package]]
 name = "clap_lex"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5538cd660450ebeb4234cfecf8f2284b844ffc4c50531e66d584ad5b91293613"
+checksum = "87eba3c8c7f42ef17f6c659fc7416d0f4758cd3e58861ee63c5fa4a4dde649e4"
 dependencies = [
  "os_str_bytes",
 ]
@@ -618,6 +627,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "deflate"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c86f7e25f518f4b81808a2cf1c50996a61f5c2eb394b2393bd87f2a4780a432f"
+dependencies = [
+ "adler32",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -835,9 +853,9 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "indexmap"
-version = "1.9.0"
+version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c6392766afd7964e2531940894cffe4bd8d7d17dbc3c1c4857040fd4b33bdb3"
+checksum = "10a35a97730320ffe8e2d410b5d3b69279b98d2c14bdb8b70ea89ecf7888d41e"
 dependencies = [
  "autocfg 1.1.0",
  "hashbrown",
@@ -873,6 +891,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "inflate"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cdb29978cc5797bd8dcc8e5bf7de604891df2a8dc576973d71a281e916db2ff"
+dependencies = [
+ "adler32",
 ]
 
 [[package]]
@@ -1004,6 +1031,45 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fb9b38af92608140b86b693604b9ffcc5824240a484d1ecd4795bacb2fe88f3"
 
 [[package]]
+name = "lnpbp"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79c8405e2d0eec3f9898d9a2fbbd2c9b2dcc80d64c3efde987e2b1075822e72d"
+dependencies = [
+ "amplify",
+ "lnpbp_bech32",
+ "lnpbp_chain",
+]
+
+[[package]]
+name = "lnpbp_bech32"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4da7044659fa9c1c86335dda27686d1bc21f65517b264529cffb8bae1a0c7dc"
+dependencies = [
+ "amplify",
+ "bech32",
+ "bitcoin_hashes",
+ "deflate",
+ "inflate",
+ "strict_encoding",
+]
+
+[[package]]
+name = "lnpbp_chain"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f27306659a0673d60a2196b7be4fe49131bd9b5977054ff0fff93e3e9f6510db"
+dependencies = [
+ "amplify",
+ "bitcoin",
+ "bitcoin_hashes",
+ "lightning_encoding",
+ "once_cell",
+ "strict_encoding",
+]
+
+[[package]]
 name = "log"
 version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1038,22 +1104,23 @@ dependencies = [
 
 [[package]]
 name = "microservices"
-version = "0.8.0-rc.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2ff0dfe414fdf502c29a32d9b9009526251e0aacc172aec6b88d995e263668f"
+version = "0.8.0-rc.8"
+source = "git+https://github.com/Internet2-WG/rust-microservices#8fc95d98401b619bc770d7432a3b88a197ede895"
 dependencies = [
  "amplify",
  "clap",
+ "colored",
  "config",
  "env_logger",
  "internet2",
  "lightning_encoding",
  "log",
- "nix",
+ "nix 0.24.1",
  "once_cell",
  "secp256k1",
  "serde 1.0.137",
  "serde_with",
+ "shellexpand",
  "strict_encoding",
  "toml",
  "zmq2",
@@ -1069,6 +1136,18 @@ dependencies = [
  "cc",
  "cfg-if",
  "libc",
+]
+
+[[package]]
+name = "nix"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f17df307904acd05aa8e32e97bb20f2a0df1728bbc2d771ae8f9a90463441e9"
+dependencies = [
+ "bitflags",
+ "cfg-if",
+ "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -1260,6 +1339,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
+dependencies = [
+ "libc",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.3",
+]
+
+[[package]]
 name = "rand_chacha"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1277,6 +1367,16 @@ checksum = "f4c8ed856279c9737206bf725bf36935d8666ead7aa69b52be55af369d193402"
 dependencies = [
  "ppv-lite86",
  "rand_core 0.5.1",
+]
+
+[[package]]
+name = "rand_chacha"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
+dependencies = [
+ "ppv-lite86",
+ "rand_core 0.6.3",
 ]
 
 [[package]]
@@ -1301,6 +1401,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90bde5296fc891b0cef12a6d03ddccc162ce7b2aff54160af9338f8d40df6d19"
 dependencies = [
  "getrandom 0.1.16",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d34f1408f55294453790c48b2f1ebbb1c5b4b7563eb1f418bcfcfdbb06ebb4e7"
+dependencies = [
+ "getrandom 0.2.7",
 ]
 
 [[package]]
@@ -1677,6 +1786,37 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "store_rpc"
+version = "0.8.0-beta.2"
+source = "git+https://github.com/Storm-WG/storm-stored#ffd19fdb909dde46242e91d6b900631401ede1d4"
+dependencies = [
+ "amplify",
+ "colored",
+ "commit_verify",
+ "internet2",
+ "log",
+ "microservices",
+ "rand 0.8.5",
+ "serde 1.0.137",
+ "serde_with",
+ "serde_yaml",
+ "storm-core",
+ "strict_encoding",
+]
+
+[[package]]
+name = "storm-core"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dedf32bbb9c87fff080515362f772685a8d0d8ab1cda160478d74db68b7852bb"
+dependencies = [
+ "amplify",
+ "bitcoin_hashes",
+ "commit_verify",
+ "strict_encoding",
+]
 
 [[package]]
 name = "strict_encoding"

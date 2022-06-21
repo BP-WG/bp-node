@@ -15,27 +15,24 @@
 #[macro_use]
 extern crate log;
 
-use bp_node::{bpd, Config, LaunchError, Opts};
+use bp_node::bpd::Opts;
+use bp_node::{bpd, Config, LaunchError};
 use clap::Parser;
 use microservices::error::BootstrapError;
-use microservices::shell::LogLevel;
 
 fn main() -> Result<(), BootstrapError<LaunchError>> {
-    println!("bpd: managin bp node daemon");
+    println!("bpd: managing bp node daemon");
 
-    let opts = Opts::parse();
-    LogLevel::from_verbosity_flag_count(opts.verbose).apply();
-    trace!("Command-line arguments: {:?}", &opts);
+    let mut opts = Opts::parse();
+    trace!("Command-line arguments: {:?}", opts);
+    opts.process();
+    trace!("Processed arguments: {:?}", opts);
 
-    let mut config = Config {
-        data_dir: opts.data_dir,
-        rpc_endpoint: opts.rpc_endpoint,
-        verbose: opts.verbose,
-    };
+    let config = Config::from(opts);
     trace!("Daemon configuration: {:?}", config);
-    config.process();
-    trace!("Processed configuration: {:?}", config);
-    debug!("CTL RPC socket {}", config.rpc_endpoint);
+    debug!("CTL socket {}", config.ctl_endpoint);
+    debug!("RPC socket {}", config.rpc_endpoint);
+    debug!("STORE socket {}", config.store_endpoint);
 
     /*
     use self::internal::ResultExt;
@@ -47,7 +44,7 @@ fn main() -> Result<(), BootstrapError<LaunchError>> {
      */
 
     debug!("Starting runtime ...");
-    bpd::service::run(config).expect("running bpd runtime");
+    bpd::run(config).expect("running bpd runtime");
 
     unreachable!()
 }
