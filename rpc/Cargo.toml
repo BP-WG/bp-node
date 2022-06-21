@@ -1,7 +1,7 @@
 [package]
 name = "bp_rpc"
 description = "BP Node RPC API"
-version = "0.3.0"
+version = "0.8.0-alpha.1"
 authors = ["Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>"]
 license = "MIT"
 keywords = ["bitcoin", "lightning-network", "lnp-bp", "distributed-computing"]
@@ -22,7 +22,6 @@ serde_crate = { package = "serde", version = "1", features = ["derive"], optiona
 serde_with = { version = "1.8", optional = true }
 serde_yaml = { version = "0.8.23", optional = true }
 log = "0.4.14"
-zmq = { package = "zmq2", version = "0.5.0" }
 
 [features]
 default = ["serde"]

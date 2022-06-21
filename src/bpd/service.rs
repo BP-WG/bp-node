@@ -16,6 +16,7 @@ use internet2::{
 use microservices::error::BootstrapError;
 use microservices::node::TryService;
 use microservices::rpc::ClientError;
+use microservices::ZMQ_CONTEXT;
 
 use crate::{Config, DaemonError, LaunchError};
 
@@ -44,9 +45,13 @@ impl Runtime {
         // let storage = storage::FileDriver::with(config.storage_conf())?;
 
         debug!("Opening RPC API socket {}", config.rpc_endpoint);
-        let ctx = zmq::Context::new();
-        let session_rpc =
-            LocalSession::connect(ZmqSocketType::Rep, &config.rpc_endpoint, None, None, &ctx)?;
+        let session_rpc = LocalSession::connect(
+            ZmqSocketType::Rep,
+            &config.rpc_endpoint,
+            None,
+            None,
+            &ZMQ_CONTEXT,
+        )?;
 
         info!("bpd runtime started successfully");
 

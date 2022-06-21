@@ -1,7 +1,7 @@
 [package]
 name = "bp-cli"
 description = "BP node command-line interface"
-version = "0.3.0"
+version = "0.8.0-alpha.1"
 authors = ["Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>"]
 license = "MIT"
 keywords = ["bitcoin", "lightning-network", "lnp-bp", "distributed-computing"]
@@ -19,7 +19,7 @@ name = "bp-cli"
 amplify = "3.12.0"
 internet2 = "0.8.0-beta.1"
 microservices = { version = "0.8.0-rc.2", default-features = false, features = ["cli"] }
-bp_rpc = { version = "0.3.0", path = "../rpc" }
+bp_rpc = { version = "0.8.0-alpha.1", path = "../rpc" }
 clap = { version = "~3.1.18", features = ["derive", "env"] }
 log = "0.4.14"
 colored = "2"
@@ -29,5 +29,5 @@ amplify = "3.12.0"
 clap = { version = "~3.1.18", features = ["derive", "env"] }
 clap_complete = "~3.1.4"
 internet2 = "0.8.0-beta.1"
-bp_rpc = { version = "0.3.0", path = "../rpc" }
+bp_rpc = { version = "0.8.0-alpha.1", path = "../rpc" }
 configure_me_codegen = "0.4"

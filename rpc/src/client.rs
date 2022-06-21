@@ -14,6 +14,7 @@ use internet2::{
     CreateUnmarshaller, SendRecvMessage, TypedEnum, Unmarshall, Unmarshaller, ZmqSocketType,
 };
 use microservices::rpc::ServerError;
+use microservices::ZMQ_CONTEXT;
 
 use crate::{FailureCode, Reply, Request};
 
@@ -40,11 +41,15 @@ pub struct Client {
 impl Client {
     pub fn with(config: Config) -> Result<Self, ServerError<FailureCode>> {
         debug!("Initializing runtime");
-        let ctx = zmq::Context::new();
 
         trace!("Connecting to xenginge daemon at {}", config.rpc_endpoint);
-        let session_rpc =
-            LocalSession::connect(ZmqSocketType::Req, &config.rpc_endpoint, None, None, &ctx)?;
+        let session_rpc = LocalSession::connect(
+            ZmqSocketType::Req,
+            &config.rpc_endpoint,
+            None,
+            None,
+            &ZMQ_CONTEXT,
+        )?;
         Ok(Self {
             config,
             session_rpc,

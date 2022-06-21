@@ -5,7 +5,7 @@ members = [".", "rpc", "cli"]
 [package]
 name = "bp_node"
 description = "BP Node: bitcoin blockchain indexing and notification service"
-version = "0.3.0"
+version = "0.8.0-alpha.1"
 authors = ["Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>"]
 license = "MIT"
 keywords = ["bitcoin", "lightning-network", "lnp-bp", "distributed-computing"]
@@ -30,9 +30,8 @@ strict_encoding = "1.8.8"
 commit_verify = "0.7.0" # TODO: Update to 0.8
 internet2 = { version = "0.8.0-beta.1", features = ["keygen", "zmq"] }
 microservices = { version = "0.8.0-rc.2", default-features = false, features = ["node", "peer"] }
-bp_rpc = { version = "0.3.0", path = "rpc" }
+bp_rpc = { version = "0.8.0-alpha.1", path = "rpc" }
 # OS
-zmq = { package = "zmq2", version = "0.5.0" }
 chrono = "0.4"
 nix = "0.19"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_debug"] }
@@ -48,7 +47,7 @@ shellexpand = { version = "2", optional = true }
 amplify = "3.12.0"
 internet2 = "0.8.0-beta.1"
 microservices = { version = "0.8.0-rc.2", default-features = false, features = ["peer"] }
-bp_rpc = { version = "0.3.0", path = "rpc" }
+bp_rpc = { version = "0.8.0-alpha.1", path = "rpc" }
 clap = { version = "~3.1.18", features = ["env"] }
 clap_complete = "~3.1.4"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_debug"] }
