@@ -44,10 +44,11 @@ pub struct Opts {
 
 impl Opts {
     pub fn process(&mut self) {
-        self.shared.process();
-        shell_setup(self.shared.verbose, [&mut self.rpc_endpoint], &mut self.shared.data_dir, &[(
-            "{chain}",
-            self.shared.chain.to_string(),
-        )]);
+        shell_setup(
+            self.shared.verbose,
+            [&mut self.rpc_endpoint, &mut self.shared.ctl_endpoint, &mut self.shared.store_endpoint],
+            &mut self.shared.data_dir,
+            &[("{chain}", self.shared.chain.to_string())],
+        );
     }
 }
