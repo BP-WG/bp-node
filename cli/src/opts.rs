@@ -1,39 +1,33 @@
-// BP Node: bitcoin blockchain indexing and notification service
+// BP Node: sovereign bitcoin wallet backend.
 //
-// Written in 2020-2022 by
-//     Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>
+// SPDX-License-Identifier: Apache-2.0
 //
-// Copyright (C) 2020-2022 by LNP/BP Standards Association, Switzerland.
+// Written in 2020-2024 by
+//     Dr Maxim Orlovsky <orlovsky@lnp-bp.org>
 //
-// You should have received a copy of the MIT License along with this software.
-// If not, see <https://opensource.org/licenses/MIT>.
-
-use bp_rpc::BP_NODE_RPC_ENDPOINT;
-use internet2::addr::ServiceAddr;
+// Copyright (C) 2020-2024 LNP/BP Standards Association. All rights reserved.
+// Copyright (C) 2020-2024 Dr Maxim Orlovsky. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 /// Command-line tool for working with store daemon
 #[derive(Parser, Clone, PartialEq, Eq, Debug)]
 #[clap(name = "bp-cli", bin_name = "bp-cli", author, version)]
 pub struct Opts {
-    /// ZMQ socket for connecting daemon RPC interface.
-    ///
-    /// Socket can be either TCP address in form of `<ipv4 | ipv6>:<port>` – or a path
-    /// to an IPC file.
-    ///
-    /// Defaults to `0.0.0.0:61961`.
-    #[clap(
-        short = 'R',
-        long = "rpc",
-        global = true,
-        default_value = BP_NODE_RPC_ENDPOINT,
-        env = "BP_NODE_RPC_ENDPOINT"
-    )]
-    pub connect: ServiceAddr,
-
     /// Set verbosity level.
     ///
     /// Can be used multiple times to increase verbosity.
-    #[clap(short, long, global = true, parse(from_occurrences))]
+    #[clap(short, long, global = true, action = clap::ArgAction::Count)]
     pub verbose: u8,
 
     /// Command to execute

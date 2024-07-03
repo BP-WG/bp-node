@@ -13,7 +13,8 @@ jobs:
   default:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+      # NOTE: Don't use nix here: everything should be based on the ubuntu-latest
       - name: Install rust stable
         uses: actions-rs/toolchain@v1
         with:
@@ -32,26 +33,24 @@ jobs:
         feature:
           - server
           - embedded
+          - esplora
+          - electrum
     steps:
-      - uses: actions/checkout@v2
-      - name: Install rust stable
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-      - name: Feature ${{ matrix.feature }}
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --no-default-features --features=${{ matrix.feature }}
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v26
+      - name: Check feature ${{ matrix.feature }} only
+        run: nix develop .#stable -c cargo check --no-default-features --features=${{ matrix.feature }}
+      - name: Check feature ${{ matrix.feature }} with defaults
+        run: nix develop .#stable -c cargo check --features=${{ matrix.feature }}
   platforms:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-20.04, ubuntu-22.04, macos-11, macos-12, windows-2019, windows-2022 ]
+        os: [ ubuntu-22.04, ubuntu-24.04, macos-13, macos-latest, windows-2019, windows-latest ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+      # NOTE: Don't use nix in platform checks: everything should be based on the host system
       - name: Install rust stable
         uses: actions-rs/toolchain@v1
         with:
@@ -67,16 +66,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        toolchain: [ nightly, beta, stable, 1.59.0 ]
+        toolchain: [ nightly, beta, stable, msrv ]
     steps:
-      - uses: actions/checkout@v2
-      - name: Install rust ${{ matrix.toolchain }}
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-      - name: All features
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --workspace --all-targets --all-features
+      - uses: actions/checkout@v4
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+      - name: Check rgb-core
+        run: nix develop ".#${{ matrix.toolchain }}" -c cargo check --workspace --all-targets --all-features

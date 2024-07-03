@@ -16,19 +16,16 @@ path = "src/main.rs"
 name = "bp-cli"
 
 [dependencies]
-amplify = "3.13.0"
-internet2 = "0.8.3"
-microservices = { version = "0.8.10", default-features = false, features = ["cli"] }
-bp_rpc = { version = "0.8.0-alpha.2", path = "../rpc" }
-clap = { version = "~3.1.18", features = ["derive", "env"] }
-log = "0.4.14"
-shellexpand = "2.1"
-colored = "2"
+amplify.workspace = true
+bp-rpc = { version = "0.11.0-alpha.1", path = "../rpc" }
+clap.workspace = true
+log.workspace = true
+shellexpand.workspace = true
+colored.workspace = true
 
 [build-dependencies]
-amplify = "3.13.0"
-clap = { version = "~3.1.18", features = ["derive", "env"] }
-clap_complete = "~3.1.4"
-internet2 = "0.8.3"
-bp_rpc = { version = "0.8.0-alpha.2", path = "../rpc" }
-configure_me_codegen = "0.4"
+amplify.workspace = true
+clap.workspace = true
+clap_complete.workspace = true
+bp-rpc = { version = "0.11.0-alpha.1", path = "../rpc" }
+configure_me_codegen.workspace = true

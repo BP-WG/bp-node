@@ -2,61 +2,80 @@
 default-members = [".", "rpc", "cli"]
 members = [".", "rpc", "cli"]
 
-[package]
-name = "bp_node"
-description = "BP Node: bitcoin blockchain indexing and notification service"
-version = "0.8.0-alpha.2"
-authors = ["Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>"]
-license = "MIT"
+[workspace.package]
+version = "0.11.0-alpha.1"
+authors = ["Dr Maxim Orlovsky <orlovsky@lnp-bp.org>"]
 keywords = ["bitcoin", "lightning-network", "lnp-bp", "bitcoin-node"]
 categories = ["cryptography::cryptocurrencies", "network-programming"]
 edition = "2021"
-rust-version = "1.59.0"
+rust-version = "1.75.0"
+build = "build.rs"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+amplify = "4.6.0"
+strict_encoding = "2.7.0-beta.4"
+bp-wallet = "0.11.0-beta.6"
+serde_crate = { package = "serde", version = "1", features = ["derive"] }
+serde_json = "1.0.114"
+serde_yaml = "0.9.19"
+toml = "0.8.2"
+clap = { version = "4.4.8", features = ["derive", "env"] }
+clap_complete = "4.5.7"
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_debug"] }
+env_logger = { version = "0.11.3" }
+shellexpand = { version = "3.1.0" }
+dotenv = { version = "0.15" }
+colored = "2.1.0"
+settings = { version = "0.14", package = "config" }
+configure_me = { version = "0.4" }
+configure_me_codegen = "0.4.4"
+
+[package]
+name = "bp-node"
+description = "BP Node: sovereign bitcoin wallet backend"
+version.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 readme = "README.md"
 build = "build.rs"
-exclude = [".github", "Dockerfile", ".dockerignore", "contrib", "doc"]
+exclude = [".github", "Dockerfile", ".dockerignore", "contrib", "shell"]
+license = "Apache-2.0"
 
 [lib]
-name = "bp_node"
+name = "bpnode"
 
 [[bin]]
 name = "bpd"
 required-features = ["server"]
 
 [dependencies]
-# LNP/BP crates
-amplify = "3.13.0"
-strict_encoding = "0.8.1"
-commit_verify = "0.8.0"
-internet2 = { version = "0.8.3", features = ["keygen", "zmq"] }
-microservices = { version = "0.8.10", default-features = false, features = ["node", "peer"] }
-lnpbp = "0.8.0"
-bp_rpc = { version = "0.8.0-alpha.2", path = "rpc" }
-store_rpc = "0.8.0"
-# OS
-chrono = "0.4"
-nix = "0.19"
-log = { version = "0.4", features = ["max_level_trace", "release_max_level_debug"] }
-env_logger = "0.7"
-clap = { version = "~3.1.18", optional = true, features = ["env", "derive"] }
-settings = { version = "0.10", package = "config", optional = true }
-configure_me = { version = "0.4", optional = true }
-dotenv = { version = "0.15", optional = true }
-colored = "2.0.0"
-shellexpand = { version = "2", optional = true }
+amplify.workspace = true
+bp-wallet = { workspace = true, features = ["cli"] }
+bp-rpc = { version = "0.11.0-alpha.1", path = "rpc" }
+serde_crate.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+toml.workspace = true
+clap = { workspace = true, optional = true }
+shellexpand = { workspace = true, optional = true }
+settings = { workspace = true, optional = true }
+configure_me = { workspace = true, optional = true }
+dotenv = { workspace = true, optional = true }
+colored.workspace = true
 
 [build-dependencies]
-amplify = "3.13.0"
-internet2 = "0.8.3"
-microservices = { version = "0.8.10", default-features = false, features = ["peer"] }
-lnpbp = "0.8.0"
-bp_rpc = { version = "0.8.0-alpha.2", path = "rpc" }
-store_rpc = "0.8.0"
-clap = { version = "~3.1.18", features = ["env", "derive"] }
-clap_complete = "~3.1.4"
-log = { version = "0.4", features = ["max_level_trace", "release_max_level_debug"] }
-shellexpand = "2"
-configure_me_codegen = "0.4"
+amplify.workspace = true
+bp-wallet = { workspace = true, features = ["cli"] }
+bp-rpc = { version = "0.11.0-alpha.1", path = "rpc" }
+clap.workspace = true
+clap_complete.workspace = true
+log.workspace = true
+shellexpand.workspace = true
+configure_me_codegen.workspace = true
 
 [features]
 default = ["server"]
@@ -64,11 +83,10 @@ default = ["server"]
 # Server is a standalone application that runs daemons.
 # Required for all apps that can be launched from command-line shell as binaries
 # (i.e. both servers and cli)
-server = ["microservices/server", "dotenv", "clap", "settings", "configure_me",
-          "amplify/parse_arg", "shellexpand"]
+server = ["dotenv", "clap", "settings", "configure_me", "shellexpand"]
 # Embedded is an app that contains embedded node and that talks to it through
 # integration layer
-embedded = ["microservices/embedded"]
+embedded = []
 
 [package.metadata.configure_me]
 spec = "config_spec.toml"

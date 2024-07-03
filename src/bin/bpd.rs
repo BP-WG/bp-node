@@ -1,50 +1,56 @@
-// BP Node: bitcoin blockchain indexing and notification service
+// BP Node: sovereign bitcoin wallet backend.
 //
-// Written in 2020-2022 by
-//     Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>
+// SPDX-License-Identifier: Apache-2.0
 //
-// Copyright (C) 2020-2022 by LNP/BP Standards Association, Switzerland.
+// Written in 2020-2024 by
+//     Dr Maxim Orlovsky <orlovsky@lnp-bp.org>
 //
-// You should have received a copy of the MIT License along with this software.
-// If not, see <https://opensource.org/licenses/MIT>.
-
-#![recursion_limit = "256"]
-
-//! Main executable for BP node.
+// Copyright (C) 2020-2024 LNP/BP Standards Association. All rights reserved.
+// Copyright (C) 2020-2024 Dr Maxim Orlovsky. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate clap;
+extern crate serde_crate as serde;
 
-use bp_node::bpd::Opts;
-use bp_node::{bpd, Config, LaunchError};
+use std::process::ExitCode;
+
+use bpwallet::cli::{Args, BpCommand, Config, DescrStdOpts, Exec, ExecError, LogLevel};
 use clap::Parser;
-use microservices::error::BootstrapError;
 
-fn main() -> Result<(), BootstrapError<LaunchError>> {
-    println!("bpd: managing bp node daemon");
+fn main() -> ExitCode {
+    if let Err(err) = run() {
+        eprintln!("Error: {err}");
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
+}
 
-    let mut opts = Opts::parse();
-    trace!("Command-line arguments: {:?}", opts);
-    opts.process();
-    trace!("Processed arguments: {:?}", opts);
+fn run() -> Result<(), ExecError> {
+    let mut args = Args::<BpCommand, DescrStdOpts>::parse();
+    args.process();
+    LogLevel::from_verbosity_flag_count(args.verbose).apply();
+    trace!("Command-line arguments: {:#?}", &args);
 
-    let config = Config::from(opts);
-    trace!("Daemon configuration: {:?}", config);
-    debug!("CTL socket {}", config.ctl_endpoint);
-    debug!("RPC socket {}", config.rpc_endpoint);
-    debug!("STORE socket {}", config.store_endpoint);
+    eprintln!("BP node daemon: sovereign bitcoin wallet backend");
+    eprintln!("    by LNP/BP Standards Association\n");
 
-    /*
-    use self::internal::ResultExt;
-    let (config_from_file, _) =
-        internal::Config::custom_args_and_optional_files(std::iter::empty::<
-            &str,
-        >())
-        .unwrap_or_exit();
-     */
-
-    debug!("Starting runtime ...");
-    bpd::run(config).expect("running bpd runtime");
-
-    unreachable!()
+    // TODO: Update arguments basing on the configuration
+    let conf = Config::load(&args.conf_path("bp"));
+    debug!("Executing command: {}", args.command);
+    args.exec(conf, "bp")
 }

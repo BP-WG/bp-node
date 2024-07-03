@@ -1,0 +1,50 @@
+#compdef bp-node
+
+autoload -U is-at-least
+
+_bp-node() {
+    typeset -A opt_args
+    typeset -a _arguments_options
+    local ret=1
+
+    if is-at-least 5.2; then
+        _arguments_options=(-s -S -C)
+    else
+        _arguments_options=(-s -C)
+    fi
+
+    local context curcontext="$curcontext" state line
+    _arguments "${_arguments_options[@]}" : \
+'-w+[]:NAME: ' \
+'--wallet=[]:NAME: ' \
+'-W+[Path to wallet directory]:WALLET_PATH:_files -/' \
+'--wallet-path=[Path to wallet directory]:WALLET_PATH:_files -/' \
+'--wpkh=[Use wpkh(KEY) descriptor as wallet]:WPKH: ' \
+'--tr-key-only=[Use tr(KEY) descriptor as wallet]:TR_KEY_ONLY: ' \
+'(--esplora)--electrum=[Electrum server to use]' \
+'(--electrum)--esplora=[Esplora server to use]' \
+'-d+[Data directory path]:DATA_DIR:_files -/' \
+'--data-dir=[Data directory path]:DATA_DIR:_files -/' \
+'-n+[Network to use]:NETWORK: ' \
+'--network=[Network to use]:NETWORK: ' \
+'*-v[Set verbosity level]' \
+'*--verbose[Set verbosity level]' \
+'--sync[]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+}
+
+(( $+functions[_bp-node_commands] )) ||
+_bp-node_commands() {
+    local commands; commands=()
+    _describe -t commands 'bp-node commands' commands "$@"
+}
+
+if [ "$funcstack[1]" = "_bp-node" ]; then
+    _bp-node "$@"
+else
+    compdef _bp-node bp-node
+fi

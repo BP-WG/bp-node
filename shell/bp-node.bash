@@ -1,5 +1,5 @@
-_bpd() {
-    local i cur prev opts cmds
+_bp-node() {
+    local i cur prev opts cmd
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
@@ -8,9 +8,9 @@ _bpd() {
 
     for i in ${COMP_WORDS[@]}
     do
-        case "${i}" in
-            "$1")
-                cmd="bpd"
+        case "${cmd},${i}" in
+            ",$1")
+                cmd="bp__node"
                 ;;
             *)
                 ;;
@@ -18,58 +18,70 @@ _bpd() {
     done
 
     case "${cmd}" in
-        bpd)
-            opts="-h -V -v -d -S -X -n -R -t --help --version --verbose --data-dir --store --ctl --chain --electrum-server --electrum-port --rpc --threaded"
+        bp__node)
+            opts="-v -w -W -d -n -h -V --verbose --wallet --wallet-path --wpkh --tr-key-only --electrum --esplora --sync --data-dir --network --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
-                --data-dir)
+                --wallet)
                     COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -w)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --wallet-path)
+                    COMPREPLY=()
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o plusdirs
+                    fi
+                    return 0
+                    ;;
+                -W)
+                    COMPREPLY=()
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o plusdirs
+                    fi
+                    return 0
+                    ;;
+                --wpkh)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --tr-key-only)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --electrum)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --esplora)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --data-dir)
+                    COMPREPLY=()
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o plusdirs
+                    fi
                     return 0
                     ;;
                 -d)
-                    COMPREPLY=($(compgen -f "${cur}"))
+                    COMPREPLY=()
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o plusdirs
+                    fi
                     return 0
                     ;;
-                --store)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -S)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --ctl)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -X)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --chain)
+                --network)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
                 -n)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --electrum-server)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --electrum-port)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --rpc)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -R)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -83,4 +95,8 @@ _bpd() {
     esac
 }
 
-complete -F _bpd -o bashdefault -o default bpd
+if [[ "${BASH_VERSINFO[0]}" -eq 4 && "${BASH_VERSINFO[1]}" -ge 4 || "${BASH_VERSINFO[0]}" -gt 4 ]]; then
+    complete -F _bp-node -o nosort -o bashdefault -o default bp-node
+else
+    complete -F _bp-node -o bashdefault -o default bp-node
+fi

@@ -13,34 +13,23 @@ jobs:
   codecov:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+      - name: Build
+        run: nix develop .#codecov -c cargo build --release
+      - name: Test
+        run: nix develop .#codecov -c cargo test --all-features --no-fail-fast
+      - name: Install grcov
+        run: nix develop .#codecov -c cargo install grcov
+      - name: Generate coverage
+        run: nix develop .#codecov -c grcov . --binary-path target/debug/deps/ -s . -t lcov --branch --ignore-not-existing --ignore '../**' --ignore '/*' -o coverage.lcov
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
         with:
-          toolchain: nightly
-          override: true
-      - name: Build & test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --workspace --all-features --no-fail-fast
+          files: ./coverage.lcov
+          flags: rust
+          # TODO: set true when CODECOV_TOKEN is set
+          fail_ci_if_error: false
         env:
-          CARGO_INCREMENTAL: '0'
-          RUSTFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off'
-          RUSTDOCFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off'
-      - id: coverage
-        name: Generate coverage
-        uses: actions-rs/grcov@0.2-proto
-        with:
-          args: >
-            -t lcov
-            --llvm
-            --ignore-not-existing
-            --ignore "/*"
-            -o ./target/lcov.info
-            ./target/debug/
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
-        with:
-          file: ${{ steps.coverage.outputs.report }}
-          directory: ./coverage/reports/
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

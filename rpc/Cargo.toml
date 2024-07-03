@@ -1,32 +1,28 @@
 [package]
-name = "bp_rpc"
+name = "bp-rpc"
 description = "BP Node RPC API"
-version = "0.8.0-alpha.2"
-authors = ["Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>"]
-license = "MIT"
-keywords = ["bitcoin", "lightning-network", "lnp-bp", "rpc"]
-categories = ["cryptography::cryptocurrencies", "network-programming"]
-edition = "2021"
-rust-version = "1.59.0"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 readme = "../README.md"
 
 [lib]
-name = "bp_rpc"
+name = "bprpc"
 
 [dependencies]
-amplify = "3.13.0"
-strict_encoding = "0.8.1"
-internet2 = "0.8.3"
-microservices = { version = "0.8.10", default-features = false, features = ["client"] }
-serde_crate = { package = "serde", version = "1", features = ["derive"], optional = true }
-serde_with = { version = "1.8", optional = true }
-serde_yaml = { version = "0.8.23", optional = true }
-log = "0.4.14"
+amplify.workspace = true
+strict_encoding.workspace = true
+serde_crate = { workspace = true, optional = true }
+serde_yaml = { workspace = true, optional = true }
+log.workspace = true
 
 [features]
 default = ["serde"]
 all = ["serde"]
 serde = [
-    "serde_crate", "serde_with", "serde_yaml",
-    "amplify/serde", "internet2/serde", "microservices/serde",
+    "serde_crate", "serde_yaml", "amplify/serde"
 ]

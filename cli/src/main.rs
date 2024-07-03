@@ -1,12 +1,24 @@
-// BP node providing distributed storage & messaging for lightning network.
+// BP Node: sovereign bitcoin wallet backend.
 //
-// Written in 2022 by
-//     Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>
+// SPDX-License-Identifier: Apache-2.0
 //
-// Copyright (C) 2022 by LNP/BP Standards Association, Switzerland.
+// Written in 2020-2024 by
+//     Dr Maxim Orlovsky <orlovsky@lnp-bp.org>
 //
-// You should have received a copy of the MIT License along with this software.
-// If not, see <https://opensource.org/licenses/MIT>.
+// Copyright (C) 2020-2024 LNP/BP Standards Association. All rights reserved.
+// Copyright (C) 2020-2024 Dr Maxim Orlovsky. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #![recursion_limit = "256"]
 
@@ -22,11 +34,7 @@ extern crate clap;
 mod command;
 mod opts;
 
-use bp_rpc::client::Client;
 use clap::Parser;
-use internet2::addr::ServiceAddr;
-use microservices::cli::LogStyle;
-use microservices::shell::{Exec, LogLevel};
 
 pub use crate::opts::{Command, Opts};
 

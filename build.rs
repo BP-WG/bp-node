@@ -1,26 +1,34 @@
-// Storage daemon (stored): microservice frontend for different storage backends
-// used in LNP/BP nodes.
+// BP Node: sovereign bitcoin wallet backend.
 //
-// Written in 2022 by
-//     Dr. Maxim Orlovsky <orlovsky@lnp-bp.org>
+// SPDX-License-Identifier: Apache-2.0
 //
-// Copyright (C) 2022 by LNP/BP Standards Association, Switzerland.
+// Written in 2020-2024 by
+//     Dr Maxim Orlovsky <orlovsky@lnp-bp.org>
 //
-// You should have received a copy of the MIT License along with this software.
-// If not, see <https://opensource.org/licenses/MIT>.
+// Copyright (C) 2020-2024 LNP/BP Standards Association. All rights reserved.
+// Copyright (C) 2020-2024 Dr Maxim Orlovsky. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#[macro_use]
+extern crate clap;
 
 use std::fs;
-
-use clap::IntoApp;
+use clap::CommandFactory;
 use clap_complete::generate_to;
 use clap_complete::shells::*;
 
-pub mod opts {
-    include!("src/opts.rs");
-}
-
 pub mod bpd {
-    pub use super::opts;
     include!("src/bpd/opts.rs");
 }
 
@@ -28,7 +36,7 @@ fn main() -> Result<(), configure_me_codegen::Error> {
     let outdir = "./shell";
 
     fs::create_dir_all(outdir).expect("failed to create shell dir");
-    for app in [bpd::Opts::command()].iter_mut() {
+    for app in [bpd::Args::command()].iter_mut() {
         let name = app.get_name().to_string();
         generate_to(Bash, app, &name, &outdir)?;
         generate_to(PowerShell, app, &name, &outdir)?;
