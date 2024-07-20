@@ -24,9 +24,10 @@
 extern crate amplify;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate clap;
 
 mod config;
-mod error;
 #[cfg(feature = "server")]
 mod bpd;
 

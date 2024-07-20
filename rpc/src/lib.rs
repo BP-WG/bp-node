@@ -21,12 +21,20 @@
 // limitations under the License.
 
 #[macro_use]
-extern crate amplify;
-#[macro_use]
 extern crate strict_encoding;
-#[macro_use]
-extern crate log;
 #[cfg(feature = "serde")]
+#[macro_use]
 extern crate serde_crate as serde;
 
+mod request;
+mod response;
+mod data;
+mod pub_msg;
+
+pub use data::{Failure, Status};
+pub use pub_msg::PubMessage;
+pub use request::Request;
+pub use response::Response;
+
+pub const BP_RPC_LIB: &str = "BPRPC";
 pub const BP_NODE_RPC_ENDPOINT: &str = "0.0.0.0:61961";

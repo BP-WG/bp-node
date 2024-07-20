@@ -21,6 +21,7 @@
 // limitations under the License.
 
 use std::path::PathBuf;
+
 use bpwallet::cli::{DescrStdOpts, GeneralOpts, ResolverOpt, WalletOpts};
 
 pub const BP_NODE_CONFIG: &str = "{data_dir}/bp_node.toml";

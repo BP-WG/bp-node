@@ -17,12 +17,10 @@ name = "bprpc"
 amplify.workspace = true
 strict_encoding.workspace = true
 serde_crate = { workspace = true, optional = true }
-serde_yaml = { workspace = true, optional = true }
-log.workspace = true
 
 [features]
 default = ["serde"]
 all = ["serde"]
 serde = [
-    "serde_crate", "serde_yaml", "amplify/serde"
+    "serde_crate", "amplify/serde"
 ]

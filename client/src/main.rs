@@ -20,9 +20,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![recursion_limit = "256"]
-
-//! Command-line interface to bp node
+//! Command-line interface to BP Node
 
 #[macro_use]
 extern crate amplify;
@@ -31,29 +29,38 @@ extern crate log;
 #[macro_use]
 extern crate clap;
 
-mod command;
-mod opts;
+mod args;
+mod client;
 
+use std::process::ExitCode;
+
+use bpwallet::cli::LogLevel;
+use bpwallet::RuntimeError;
 use clap::Parser;
 
-pub use crate::opts::{Command, Opts};
+pub use crate::args::{Args, Command};
 
-fn main() {
-    println!("bp-cli: command-line tool for working with BP node");
-
-    let opts = Opts::parse();
-    LogLevel::from_verbosity_flag_count(opts.verbose).apply();
-    trace!("Command-line arguments: {:#?}", &opts);
-
-    let mut connect = opts.connect.clone();
-    if let ServiceAddr::Ipc(ref mut path) = connect {
-        *path = shellexpand::tilde(path).to_string();
+fn main() -> ExitCode {
+    if let Err(err) = run() {
+        eprintln!("Error: {err}");
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
-    debug!("RPC socket {}", connect);
+}
 
-    let mut client = Client::with(&connect).expect("Error initializing client");
+fn run() -> Result<(), RuntimeError> {
+    eprintln!("BP: command-line interface to BP Node");
+    eprintln!("    by LNP/BP Labs\n");
 
-    trace!("Executing command: {}", opts.command);
-    opts.exec(&mut client)
-        .unwrap_or_else(|err| eprintln!("{} {}\n", "Error:".err(), err.err_details()));
+    let mut args = Args::parse();
+    // args.process();
+    LogLevel::from_verbosity_flag_count(args.verbose).apply();
+    trace!("Command-line arguments: {:#?}", &args);
+
+    // TODO: Update arguments basing on the configuration
+    // let conf = Config::load(&args.conf_path("bp"));
+    // debug!("Executing command: {}", args.command);
+    // args.exec(conf, "bp-cli")
+    Ok(())
 }

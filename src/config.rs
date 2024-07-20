@@ -22,11 +22,6 @@
 
 use std::path::PathBuf;
 
-#[cfg(feature = "server")]
-use crate::bpd;
-#[cfg(feature = "server")]
-use crate::opts::Opts;
-
 /// Final configuration resulting from data contained in config file environment
 /// variables and command-line options. For security reasons node key is kept
 /// separately.
@@ -35,24 +30,4 @@ use crate::opts::Opts;
 pub struct Config {
     /// Data location
     pub data_dir: PathBuf,
-}
-
-#[cfg(feature = "server")]
-impl From<Opts> for Config {
-    fn from(opts: Opts) -> Self {
-        Config {
-            data_dir: opts.data_dir,
-        }
-    }
-}
-
-impl From<bpd::Opts> for Config {
-    fn from(opts: bpd::Opts) -> Config {
-        let mut config = Config::from(opts.shared);
-        config
-    }
-}
-
-impl Config {
-    pub fn set_rpc_endpoint(&mut self, endpoint: ServiceAddr) { self.rpc_endpoint = endpoint; }
 }

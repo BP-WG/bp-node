@@ -1,6 +1,6 @@
 [workspace]
-default-members = [".", "rpc", "cli"]
-members = [".", "rpc", "cli"]
+default-members = [".", "rpc", "client"]
+members = [".", "rpc", "client"]
 
 [workspace.package]
 version = "0.11.0-alpha.1"
@@ -9,17 +9,23 @@ keywords = ["bitcoin", "lightning-network", "lnp-bp", "bitcoin-node"]
 categories = ["cryptography::cryptocurrencies", "network-programming"]
 edition = "2021"
 rust-version = "1.75.0"
-build = "build.rs"
 license = "Apache-2.0"
 
 [workspace.dependencies]
 amplify = "4.6.0"
 strict_encoding = "2.7.0-beta.4"
 bp-wallet = "0.11.0-beta.6"
+
+sha2 = "0.10.8"
+io-reactor = "0.5.2"
+cyphernet = { version = "0.5.2", features = ["tor", "dns", "ed25519", "p2p-ed25519"] }
+netservices = { version = "0.8.1", features = ["eidolon", "io-reactor"] }
+
 serde_crate = { package = "serde", version = "1", features = ["derive"] }
 serde_json = "1.0.114"
 serde_yaml = "0.9.19"
 toml = "0.8.2"
+
 clap = { version = "4.4.8", features = ["derive", "env"] }
 clap_complete = "4.5.7"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_debug"] }
@@ -40,10 +46,10 @@ keywords.workspace = true
 categories.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
 readme = "README.md"
 build = "build.rs"
 exclude = [".github", "Dockerfile", ".dockerignore", "contrib", "shell"]
-license = "Apache-2.0"
 
 [lib]
 name = "bpnode"
@@ -60,6 +66,7 @@ serde_crate.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 toml.workspace = true
+log.workspace = true
 clap = { workspace = true, optional = true }
 shellexpand = { workspace = true, optional = true }
 settings = { workspace = true, optional = true }
@@ -90,3 +97,7 @@ embedded = []
 
 [package.metadata.configure_me]
 spec = "config_spec.toml"
+
+[patch.crates-io]
+io-reactor = { git = "https://github.com/rust-amplify/io-reactor", branch = "terminate" }
+netservices = { git = "https://github.com/cyphernet-dao/rust-netservices", branch = "develop" }

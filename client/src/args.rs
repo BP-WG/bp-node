@@ -20,6 +20,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod opts;
+/// Command-line tool for working with store daemon
+#[derive(Parser, Clone, PartialEq, Eq, Debug)]
+#[clap(name = "bp-cli", bin_name = "bp-cli", author, version)]
+pub struct Args {
+    /// Set verbosity level.
+    ///
+    /// Can be used multiple times to increase verbosity.
+    #[clap(short, long, global = true, action = clap::ArgAction::Count)]
+    pub verbose: u8,
 
-pub use opts::Args;
+    /// Command to execute
+    #[clap(subcommand)]
+    pub command: Command,
+}
+
+/// Command-line commands:
+#[derive(Subcommand, Clone, PartialEq, Eq, Debug, Display)]
+pub enum Command {
+    #[display("none")]
+    None,
+}

@@ -42,7 +42,7 @@ The node provides following set of services:
 
 The repository also contains a BP Node RPC library (`bp-rpc` crate in 
 [`rpc`](./rpc) directory) and command-line tool (`bp-cli` crate in 
-[`cli`](./cli) directory) for querying/working with the node.
+[`cli`](./client) directory) for querying/working with the node.
 
 [`bitcoinkernel`]: https://github.com/bitcoin/bitcoin/issues/27587
 [BP Core Lib]: https://github.com/BP-WG/bp-core
