@@ -34,8 +34,7 @@ mod client;
 
 use std::process::ExitCode;
 
-use bpwallet::cli::LogLevel;
-use bpwallet::RuntimeError;
+use bpwallet::cli::{ExecError, LogLevel};
 use clap::Parser;
 
 pub use crate::args::{Args, Command};
@@ -49,7 +48,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn run() -> Result<(), RuntimeError> {
+fn run() -> Result<(), ExecError> {
     eprintln!("BP: command-line interface to BP Node");
     eprintln!("    by LNP/BP Labs\n");
 

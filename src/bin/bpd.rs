@@ -28,8 +28,7 @@ extern crate serde_crate as serde;
 
 use std::process::ExitCode;
 
-use bpwallet::cli::{Args, BpCommand, Config, DescrStdOpts, Exec, LogLevel};
-use bpwallet::RuntimeError;
+use bpwallet::cli::{Args, BpCommand, Config, DescrStdOpts, Exec, ExecError, LogLevel};
 use clap::Parser;
 
 fn main() -> ExitCode {
@@ -41,7 +40,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn run() -> Result<(), RuntimeError> {
+fn run() -> Result<(), ExecError> {
     let mut args = Args::<BpCommand, DescrStdOpts>::parse();
     args.process();
     LogLevel::from_verbosity_flag_count(args.verbose).apply();

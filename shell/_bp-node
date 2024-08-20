@@ -15,14 +15,15 @@ _bp-node() {
 
     local context curcontext="$curcontext" state line
     _arguments "${_arguments_options[@]}" : \
-'-w+[]:NAME: ' \
-'--wallet=[]:NAME: ' \
-'-W+[Path to wallet directory]:WALLET_PATH:_files -/' \
-'--wallet-path=[Path to wallet directory]:WALLET_PATH:_files -/' \
-'--wpkh=[Use wpkh(KEY) descriptor as wallet]:WPKH: ' \
-'--tr-key-only=[Use tr(KEY) descriptor as wallet]:TR_KEY_ONLY: ' \
-'(--esplora)--electrum=[Electrum server to use]' \
-'(--electrum)--esplora=[Esplora server to use]' \
+'-w+[Use specific named wallet]:NAME: ' \
+'--wallet=[Use specific named wallet]:NAME: ' \
+'-W+[Use wallet from a given path]:WALLET_PATH:_files -/' \
+'--wallet-path=[Use wallet from a given path]:WALLET_PATH:_files -/' \
+'--wpkh=[Use wpkh(WPKH) descriptor as wallet]:WPKH: ' \
+'--tr-key-only=[Use tr(TR_KEY_ONLY) descriptor as wallet]:TR_KEY_ONLY: ' \
+'--electrum=[Electrum server to use]' \
+'--esplora=[Esplora server to use]' \
+'--mempool=[Mempool server to use]' \
 '-d+[Data directory path]:DATA_DIR:_files -/' \
 '--data-dir=[Data directory path]:DATA_DIR:_files -/' \
 '-n+[Network to use]:NETWORK: ' \

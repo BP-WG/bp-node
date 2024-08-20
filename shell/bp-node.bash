@@ -19,7 +19,7 @@ _bp-node() {
 
     case "${cmd}" in
         bp__node)
-            opts="-v -w -W -d -n -h -V --verbose --wallet --wallet-path --wpkh --tr-key-only --electrum --esplora --sync --data-dir --network --help --version"
+            opts="-v -w -W -d -n -h -V --verbose --wallet --wallet-path --wpkh --tr-key-only --electrum --esplora --mempool --sync --data-dir --network --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -60,6 +60,10 @@ _bp-node() {
                     return 0
                     ;;
                 --esplora)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --mempool)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

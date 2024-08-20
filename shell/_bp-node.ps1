@@ -21,14 +21,15 @@ Register-ArgumentCompleter -Native -CommandName 'bp-node' -ScriptBlock {
 
     $completions = @(switch ($command) {
         'bp-node' {
-            [CompletionResult]::new('-w', 'w', [CompletionResultType]::ParameterName, 'w')
-            [CompletionResult]::new('--wallet', 'wallet', [CompletionResultType]::ParameterName, 'wallet')
-            [CompletionResult]::new('-W', 'W ', [CompletionResultType]::ParameterName, 'Path to wallet directory')
-            [CompletionResult]::new('--wallet-path', 'wallet-path', [CompletionResultType]::ParameterName, 'Path to wallet directory')
-            [CompletionResult]::new('--wpkh', 'wpkh', [CompletionResultType]::ParameterName, 'Use wpkh(KEY) descriptor as wallet')
-            [CompletionResult]::new('--tr-key-only', 'tr-key-only', [CompletionResultType]::ParameterName, 'Use tr(KEY) descriptor as wallet')
+            [CompletionResult]::new('-w', 'w', [CompletionResultType]::ParameterName, 'Use specific named wallet')
+            [CompletionResult]::new('--wallet', 'wallet', [CompletionResultType]::ParameterName, 'Use specific named wallet')
+            [CompletionResult]::new('-W', 'W ', [CompletionResultType]::ParameterName, 'Use wallet from a given path')
+            [CompletionResult]::new('--wallet-path', 'wallet-path', [CompletionResultType]::ParameterName, 'Use wallet from a given path')
+            [CompletionResult]::new('--wpkh', 'wpkh', [CompletionResultType]::ParameterName, 'Use wpkh(WPKH) descriptor as wallet')
+            [CompletionResult]::new('--tr-key-only', 'tr-key-only', [CompletionResultType]::ParameterName, 'Use tr(TR_KEY_ONLY) descriptor as wallet')
             [CompletionResult]::new('--electrum', 'electrum', [CompletionResultType]::ParameterName, 'Electrum server to use')
             [CompletionResult]::new('--esplora', 'esplora', [CompletionResultType]::ParameterName, 'Esplora server to use')
+            [CompletionResult]::new('--mempool', 'mempool', [CompletionResultType]::ParameterName, 'Mempool server to use')
             [CompletionResult]::new('-d', 'd', [CompletionResultType]::ParameterName, 'Data directory path')
             [CompletionResult]::new('--data-dir', 'data-dir', [CompletionResultType]::ParameterName, 'Data directory path')
             [CompletionResult]::new('-n', 'n', [CompletionResultType]::ParameterName, 'Network to use')
