@@ -101,4 +101,6 @@ spec = "config_spec.toml"
 
 [patch.crates-io]
 io-reactor = { git = "https://github.com/rust-amplify/io-reactor", branch = "terminate" }
+cyphergraphy = { git = "https://github.com/cyphernet-dao/rust-cyphernet", branch = "master" }
+cypheraddr = { git = "https://github.com/cyphernet-dao/rust-cyphernet", branch = "master" }
 netservices = { git = "https://github.com/cyphernet-dao/rust-netservices", branch = "develop" }
