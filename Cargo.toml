@@ -18,11 +18,12 @@ bp-std = "0.11.0-beta.7"
 bp-wallet = "0.11.0-beta.7"
 
 sha2 = "0.10.8"
-io-reactor = "0.5.2"
+io-reactor = "0.6.0"
 cyphernet = { version = "0.5.2", features = ["tor", "dns", "ed25519", "p2p-ed25519"] }
 netservices = { version = "0.8.1", features = ["eidolon", "io-reactor"] }
+socket2 = "0.5.7"
 
-serde_crate = { package = "serde", version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.114"
 serde_yaml = "0.9.19"
 toml = "0.8.2"
@@ -63,7 +64,11 @@ required-features = ["server"]
 amplify.workspace = true
 bp-wallet = { workspace = true, features = ["cli"] }
 bp-rpc = { version = "0.11.0-alpha.1", path = "rpc" }
-serde_crate.workspace = true
+io-reactor.workspace = true
+cyphernet.workspace = true
+netservices = { workspace = true, features = ["log"] }
+socket2.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 toml.workspace = true
@@ -100,7 +105,7 @@ embedded = []
 spec = "config_spec.toml"
 
 [patch.crates-io]
-io-reactor = { git = "https://github.com/rust-amplify/io-reactor", branch = "terminate" }
+io-reactor = { git = "https://github.com/rust-amplify/io-reactor", branch = "v0.6" }
 cyphergraphy = { git = "https://github.com/cyphernet-dao/rust-cyphernet", branch = "master" }
 cypheraddr = { git = "https://github.com/cyphernet-dao/rust-cyphernet", branch = "master" }
-netservices = { git = "https://github.com/cyphernet-dao/rust-netservices", branch = "develop" }
+netservices = { git = "https://github.com/cyphernet-dao/rust-netservices", branch = "server" }

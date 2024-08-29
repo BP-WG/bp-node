@@ -20,6 +20,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
 /// Final configuration resulting from data contained in config file environment
@@ -30,4 +31,6 @@ use std::path::PathBuf;
 pub struct Config {
     /// Data location
     pub data_dir: PathBuf,
+
+    pub listening: Vec<SocketAddr>,
 }

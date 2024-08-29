@@ -20,16 +20,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io::{Read, Write};
+
 use amplify::confinement::{MediumBlob, TinyBlob, U24 as U24MAX};
+use amplify::IoError;
+use netservices::Frame;
 use strict_encoding::{DecodeError, DeserializeError, StrictDeserialize, StrictSerialize};
 
 use crate::BP_RPC_LIB;
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
+#[display(lowercase)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = BP_RPC_LIB, tags = custom)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate"))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Request {
+    #[display("ping")]
     #[strict_type(tag = 0x00)]
     Ping(TinyBlob),
 
@@ -55,4 +61,12 @@ impl From<Request> for Vec<u8> {
     fn from(req: Request) -> Self {
         req.to_strict_serialized::<U24MAX>().expect("request does not fit frame size").into_vec()
     }
+}
+
+impl Frame for Request {
+    type Error = IoError;
+
+    fn unmarshall(reader: impl Read) -> Result<Option<Self>, Self::Error> { todo!() }
+
+    fn marshall(&self, writer: impl Write) -> Result<usize, Self::Error> { todo!() }
 }

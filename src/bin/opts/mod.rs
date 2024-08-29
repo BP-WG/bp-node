@@ -20,9 +20,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use bpwallet::cli::{DescrStdOpts, GeneralOpts, ResolverOpt, WalletOpts};
+use bpwallet::cli::{GeneralOpts, ResolverOpt};
+
+use crate::bpnode::Config;
 
 pub const BP_NODE_CONFIG: &str = "{data_dir}/bp_node.toml";
 
@@ -30,27 +33,24 @@ pub const BP_NODE_CONFIG: &str = "{data_dir}/bp_node.toml";
 #[derive(Parser)]
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[command(author, version, about)]
-pub struct Args {
+pub struct Opts {
     /// Set verbosity level.
     ///
     /// Can be used multiple times to increase verbosity.
-    #[clap(short, long, global = true, action = clap::ArgAction::Count)]
+    #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     pub verbose: u8,
-
-    #[command(flatten)]
-    pub wallet: WalletOpts<DescrStdOpts>,
 
     #[command(flatten)]
     pub resolver: ResolverOpt,
 
-    #[clap(long, global = true)]
-    pub sync: bool,
-
     #[command(flatten)]
     pub general: GeneralOpts,
+
+    #[arg(short, long, required = true)]
+    pub listen: Vec<SocketAddr>,
 }
 
-impl Args {
+impl Opts {
     pub fn process(&mut self) { self.general.process(); }
 
     pub fn conf_path(&self, name: &'static str) -> PathBuf {
@@ -58,5 +58,14 @@ impl Args {
         conf_path.push(name);
         conf_path.set_extension("toml");
         conf_path
+    }
+}
+
+impl From<Opts> for Config {
+    fn from(opts: Opts) -> Self {
+        Config {
+            data_dir: opts.general.data_dir,
+            listening: opts.listen,
+        }
     }
 }

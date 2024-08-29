@@ -21,22 +21,29 @@
 // limitations under the License.
 
 #[macro_use]
+extern crate amplify;
+#[macro_use]
 extern crate clap;
 
 use std::fs;
+
 use clap::CommandFactory;
 use clap_complete::generate_to;
 use clap_complete::shells::*;
 
 pub mod bpd {
-    include!("src/bpd/opts.rs");
+    include!("src/bin/opts/mod.rs");
+}
+
+pub mod bpnode {
+    include!("src/config.rs");
 }
 
 fn main() -> Result<(), configure_me_codegen::Error> {
     let outdir = "./shell";
 
     fs::create_dir_all(outdir).expect("failed to create shell dir");
-    for app in [bpd::Args::command()].iter_mut() {
+    for app in [bpd::Opts::command()].iter_mut() {
         let name = app.get_name().to_string();
         generate_to(Bash, app, &name, &outdir)?;
         generate_to(PowerShell, app, &name, &outdir)?;

@@ -52,7 +52,7 @@ fn run() -> Result<(), ExecError> {
     eprintln!("BP: command-line interface to BP Node");
     eprintln!("    by LNP/BP Labs\n");
 
-    let mut args = Args::parse();
+    let args = Args::parse();
     // args.process();
     LogLevel::from_verbosity_flag_count(args.verbose).apply();
     trace!("Command-line arguments: {:#?}", &args);

@@ -15,22 +15,18 @@ _bp-node() {
 
     local context curcontext="$curcontext" state line
     _arguments "${_arguments_options[@]}" : \
-'-w+[Use specific named wallet]:NAME: ' \
-'--wallet=[Use specific named wallet]:NAME: ' \
-'-W+[Use wallet from a given path]:WALLET_PATH:_files -/' \
-'--wallet-path=[Use wallet from a given path]:WALLET_PATH:_files -/' \
-'--wpkh=[Use wpkh(WPKH) descriptor as wallet]:WPKH: ' \
-'--tr-key-only=[Use tr(TR_KEY_ONLY) descriptor as wallet]:TR_KEY_ONLY: ' \
 '--electrum=[Electrum server to use]' \
 '--esplora=[Esplora server to use]' \
 '--mempool=[Mempool server to use]' \
 '-d+[Data directory path]:DATA_DIR:_files -/' \
 '--data-dir=[Data directory path]:DATA_DIR:_files -/' \
-'-n+[Network to use]:NETWORK: ' \
-'--network=[Network to use]:NETWORK: ' \
+'-n+[Network to use]:NETWORK:_default' \
+'--network=[Network to use]:NETWORK:_default' \
+'*-l+[]:LISTEN:_default' \
+'*--listen=[]:LISTEN:_default' \
 '*-v[Set verbosity level]' \
 '*--verbose[Set verbosity level]' \
-'--sync[]' \
+'--no-network-prefix[Do not add network prefix to the \`--data-dir\`]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
 '-V[Print version]' \

@@ -28,7 +28,7 @@ use crate::BP_RPC_LIB;
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = BP_RPC_LIB, tags = custom, dumb = Self::ReversePing(strict_dumb!()))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate"))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum PubMessage {
     #[strict_type(tag = 0x01)]
     ReversePing(TinyBlob),

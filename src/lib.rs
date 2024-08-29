@@ -22,13 +22,9 @@
 
 #[macro_use]
 extern crate amplify;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate clap;
 
 mod config;
-#[cfg(feature = "server")]
-mod bpd;
+mod rpc;
 
 pub use config::Config;
+pub use rpc::RpcController;

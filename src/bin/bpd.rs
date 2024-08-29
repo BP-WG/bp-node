@@ -21,36 +21,52 @@
 // limitations under the License.
 
 #[macro_use]
+extern crate amplify;
+#[macro_use]
 extern crate log;
 #[macro_use]
 extern crate clap;
-extern crate serde_crate as serde;
 
-use std::process::ExitCode;
+mod opts;
 
-use bpwallet::cli::{Args, BpCommand, Config, DescrStdOpts, Exec, ExecError, LogLevel};
+use amplify::IoError;
+pub use bpnode;
+use bpnode::{Config, RpcController};
+use bpwallet::cli::LogLevel;
 use clap::Parser;
+use netservices::{service, NetAccept};
 
-fn main() -> ExitCode {
-    if let Err(err) = run() {
-        eprintln!("Error: {err}");
-        ExitCode::FAILURE
-    } else {
-        ExitCode::SUCCESS
-    }
+use crate::opts::Opts;
+
+#[derive(Debug, Display, Error)]
+#[display(inner)]
+pub enum Error {
+    Rpc(IoError),
+
+    /// unable to create thread for {0}
+    Thread(&'static str),
 }
 
-fn run() -> Result<(), ExecError> {
-    let mut args = Args::<BpCommand, DescrStdOpts>::parse();
-    args.process();
-    LogLevel::from_verbosity_flag_count(args.verbose).apply();
-    trace!("Command-line arguments: {:#?}", &args);
+fn main() -> Result<(), Error> {
+    let mut opts = Opts::parse();
+    opts.process();
+    LogLevel::from_verbosity_flag_count(opts.verbose).apply();
+    trace!("Command-line arguments: {:#?}", &opts);
 
-    eprintln!("BP node daemon: sovereign bitcoin wallet backend");
-    eprintln!("    by LNP/BP Standards Association\n");
+    eprintln!("BP Node (daemon): sovereign bitcoin wallet backend");
+    eprintln!("    by LNP/BP Labs, Switzerland\n");
 
     // TODO: Update arguments basing on the configuration
-    let conf = Config::load(&args.conf_path("bp"));
-    debug!("Executing command: {}", args.command);
-    args.exec(conf, "bp")
+    let conf = Config::from(opts);
+
+    let controller = RpcController::new();
+    let listen = conf.listening.iter().map(|addr| {
+        NetAccept::bind(addr).unwrap_or_else(|err| panic!("unable to bind to {addr}: {err}"))
+    });
+    service::Runtime::new(conf.listening[0].clone(), controller, listen)
+        .map_err(|err| Error::Rpc(err.into()))?
+        .join()
+        .map_err(|_| Error::Thread("RPC controller"))?;
+
+    Ok(())
 }

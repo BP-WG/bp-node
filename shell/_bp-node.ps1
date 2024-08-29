@@ -21,12 +21,6 @@ Register-ArgumentCompleter -Native -CommandName 'bp-node' -ScriptBlock {
 
     $completions = @(switch ($command) {
         'bp-node' {
-            [CompletionResult]::new('-w', '-w', [CompletionResultType]::ParameterName, 'Use specific named wallet')
-            [CompletionResult]::new('--wallet', '--wallet', [CompletionResultType]::ParameterName, 'Use specific named wallet')
-            [CompletionResult]::new('-W', '-W ', [CompletionResultType]::ParameterName, 'Use wallet from a given path')
-            [CompletionResult]::new('--wallet-path', '--wallet-path', [CompletionResultType]::ParameterName, 'Use wallet from a given path')
-            [CompletionResult]::new('--wpkh', '--wpkh', [CompletionResultType]::ParameterName, 'Use wpkh(WPKH) descriptor as wallet')
-            [CompletionResult]::new('--tr-key-only', '--tr-key-only', [CompletionResultType]::ParameterName, 'Use tr(TR_KEY_ONLY) descriptor as wallet')
             [CompletionResult]::new('--electrum', '--electrum', [CompletionResultType]::ParameterName, 'Electrum server to use')
             [CompletionResult]::new('--esplora', '--esplora', [CompletionResultType]::ParameterName, 'Esplora server to use')
             [CompletionResult]::new('--mempool', '--mempool', [CompletionResultType]::ParameterName, 'Mempool server to use')
@@ -34,9 +28,11 @@ Register-ArgumentCompleter -Native -CommandName 'bp-node' -ScriptBlock {
             [CompletionResult]::new('--data-dir', '--data-dir', [CompletionResultType]::ParameterName, 'Data directory path')
             [CompletionResult]::new('-n', '-n', [CompletionResultType]::ParameterName, 'Network to use')
             [CompletionResult]::new('--network', '--network', [CompletionResultType]::ParameterName, 'Network to use')
+            [CompletionResult]::new('-l', '-l', [CompletionResultType]::ParameterName, 'l')
+            [CompletionResult]::new('--listen', '--listen', [CompletionResultType]::ParameterName, 'listen')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Set verbosity level')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Set verbosity level')
-            [CompletionResult]::new('--sync', '--sync', [CompletionResultType]::ParameterName, 'sync')
+            [CompletionResult]::new('--no-network-prefix', '--no-network-prefix', [CompletionResultType]::ParameterName, 'Do not add network prefix to the `--data-dir`')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
