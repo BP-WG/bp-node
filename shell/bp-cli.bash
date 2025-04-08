@@ -15,14 +15,14 @@ _bp-cli() {
             bp__cli,help)
                 cmd="bp__cli__help"
                 ;;
-            bp__cli,none)
-                cmd="bp__cli__none"
+            bp__cli,ping)
+                cmd="bp__cli__ping"
                 ;;
             bp__cli__help,help)
                 cmd="bp__cli__help__help"
                 ;;
-            bp__cli__help,none)
-                cmd="bp__cli__help__none"
+            bp__cli__help,ping)
+                cmd="bp__cli__help__ping"
                 ;;
             *)
                 ;;
@@ -31,12 +31,20 @@ _bp-cli() {
 
     case "${cmd}" in
         bp__cli)
-            opts="-v -h -V --verbose --help --version none help"
+            opts="-v -r -h -V --verbose --remote --help --version ping help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
+                --remote)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -r)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -45,7 +53,7 @@ _bp-cli() {
             return 0
             ;;
         bp__cli__help)
-            opts="none help"
+            opts="ping help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -72,7 +80,7 @@ _bp-cli() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        bp__cli__help__none)
+        bp__cli__help__ping)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -86,7 +94,7 @@ _bp-cli() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        bp__cli__none)
+        bp__cli__ping)
             opts="-v -h --verbose --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )

@@ -21,17 +21,19 @@ Register-ArgumentCompleter -Native -CommandName 'bp-cli' -ScriptBlock {
 
     $completions = @(switch ($command) {
         'bp-cli' {
+            [CompletionResult]::new('-r', '-r', [CompletionResultType]::ParameterName, 'r')
+            [CompletionResult]::new('--remote', '--remote', [CompletionResultType]::ParameterName, 'remote')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Set verbosity level')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Set verbosity level')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
-            [CompletionResult]::new('none', 'none', [CompletionResultType]::ParameterValue, 'none')
+            [CompletionResult]::new('ping', 'ping', [CompletionResultType]::ParameterValue, 'ping')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
-        'bp-cli;none' {
+        'bp-cli;ping' {
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Set verbosity level')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Set verbosity level')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
@@ -39,11 +41,11 @@ Register-ArgumentCompleter -Native -CommandName 'bp-cli' -ScriptBlock {
             break
         }
         'bp-cli;help' {
-            [CompletionResult]::new('none', 'none', [CompletionResultType]::ParameterValue, 'none')
+            [CompletionResult]::new('ping', 'ping', [CompletionResultType]::ParameterValue, 'ping')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
-        'bp-cli;help;none' {
+        'bp-cli;help;ping' {
             break
         }
         'bp-cli;help;help' {

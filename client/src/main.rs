@@ -31,35 +31,20 @@ extern crate clap;
 
 mod args;
 mod client;
-
-use std::process::ExitCode;
+mod command;
 
 use bpwallet::cli::{ExecError, LogLevel};
 use clap::Parser;
 
 pub use crate::args::{Args, Command};
+use crate::client::BpClient;
 
-fn main() -> ExitCode {
-    if let Err(err) = run() {
-        eprintln!("Error: {err}");
-        ExitCode::FAILURE
-    } else {
-        ExitCode::SUCCESS
-    }
-}
-
-fn run() -> Result<(), ExecError> {
-    eprintln!("BP: command-line interface to BP Node");
-    eprintln!("    by LNP/BP Labs\n");
-
+fn main() -> Result<(), ExecError> {
     let args = Args::parse();
-    // args.process();
     LogLevel::from_verbosity_flag_count(args.verbose).apply();
     trace!("Command-line arguments: {:#?}", &args);
 
-    // TODO: Update arguments basing on the configuration
-    // let conf = Config::load(&args.conf_path("bp"));
-    // debug!("Executing command: {}", args.command);
-    // args.exec(conf, "bp-cli")
-    Ok(())
+    let client = BpClient::new(args.remote)?;
+
+    args.command.exec(client)
 }

@@ -32,7 +32,9 @@ mod request;
 mod response;
 mod data;
 mod pub_msg;
+mod connectivity;
 
+pub use connectivity::{RemoteAddr, Session};
 pub use data::{Failure, Status};
 pub use pub_msg::PubMessage;
 pub use request::Request;

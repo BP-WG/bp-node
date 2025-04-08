@@ -25,21 +25,14 @@ use std::convert::Infallible;
 use std::error::Error;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
-use amplify::IoError;
-use bprpc::{Request, Response, Status};
-use cyphernet::addr::{InetHost, NetAddr};
+use bprpc::{RemoteAddr, Request, Response, Session, Status};
 use netservices::remotes::DisconnectReason;
 use netservices::service::ServiceController;
 use netservices::{Direction, Frame, NetAccept, NetTransport};
 use reactor::{Action, ResourceId, Timestamp};
+use strict_encoding::DecodeError;
 
-pub type RemoteAddr = NetAddr<InetHost>;
-// For now, we use a very simple form of session: plain TCP stream
-pub type Session = TcpStream;
-// In the future this should be
-// EidolonSession<ed25519::PrivateKey, NoiseSession<x25519::PrivateKey, Sha256, TcpStream>>
-
-const CLIENT_HANDLER: &str = "client-handler";
+const CLIENT_HANDLER: &str = "rpc-controller";
 
 pub struct RpcController {
     actions: VecDeque<Action<NetAccept<Session, TcpListener>, NetTransport<Session>>>,
@@ -82,7 +75,7 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcController {
     }
 
     fn on_listening(&mut self, socket: SocketAddr) {
-        print!("Listening on {socket}");
+        log::info!(target: CLIENT_HANDLER, "Listening on {socket}");
     }
 
     fn on_disconnected(&mut self, _: SocketAddr, _: Direction, _: &DisconnectReason) {
@@ -92,7 +85,7 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcController {
     fn on_command(&mut self, _: ()) { unreachable!("there are no commands for this service") }
 
     fn on_frame(&mut self, res_id: ResourceId, req: Request) {
-        log::debug!(target: CLIENT_HANDLER, "Processing `{:?}`", req);
+        log::debug!(target: CLIENT_HANDLER, "Processing `{req}`");
         let response = match req {
             Request::Ping(noise) => Response::Pong(noise),
             Request::Noop => {
@@ -103,12 +96,13 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcController {
                 clients: self.clients,
             }),
         };
+        log::debug!(target: CLIENT_HANDLER, "Sending `{response}`");
         let mut data = Vec::new();
         let _ = response.marshall(&mut data);
         self.actions.push_back(Action::Send(res_id, data));
     }
 
-    fn on_frame_unparsable(&mut self, res_id: ResourceId, err: &IoError) {
+    fn on_frame_unparsable(&mut self, res_id: ResourceId, err: &DecodeError) {
         log::error!(target: CLIENT_HANDLER, "Disconnecting {res_id} due to unparsable frame: {err}");
         self.actions.push_back(Action::UnregisterTransport(res_id))
     }

@@ -40,3 +40,4 @@ configure_me_codegen.workspace = true
 default = ["cli"]
 all = ["log", "cli"]
 cli = ["log", "clap", "colored", "shellexpand", "bp-wallet"]
+log = ["dep:log", "io-reactor/log", "netservices/log"]

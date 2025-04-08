@@ -22,10 +22,11 @@
 
 use std::io::{Read, Write};
 
-use amplify::confinement::{MediumBlob, TinyBlob, U24 as U24MAX};
-use amplify::IoError;
+use amplify::confinement::{TinyBlob, U24 as U24MAX};
 use netservices::Frame;
-use strict_encoding::{DecodeError, DeserializeError, StrictDeserialize, StrictSerialize};
+use strict_encoding::{
+    DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
+};
 
 use crate::BP_RPC_LIB;
 
@@ -35,7 +36,7 @@ use crate::BP_RPC_LIB;
 #[strict_type(lib = BP_RPC_LIB, tags = custom)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Request {
-    #[display("ping")]
+    #[display("ping(...)")]
     #[strict_type(tag = 0x00)]
     Ping(TinyBlob),
 
@@ -45,28 +46,22 @@ pub enum Request {
     #[strict_type(tag = 0x02)]
     Status,
 }
-impl StrictSerialize for Request {}
-impl StrictDeserialize for Request {}
-
-impl TryFrom<Vec<u8>> for Request {
-    type Error = DeserializeError;
-
-    fn try_from(data: Vec<u8>) -> Result<Self, Self::Error> {
-        let data = MediumBlob::try_from(data).map_err(DecodeError::from)?;
-        Request::from_strict_serialized(data)
-    }
-}
-
-impl From<Request> for Vec<u8> {
-    fn from(req: Request) -> Self {
-        req.to_strict_serialized::<U24MAX>().expect("request does not fit frame size").into_vec()
-    }
-}
 
 impl Frame for Request {
-    type Error = IoError;
+    type Error = DecodeError;
 
-    fn unmarshall(reader: impl Read) -> Result<Option<Self>, Self::Error> { todo!() }
+    fn unmarshall(reader: impl Read) -> Result<Option<Self>, Self::Error> {
+        let mut reader = StrictReader::with(StreamReader::new::<U24MAX>(reader));
+        match Self::strict_decode(&mut reader) {
+            Ok(request) => Ok(Some(request)),
+            Err(DecodeError::Io(_)) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
 
-    fn marshall(&self, writer: impl Write) -> Result<usize, Self::Error> { todo!() }
+    fn marshall(&self, writer: impl Write) -> Result<(), Self::Error> {
+        let writer = StrictWriter::with(StreamWriter::new::<U24MAX>(writer));
+        self.strict_encode(writer)?;
+        Ok(())
+    }
 }

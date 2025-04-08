@@ -1,3 +1,6 @@
+use std::net::TcpStream;
+
+use cyphernet::addr::{InetHost, NetAddr};
 // BP Node: sovereign bitcoin wallet backend.
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -20,16 +23,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use amplify::confinement::TinyBlob;
-
-use crate::BP_RPC_LIB;
-
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = BP_RPC_LIB, tags = custom, dumb = Self::ReversePing(strict_dumb!()))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum PubMessage {
-    #[strict_type(tag = 0x01)]
-    #[display("ping(...)")]
-    ReversePing(TinyBlob),
-}
+pub type RemoteAddr = NetAddr<InetHost>;
+// For now, we use a very simple form of session: plain TCP stream
+pub type Session = TcpStream;
+// In the future this should be
+// EidolonSession<ed25519::PrivateKey, NoiseSession<x25519::PrivateKey, Sha256, TcpStream>>

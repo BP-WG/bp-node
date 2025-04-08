@@ -20,24 +20,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use bprpc::RemoteAddr;
+
 /// Command-line tool for working with store daemon
 #[derive(Parser, Clone, PartialEq, Eq, Debug)]
-#[clap(name = "bp-cli", bin_name = "bp-cli", author, version)]
+#[command(name = "bp-cli", bin_name = "bp-cli", author, version)]
 pub struct Args {
     /// Set verbosity level.
     ///
     /// Can be used multiple times to increase verbosity.
-    #[clap(short, long, global = true, action = clap::ArgAction::Count)]
+    #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     pub verbose: u8,
 
+    #[arg(short, long)]
+    pub remote: RemoteAddr,
+
     /// Command to execute
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub command: Command,
 }
 
 /// Command-line commands:
 #[derive(Subcommand, Clone, PartialEq, Eq, Debug, Display)]
 pub enum Command {
-    #[display("none")]
-    None,
+    #[display("ping")]
+    Ping,
 }

@@ -449,6 +449,7 @@ dependencies = [
  "serde_yaml",
  "shellexpand",
  "socket2",
+ "strict_encoding",
  "toml 0.8.20",
 ]
 
@@ -459,6 +460,7 @@ dependencies = [
  "amplify",
  "bp-std",
  "bp-wallet",
+ "cyphernet",
  "netservices",
  "serde",
  "strict_encoding",
@@ -1650,9 +1652,9 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "miniz_oxide"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff70ce3e48ae43fa075863cef62e8b43b71a4f2382229920e0df362592919430"
+checksum = "3be647b768db090acb35d5ec5db2b0e1f1de11133ca123b9eacf5137868f892a"
 dependencies = [
  "adler2",
 ]
@@ -1677,7 +1679,7 @@ dependencies = [
 [[package]]
 name = "netservices"
 version = "0.8.1"
-source = "git+https://github.com/cyphernet-dao/rust-netservices?branch=server#8d23288fdb5846278edb75f26a6ddfeeadfa3b3e"
+source = "git+https://github.com/cyphernet-dao/rust-netservices?branch=server#e3a2f83d2924df6209f648d96e17a0f50cb174c7"
 dependencies = [
  "amplify",
  "cyphernet",

@@ -18,6 +18,7 @@ amplify.workspace = true
 strict_encoding.workspace = true
 bp-std.workspace = true
 bp-wallet.workspace = true
+cyphernet.workspace = true
 netservices.workspace = true
 serde = { workspace = true, optional = true }
 
