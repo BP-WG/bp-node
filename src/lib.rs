@@ -28,6 +28,7 @@ mod config;
 mod rpc;
 mod import;
 mod blocks;
+pub mod db;
 
 pub use config::Config;
 pub use rpc::RpcController;

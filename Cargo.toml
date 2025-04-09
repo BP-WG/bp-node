@@ -19,7 +19,10 @@ bp-wallet = "0.12.0-beta.5"
 
 io-reactor = "0.6.0"
 cyphernet = { version = "0.5.2", features = ["tor", "dns", "ed25519", "p2p-ed25519"] }
+microservices = { version = "0.12.0" }
 netservices = { version = "0.11.0", features = ["eidolon", "reactor"] }
+
+redb = "2.4.0"
 
 serde = { version = "1", features = ["derive"] }
 
@@ -60,7 +63,9 @@ strict_encoding.workspace = true
 bp-wallet = { workspace = true, features = ["cli"] }
 bp-rpc = { version = "0.12.0-alpha.1", path = "rpc" }
 io-reactor.workspace = true
+microservices = { workspace = true, features = ["log"] }
 netservices = { workspace = true, features = ["log"] }
+redb.workspace = true
 log.workspace = true
 clap = { workspace = true, optional = true }
 shellexpand = { workspace = true, optional = true }
@@ -93,4 +98,5 @@ spec = "config_spec.toml"
 io-reactor = { git = "https://github.com/rust-amplify/io-reactor", branch = "v0.6" }
 cyphergraphy = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
 cypheraddr = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
+microservices = { git = "https://github.com/cyphernet-labs/microservices.rs", branch = "master" }
 netservices = { git = "https://github.com/cyphernet-labs/netservices.rs", branch = "server" }

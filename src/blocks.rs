@@ -22,3 +22,27 @@
 // limitations under the License.
 
 //! Block processor organized as a worker thread pool.
+
+use std::convert::Infallible;
+use std::ops::ControlFlow;
+
+use bprpc::BlockMsg;
+use microservices::UService;
+
+const NAME: &str = "blockproc";
+
+pub struct BlockProcessor;
+
+impl BlockProcessor {
+    pub fn new() -> Self { Self }
+}
+
+impl UService for BlockProcessor {
+    type Msg = BlockMsg;
+    type Error = Infallible;
+    const NAME: &'static str = "";
+
+    fn process(&mut self, msg: Self::Msg) -> Result<ControlFlow<u8>, Self::Error> { todo!() }
+
+    fn terminate(&mut self) { todo!() }
+}

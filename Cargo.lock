@@ -468,7 +468,9 @@ dependencies = [
  "dotenv",
  "io-reactor",
  "log",
+ "microservices",
  "netservices",
+ "redb",
  "shellexpand",
  "strict_encoding",
 ]
@@ -1500,6 +1502,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
+name = "microservices"
+version = "0.12.0"
+source = "git+https://github.com/cyphernet-labs/microservices.rs?branch=master#c670e84967a27bce2408847a65d537d34bcda76d"
+dependencies = [
+ "crossbeam-channel",
+ "getrandom 0.2.15",
+ "log",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1849,6 +1862,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
 dependencies = [
  "getrandom 0.3.2",
+]
+
+[[package]]
+name = "redb"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea0a72cd7140de9fc3e318823b883abf819c20d478ec89ce880466dc2ef263c6"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

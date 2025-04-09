@@ -38,6 +38,7 @@ mod import;
 
 pub use connectivity::{RemoteAddr, Session};
 pub use data::{Failure, Status};
+pub use import::BlockMsg;
 pub use pub_msg::PubMessage;
 pub use request::Request;
 pub use response::Response;
