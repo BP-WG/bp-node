@@ -50,6 +50,15 @@ pub struct Opts {
 
     #[arg(short, long)]
     pub provider: Vec<RemoteAddr>,
+
+    #[command(subcommand)]
+    pub command: Option<Command>,
+}
+
+#[derive(Subcommand)]
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum Command {
+    Init,
 }
 
 impl Opts {

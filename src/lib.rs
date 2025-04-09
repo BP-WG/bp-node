@@ -33,6 +33,6 @@ pub mod db;
 pub use blocks::BlockImporter;
 pub use config::Config;
 pub use rpc::RpcController;
-pub use runtime::{InitError, Runtime};
+pub use runtime::{InitError, PATH_INDEXDB, Runtime};
 
 // Block file separator 0xD9B4BEF9

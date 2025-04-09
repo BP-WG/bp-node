@@ -34,16 +34,30 @@ use redb::DatabaseError;
 use crate::db::IndexDb;
 use crate::{BlockImporter, Config, RpcController};
 
+pub const PATH_INDEXDB: &str = "bp-index";
+
 #[derive(Debug, Display, Error, From)]
-#[display(inner)]
+#[display(doc_comments)]
 pub enum InitError {
+    /// unable to initialize RPC service.
+    ///
+    /// {0}
     Rpc(IoError),
+
+    /// unable to initialize block importing service.
+    ///
+    /// {0}
     Importer(IoError),
 
+    /// unable to open database.
+    ///
+    /// {0}
+    ///
+    /// Tip: make sure you have initialized database with `bpd init` command.
     #[from]
     Db(DatabaseError),
 
-    /// unable to create thread for {0}
+    /// unable to create thread for {0}.
     Thread(&'static str),
 }
 
@@ -56,12 +70,12 @@ pub struct Runtime {
 
 impl Runtime {
     pub fn start(conf: Config) -> Result<Self, InitError> {
-        // TODO: Add inter-thread connectivity
+        // TODO: Add query thread
 
         const TIMEOUT: Option<Duration> = Some(Duration::from_secs(60 * 10));
 
         log::info!("Starting database managing thread...");
-        let indexdb = IndexDb::new(&conf.data_dir.join("bp-index"))?;
+        let indexdb = IndexDb::new(&conf.data_dir.join(PATH_INDEXDB))?;
         let db = UThread::new(indexdb, TIMEOUT);
 
         let mut importers = Vec::new();

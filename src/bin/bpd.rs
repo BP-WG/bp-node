@@ -22,30 +22,73 @@
 // limitations under the License.
 
 #[macro_use]
-extern crate log;
-#[macro_use]
 extern crate clap;
 
 mod opts;
 
+use std::fs;
+use std::process::{ExitCode, Termination, exit};
+
 pub use bpnode;
-use bpnode::{Config, InitError, Runtime};
+use bpnode::{Config, InitError, PATH_INDEXDB, Runtime};
 use bpwallet::cli::LogLevel;
 use clap::Parser;
+use redb::Database;
 
-use crate::opts::Opts;
+use crate::opts::{Command, Opts};
 
-fn main() -> Result<(), InitError> {
+struct Status(Result<(), InitError>);
+
+impl Termination for Status {
+    fn report(self) -> ExitCode {
+        match self.0 {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(err) => {
+                eprintln!("Error: {err}");
+                ExitCode::FAILURE
+            }
+        }
+    }
+}
+
+fn main() -> Status {
     let mut opts = Opts::parse();
     opts.process();
     LogLevel::from_verbosity_flag_count(opts.verbose).apply();
-    trace!("Command-line arguments: {:#?}", &opts);
+    log::debug!("Command-line arguments: {:#?}", &opts);
 
-    eprintln!("BP Node (daemon): sovereign bitcoin wallet backend");
-    eprintln!("    by LNP/BP Labs, Switzerland\n");
-
-    // TODO: Update arguments basing on the configuration
-    let conf = Config::from(opts);
-
-    Runtime::start(conf)?.run()
+    match opts.command {
+        Some(Command::Init) => {
+            eprint!("Initializing ... ");
+            let mut index_path = opts.general.data_dir.join(PATH_INDEXDB);
+            match fs::exists(&index_path) {
+                Err(err) => {
+                    eprintln!("unable to access path '{}': {err}", index_path.display());
+                    exit(1);
+                }
+                Ok(true) => {
+                    eprintln!("index database directory already exists, cancelling");
+                    exit(2);
+                }
+                Ok(false) => {}
+            }
+            if let Err(err) = fs::create_dir_all(&opts.general.data_dir) {
+                eprintln!(
+                    "unable to create data directory at '{}'\n{err}",
+                    opts.general.data_dir.display()
+                );
+                exit(3);
+            }
+            if let Err(err) = Database::create(&index_path) {
+                eprintln!("unable to create index database.\n{err}");
+                exit(4);
+            }
+            eprintln!("index database initialized, exiting");
+            Status(Ok(()))
+        }
+        None => {
+            let conf = Config::from(opts);
+            Status(Runtime::start(conf).and_then(|runtime| runtime.run()))
+        }
+    }
 }
