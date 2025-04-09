@@ -32,7 +32,7 @@ use netservices::{NetAccept, service};
 use redb::DatabaseError;
 
 use crate::db::IndexDb;
-use crate::{BlockProcessor, Config, RpcController, RpcImport};
+use crate::{BlockImporter, Config, RpcController};
 
 #[derive(Debug, Display, Error, From)]
 #[display(inner)]
@@ -51,7 +51,6 @@ pub struct Runtime {
     network: Network,
     rpc: service::Runtime<()>,
     importers: Vec<Client<BlockMsg>>,
-    blocks: UThread<BlockProcessor>,
     db: UThread<IndexDb>,
 }
 
@@ -62,15 +61,13 @@ impl Runtime {
         const TIMEOUT: Option<Duration> = Some(Duration::from_secs(60 * 10));
 
         log::info!("Starting database managing thread...");
-        let db = UThread::new(IndexDb::new(&conf.data_dir)?, TIMEOUT);
-
-        log::info!("Starting block processor thread...");
-        let blocks = UThread::new(BlockProcessor::new(db.sender()), TIMEOUT);
+        let indexdb = IndexDb::new(&conf.data_dir.join("bp-index"))?;
+        let db = UThread::new(indexdb, TIMEOUT);
 
         let mut importers = Vec::new();
         for provider in &conf.providers {
             log::info!("Connecting to block provider {provider}...");
-            let controller = RpcImport::new(db.sender());
+            let controller = BlockImporter::new(db.sender(), provider.clone());
             let importer = Client::new(controller, provider.clone())
                 .map_err(|err| InitError::Importer(err.into()))?;
             importers.push(importer);
@@ -85,16 +82,13 @@ impl Runtime {
             .map_err(|err| InitError::Rpc(err.into()))?;
 
         log::info!("Launch completed successfully");
-        Ok(Self { network: conf.network, rpc, blocks, importers, db })
+        Ok(Self { network: conf.network, rpc, importers, db })
     }
 
-    pub fn run(mut self) -> Result<(), InitError> {
+    pub fn run(self) -> Result<(), InitError> {
         self.rpc
             .join()
             .map_err(|_| InitError::Thread("RPC server"))?;
-        self.blocks
-            .join()
-            .map_err(|_| InitError::Thread("block processor"))?;
         for importer in self.importers {
             importer.join().map_err(|_| InitError::Thread("importer"))?;
         }

@@ -39,6 +39,12 @@ use redb::{
 #[display("#{0:010X}")]
 pub struct TxNo(u40);
 
+impl TxNo {
+    pub fn start() -> Self { TxNo(u40::ONE) }
+
+    pub fn inc_assign(&mut self) { self.0 += u40::ONE }
+}
+
 impl ByteArray<5> for TxNo {
     fn from_byte_array(val: impl Into<[u8; 5]>) -> Self { Self(u40::from_be_bytes(val.into())) }
 
@@ -128,11 +134,14 @@ impl redb::Value for DbTx {
     fn type_name() -> TypeName { TypeName::new("BpNodeTx") }
 }
 
+pub const TABLE_MAIN: TableDefinition<&'static str, &[u8]> = TableDefinition::new("main");
 pub const TABLE_BLKS: TableDefinition<[u8; 32], DbBlockHeader> = TableDefinition::new("blocks");
 pub const TABLE_TXIDS: TableDefinition<[u8; 32], TxNo> = TableDefinition::new("txids");
 pub const TABLE_TXES: TableDefinition<TxNo, DbTx> = TableDefinition::new("transactions");
 pub const TABLE_OUTS: TableDefinition<TxNo, Vec<TxNo>> = TableDefinition::new("spends");
 pub const TABLE_SPKS: TableDefinition<&[u8], TxNo> = TableDefinition::new("scripts");
+
+pub const REC_TXNO: &str = "txno";
 
 pub struct IndexDb(Database);
 
