@@ -23,6 +23,7 @@ microservices = { version = "0.12.0" }
 netservices = { version = "0.11.0", features = ["eidolon", "reactor"] }
 
 redb = "2.4.0"
+crossbeam-channel = "0.5.15"
 
 serde = { version = "1", features = ["derive"] }
 
@@ -66,6 +67,7 @@ io-reactor.workspace = true
 microservices = { workspace = true, features = ["log"] }
 netservices = { workspace = true, features = ["log"] }
 redb.workspace = true
+crossbeam-channel.workspace = true
 log.workspace = true
 clap = { workspace = true, optional = true }
 shellexpand = { workspace = true, optional = true }

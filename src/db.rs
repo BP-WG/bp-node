@@ -22,11 +22,18 @@
 // limitations under the License.
 
 use std::cmp::Ordering;
+use std::ops::ControlFlow;
+use std::path::Path;
 
 use amplify::num::u40;
 use amplify::{ByteArray, FromSliceError};
 use bpwallet::{BlockHeader, ConsensusDecode, ConsensusEncode, Tx};
-use redb::{TableDefinition, TypeName};
+use crossbeam_channel::{SendError, Sender};
+use microservices::UService;
+use redb::{
+    Database, DatabaseError, ReadTransaction, TableDefinition, TransactionError, TypeName,
+    WriteTransaction,
+};
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Display)]
 #[display("#{0:010X}")]
@@ -126,3 +133,56 @@ pub const TABLE_TXIDS: TableDefinition<[u8; 32], TxNo> = TableDefinition::new("t
 pub const TABLE_TXES: TableDefinition<TxNo, DbTx> = TableDefinition::new("transactions");
 pub const TABLE_OUTS: TableDefinition<TxNo, Vec<TxNo>> = TableDefinition::new("spends");
 pub const TABLE_SPKS: TableDefinition<&[u8], TxNo> = TableDefinition::new("scripts");
+
+pub struct IndexDb(Database);
+
+impl IndexDb {
+    pub fn new(path: impl AsRef<Path>) -> Result<Self, DatabaseError> {
+        Database::open(path).map(Self)
+    }
+}
+
+pub enum DbMsg {
+    Read(Sender<ReadTransaction>),
+    Write(Sender<WriteTransaction>),
+}
+
+#[derive(Debug, Display, Error, From)]
+#[display(inner)]
+pub enum IndexDbError {
+    #[from]
+    Transaction(TransactionError),
+
+    #[from]
+    Read(SendError<ReadTransaction>),
+
+    #[from]
+    Write(SendError<WriteTransaction>),
+}
+
+impl UService for IndexDb {
+    type Msg = DbMsg;
+    type Error = IndexDbError;
+    const NAME: &'static str = "indexdb";
+
+    fn process(&mut self, msg: Self::Msg) -> Result<ControlFlow<u8>, Self::Error> {
+        match msg {
+            DbMsg::Read(sender) => {
+                let tx = self.0.begin_read()?;
+                sender.send(tx)?;
+            }
+            DbMsg::Write(sender) => {
+                let tx = self.0.begin_write()?;
+                sender.send(tx)?;
+            }
+        }
+        Ok(ControlFlow::Continue(()))
+    }
+
+    fn terminate(&mut self) {
+        log::info!("Compacting database on shutdown...");
+        if let Err(e) = self.0.compact() {
+            log::error!("Failed to compact database: {e}");
+        }
+    }
+}

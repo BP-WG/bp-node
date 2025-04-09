@@ -26,15 +26,20 @@
 use std::net::SocketAddr;
 
 use bprpc::{BlockMsg, RemoteAddr, Session};
+use microservices::USender;
 use netservices::client::{ClientDelegate, ConnectionDelegate, OnDisconnect};
 use netservices::{Frame, ImpossibleResource, NetTransport};
 
+use crate::db::DbMsg;
+
 const NAME: &str = "importer";
 
-pub struct RpcImport {}
+pub struct RpcImport {
+    db: USender<DbMsg>,
+}
 
 impl RpcImport {
-    pub fn new() -> Self { Self {} }
+    pub fn new(db: USender<DbMsg>) -> Self { Self { db } }
 }
 
 impl ConnectionDelegate<RemoteAddr, Session> for RpcImport {

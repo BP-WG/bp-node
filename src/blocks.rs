@@ -27,20 +27,24 @@ use std::convert::Infallible;
 use std::ops::ControlFlow;
 
 use bprpc::BlockMsg;
-use microservices::UService;
+use microservices::{USender, UService};
+
+use crate::db::DbMsg;
 
 const NAME: &str = "blockproc";
 
-pub struct BlockProcessor;
+pub struct BlockProcessor {
+    db: USender<DbMsg>,
+}
 
 impl BlockProcessor {
-    pub fn new() -> Self { Self }
+    pub fn new(db: USender<DbMsg>) -> Self { Self { db } }
 }
 
 impl UService for BlockProcessor {
     type Msg = BlockMsg;
     type Error = Infallible;
-    const NAME: &'static str = "";
+    const NAME: &'static str = "blockproc";
 
     fn process(&mut self, msg: Self::Msg) -> Result<ControlFlow<u8>, Self::Error> { todo!() }
 

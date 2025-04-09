@@ -465,6 +465,7 @@ dependencies = [
  "config",
  "configure_me",
  "configure_me_codegen",
+ "crossbeam-channel",
  "dotenv",
  "io-reactor",
  "log",
