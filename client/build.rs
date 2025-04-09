@@ -40,11 +40,12 @@ fn main() -> Result<(), configure_me_codegen::Error> {
     let outdir = "../shell";
 
     fs::create_dir_all(outdir).expect("failed to create shell dir");
+    #[allow(clippy::single_element_loop)]
     for app in [cli::Args::command()].iter_mut() {
         let name = app.get_name().to_string();
-        generate_to(Bash, app, &name, &outdir)?;
-        generate_to(PowerShell, app, &name, &outdir)?;
-        generate_to(Zsh, app, &name, &outdir)?;
+        generate_to(Bash, app, &name, outdir)?;
+        generate_to(PowerShell, app, &name, outdir)?;
+        generate_to(Zsh, app, &name, outdir)?;
     }
 
     // configure_me_codegen::build_script_auto()

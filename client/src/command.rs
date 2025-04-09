@@ -23,8 +23,8 @@
 
 use bpwallet::cli::ExecError;
 
-use crate::client::BpClient;
 use crate::Command;
+use crate::client::BpClient;
 
 impl Command {
     pub fn exec(self, mut client: BpClient) -> Result<(), ExecError> {

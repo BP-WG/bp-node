@@ -35,7 +35,7 @@ use netservices::{Direction, Frame, NetAccept, NetTransport};
 use reactor::{Action, ResourceId, Timestamp};
 use strict_encoding::DecodeError;
 
-const NAME: &str = "rpc-controller";
+const NAME: &str = "rpc";
 
 pub struct RpcController {
     actions: VecDeque<Action<NetAccept<Session, TcpListener>, NetTransport<Session>>>,
@@ -43,23 +43,11 @@ pub struct RpcController {
 }
 
 impl RpcController {
-    pub fn new() -> Self {
-        Self {
-            actions: none!(),
-            clients: 0,
-        }
-    }
+    pub fn new() -> Self { Self { actions: none!(), clients: 0 } }
 }
 
 impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcController {
     type InFrame = Request;
-
-    fn extract_actions(
-        &mut self,
-    ) -> impl IntoIterator<Item = Action<NetAccept<Session, TcpListener>, NetTransport<Session>>>
-    {
-        self.actions.drain(..)
-    }
 
     fn should_accept(&mut self, _remote: &RemoteAddr, _time: Timestamp) -> bool {
         // For now, we just do not allow more than 64k connections.
@@ -95,9 +83,7 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcController {
                 // Do nothing
                 return;
             }
-            Request::Status => Response::Status(Status {
-                clients: self.clients,
-            }),
+            Request::Status => Response::Status(Status { clients: self.clients }),
         };
         log::debug!(target: NAME, "Sending `{response}`");
         let mut data = Vec::new();
@@ -109,4 +95,10 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcController {
         log::error!(target: NAME, "Disconnecting {res_id} due to unparsable frame: {err}");
         self.actions.push_back(Action::UnregisterTransport(res_id))
     }
+}
+
+impl Iterator for RpcController {
+    type Item = Action<NetAccept<Session, TcpListener>, NetTransport<Session>>;
+
+    fn next(&mut self) -> Option<Self::Item> { self.actions.pop_front() }
 }

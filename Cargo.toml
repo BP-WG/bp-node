@@ -3,30 +3,25 @@ default-members = [".", "rpc", "client"]
 members = [".", "rpc", "client"]
 
 [workspace.package]
-version = "0.11.0-alpha.1"
+version = "0.12.0-alpha.1"
 authors = ["Dr Maxim Orlovsky <orlovsky@lnp-bp.org>"]
 keywords = ["bitcoin", "lightning-network", "lnp-bp", "bitcoin-node"]
 categories = ["cryptography::cryptocurrencies", "network-programming"]
-edition = "2021"
-rust-version = "1.75.0"
+edition = "2024"
+rust-version = "1.85.0"
 license = "Apache-2.0"
 
 [workspace.dependencies]
-amplify = "4.7.0"
-strict_encoding = "2.7.0-rc.1"
-bp-std = "0.11.0-beta.7"
-bp-wallet = "0.11.0-beta.7"
+amplify = "4.8.0"
+strict_encoding = "2.8.1"
+bp-std = "0.12.0-beta.5"
+bp-wallet = "0.12.0-beta.5"
 
-sha2 = "0.10.8"
 io-reactor = "0.6.0"
 cyphernet = { version = "0.5.2", features = ["tor", "dns", "ed25519", "p2p-ed25519"] }
-netservices = { version = "0.8.1", features = ["eidolon", "io-reactor"] }
-socket2 = "0.5.7"
+netservices = { version = "0.11.0", features = ["eidolon", "reactor"] }
 
 serde = { version = "1", features = ["derive"] }
-serde_json = "1.0.114"
-serde_yaml = "0.9.19"
-toml = "0.8.2"
 
 clap = { version = "4.4.8", features = ["derive", "env"] }
 clap_complete = "4.5.7"
@@ -34,7 +29,6 @@ log = { version = "0.4", features = ["max_level_trace", "release_max_level_debug
 env_logger = { version = "0.11.3" }
 shellexpand = { version = "3.1.0" }
 dotenv = { version = "0.15" }
-colored = "2.1.0"
 settings = { version = "0.14", package = "config" }
 configure_me = { version = "0.4" }
 configure_me_codegen = "0.4.4"
@@ -64,27 +58,20 @@ required-features = ["server"]
 amplify.workspace = true
 strict_encoding.workspace = true
 bp-wallet = { workspace = true, features = ["cli"] }
-bp-rpc = { version = "0.11.0-alpha.1", path = "rpc" }
+bp-rpc = { version = "0.12.0-alpha.1", path = "rpc" }
 io-reactor.workspace = true
-cyphernet.workspace = true
 netservices = { workspace = true, features = ["log"] }
-socket2.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-serde_yaml.workspace = true
-toml.workspace = true
 log.workspace = true
 clap = { workspace = true, optional = true }
 shellexpand = { workspace = true, optional = true }
 settings = { workspace = true, optional = true }
 configure_me = { workspace = true, optional = true }
 dotenv = { workspace = true, optional = true }
-colored.workspace = true
 
 [build-dependencies]
 amplify.workspace = true
 bp-wallet = { workspace = true, features = ["cli"] }
-bp-rpc = { version = "0.11.0-alpha.1", path = "rpc" }
+bp-rpc = { version = "0.12.0-alpha.1", path = "rpc" }
 clap.workspace = true
 clap_complete.workspace = true
 log.workspace = true
@@ -97,16 +84,13 @@ default = ["server"]
 # Server is a standalone application that runs daemons.
 # Required for all apps that can be launched from command-line shell as binaries
 # (i.e. both servers and cli)
-server = ["dotenv", "clap", "settings", "configure_me", "shellexpand"]
-# Embedded is an app that contains embedded node and that talks to it through
-# integration layer
-embedded = []
+server = ["dep:dotenv", "dep:clap", "dep:settings", "dep:configure_me", "dep:shellexpand"]
 
 [package.metadata.configure_me]
 spec = "config_spec.toml"
 
 [patch.crates-io]
 io-reactor = { git = "https://github.com/rust-amplify/io-reactor", branch = "v0.6" }
-cyphergraphy = { git = "https://github.com/cyphernet-dao/rust-cyphernet", branch = "master" }
-cypheraddr = { git = "https://github.com/cyphernet-dao/rust-cyphernet", branch = "master" }
-netservices = { git = "https://github.com/cyphernet-dao/rust-netservices", branch = "server" }
+cyphergraphy = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
+cypheraddr = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
+netservices = { git = "https://github.com/cyphernet-labs/netservices.rs", branch = "server" }

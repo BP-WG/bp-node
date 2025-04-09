@@ -29,7 +29,7 @@ use strict_encoding::{
     DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
 };
 
-use crate::{Failure, Status, BP_RPC_LIB};
+use crate::{BP_RPC_LIB, Failure, Status};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]

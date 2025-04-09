@@ -64,9 +64,6 @@ impl Opts {
 
 impl From<Opts> for Config {
     fn from(opts: Opts) -> Self {
-        Config {
-            data_dir: opts.general.data_dir,
-            listening: opts.listen,
-        }
+        Config { data_dir: opts.general.data_dir, listening: opts.listen }
     }
 }

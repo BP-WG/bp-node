@@ -35,7 +35,7 @@ pub use bpnode;
 use bpnode::{Config, RpcController};
 use bpwallet::cli::LogLevel;
 use clap::Parser;
-use netservices::{service, NetAccept};
+use netservices::{NetAccept, service};
 
 use crate::opts::Opts;
 
