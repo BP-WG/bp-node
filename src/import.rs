@@ -21,15 +21,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate amplify;
-
-mod config;
-mod rpc;
-mod import;
-mod blocks;
-
-pub use config::Config;
-pub use rpc::RpcController;
-
-// Block file separator 0xD9B4BEF9
+//! Block importer interface organized into a reactor thread.

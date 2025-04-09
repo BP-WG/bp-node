@@ -2,11 +2,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-// Written in 2020-2024 by
+// Written in 2020-2025 by
 //     Dr Maxim Orlovsky <orlovsky@lnp-bp.org>
 //
 // Copyright (C) 2020-2024 LNP/BP Standards Association. All rights reserved.
-// Copyright (C) 2020-2024 Dr Maxim Orlovsky. All rights reserved.
+// Copyright (C) 2025 LNP/BP Labs, InDCS, Switzerland. All rights reserved.
+// Copyright (C) 2020-2025 Dr Maxim Orlovsky. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +21,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! RPC connections from clients organized into a reactor thread.
+
 use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::error::Error;
@@ -32,7 +35,7 @@ use netservices::{Direction, Frame, NetAccept, NetTransport};
 use reactor::{Action, ResourceId, Timestamp};
 use strict_encoding::DecodeError;
 
-const CLIENT_HANDLER: &str = "rpc-controller";
+const NAME: &str = "rpc-controller";
 
 pub struct RpcController {
     actions: VecDeque<Action<NetAccept<Session, TcpListener>, NetTransport<Session>>>,
@@ -75,7 +78,7 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcController {
     }
 
     fn on_listening(&mut self, socket: SocketAddr) {
-        log::info!(target: CLIENT_HANDLER, "Listening on {socket}");
+        log::info!(target: NAME, "Listening on {socket}");
     }
 
     fn on_disconnected(&mut self, _: SocketAddr, _: Direction, _: &DisconnectReason) {
@@ -85,7 +88,7 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcController {
     fn on_command(&mut self, _: ()) { unreachable!("there are no commands for this service") }
 
     fn on_frame(&mut self, res_id: ResourceId, req: Request) {
-        log::debug!(target: CLIENT_HANDLER, "Processing `{req}`");
+        log::debug!(target: NAME, "Processing `{req}`");
         let response = match req {
             Request::Ping(noise) => Response::Pong(noise),
             Request::Noop => {
@@ -96,14 +99,14 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcController {
                 clients: self.clients,
             }),
         };
-        log::debug!(target: CLIENT_HANDLER, "Sending `{response}`");
+        log::debug!(target: NAME, "Sending `{response}`");
         let mut data = Vec::new();
         let _ = response.marshall(&mut data);
         self.actions.push_back(Action::Send(res_id, data));
     }
 
     fn on_frame_unparsable(&mut self, res_id: ResourceId, err: &DecodeError) {
-        log::error!(target: CLIENT_HANDLER, "Disconnecting {res_id} due to unparsable frame: {err}");
+        log::error!(target: NAME, "Disconnecting {res_id} due to unparsable frame: {err}");
         self.actions.push_back(Action::UnregisterTransport(res_id))
     }
 }
