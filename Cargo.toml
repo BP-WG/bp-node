@@ -1,6 +1,7 @@
 [workspace]
 default-members = [".", "rpc", "client"]
 members = [".", "rpc", "client"]
+exclude = ["providers/bitcoincore"]
 
 [workspace.package]
 version = "0.12.0-alpha.1"

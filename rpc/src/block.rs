@@ -23,8 +23,9 @@
 
 use std::io::{Read, Write};
 
+use amplify::IoError;
 use amplify::confinement::{SmallVec, U24 as U24MAX};
-use bpstd::{BlockHeader, Tx};
+use bpstd::{BlockHeader, ConsensusDecode, ConsensusDecodeError, ConsensusEncode, Tx};
 use netservices::Frame;
 use strict_encoding::{
     DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
@@ -59,4 +60,12 @@ impl Frame for BlockMsg {
         self.strict_encode(writer)?;
         Ok(())
     }
+}
+
+impl ConsensusEncode for BlockMsg {
+    fn consensus_encode(&self, writer: &mut impl Write) -> Result<usize, IoError> { todo!() }
+}
+
+impl ConsensusDecode for BlockMsg {
+    fn consensus_decode(reader: &mut impl Read) -> Result<Self, ConsensusDecodeError> { todo!() }
 }

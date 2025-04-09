@@ -1,0 +1,30 @@
+[workspace]
+
+[package]
+name = "bp-node-bitcoincore-provider"
+description = "Bitcoin Core block provider for BP Node"
+version = "0.12.0-alpha.1"
+authors = ["Dr Maxim Orlovsky <orlovsky@lnp-bp.org>"]
+keywords = ["bitcoin", "blockchain", "bitcoin-core"]
+categories = ["cryptography::cryptocurrencies", "network-programming"]
+edition = "2024"
+rust-version = "1.85.0"
+license = "Apache-2.0"
+
+[dependencies]
+bp-consensus = { version = "0.12.0-beta.5" }
+bp-rpc = { version = "0.12.0-alpha.1" }
+cyphernet = { version = "0.5.2", features = ["tor", "dns", "ed25519", "p2p-ed25519"] }
+microservices = { version = "0.12.0" }
+netservices = { version = "0.11.0", features = ["eidolon", "reactor"] }
+crossbeam-channel = "0.5.15"
+clap = { version = "4.4.8", features = ["derive", "env"] }
+
+[patch.crates-io]
+io-reactor = { git = "https://github.com/rust-amplify/io-reactor", branch = "v0.6" }
+cyphergraphy = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
+cypheraddr = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
+microservices = { git = "https://github.com/cyphernet-labs/microservices.rs", branch = "master" }
+netservices = { git = "https://github.com/cyphernet-labs/netservices.rs", branch = "server" }
+
+bp-rpc = { git = "https://github.com/BP-WG/bp-node", branch = "master" }

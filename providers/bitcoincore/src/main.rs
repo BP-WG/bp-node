@@ -1,13 +1,12 @@
-// BP Node: sovereign bitcoin wallet backend.
+// Bitcoin Core blocks provider for BP Node
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-// Written in 2020-2025 by
+// Written in 2025 by
 //     Dr Maxim Orlovsky <orlovsky@lnp-bp.org>
 //
-// Copyright (C) 2020-2024 LNP/BP Standards Association. All rights reserved.
 // Copyright (C) 2025 LNP/BP Labs, InDCS, Switzerland. All rights reserved.
-// Copyright (C) 2020-2025 Dr Maxim Orlovsky. All rights reserved.
+// Copyright (C) 2025 Dr Maxim Orlovsky. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,27 +20,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate amplify;
-#[macro_use]
-extern crate strict_encoding;
-#[cfg(feature = "serde")]
-#[macro_use]
-extern crate serde;
+use std::any::Any;
+use std::path::PathBuf;
 
-mod request;
-mod response;
-mod data;
-mod pub_msg;
-mod connectivity;
-mod block;
+use bprpc::RemoteAddr;
+use clap::Parser;
 
-pub use block::BlockMsg;
-pub use connectivity::{RemoteAddr, Session};
-pub use data::{Failure, Status};
-pub use pub_msg::PubMessage;
-pub use request::Request;
-pub use response::Response;
+pub const BLOCK_SEPARATOR: u32 = 0xD9B4BEF9;
 
-pub const BP_RPC_LIB: &str = "BPRPC";
-pub const BP_NODE_RPC_ENDPOINT: &str = "0.0.0.0:61961";
+/// Command-line arguments
+#[derive(Parser)]
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[command(author, version, about)]
+pub struct Opts {
+    /// Data directory for Bitcoin Core blocks
+    #[arg(short, long)]
+    pub data_dir: PathBuf,
+
+    /// Bitcoin Core RPC address.
+    pub bitcoin_core: RemoteAddr,
+
+    /// BP Node block import interface address.
+    pub bp_node: RemoteAddr,
+}
+
+fn main() -> Result<(), Box<dyn Any>> { Ok(()) }
