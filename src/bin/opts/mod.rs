@@ -24,11 +24,12 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use bpwallet::cli::{GeneralOpts, ResolverOpt};
+use bprpc::RemoteAddr;
+use bpwallet::cli::GeneralOpts;
 
 use crate::bpnode::Config;
 
-pub const BP_NODE_CONFIG: &str = "{data_dir}/bp_node.toml";
+pub const BP_NODE_CONFIG: &str = "{data_dir}/bp-node.toml";
 
 /// Command-line arguments
 #[derive(Parser)]
@@ -42,13 +43,13 @@ pub struct Opts {
     pub verbose: u8,
 
     #[command(flatten)]
-    pub resolver: ResolverOpt,
-
-    #[command(flatten)]
     pub general: GeneralOpts,
 
-    #[arg(short, long, required = true)]
+    #[arg(short, long)]
     pub listen: Vec<SocketAddr>,
+
+    #[arg(short, long)]
+    pub provider: Vec<RemoteAddr>,
 }
 
 impl Opts {
@@ -64,6 +65,11 @@ impl Opts {
 
 impl From<Opts> for Config {
     fn from(opts: Opts) -> Self {
-        Config { data_dir: opts.general.data_dir, listening: opts.listen }
+        Config {
+            data_dir: opts.general.data_dir,
+            network: opts.general.network,
+            listening: opts.listen,
+            providers: opts.provider,
+        }
     }
 }

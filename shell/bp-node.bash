@@ -19,24 +19,12 @@ _bp-node() {
 
     case "${cmd}" in
         bp__node)
-            opts="-v -d -n -l -h -V --verbose --electrum --esplora --mempool --data-dir --network --no-network-prefix --listen --help --version"
+            opts="-v -d -n -l -p -h -V --verbose --data-dir --network --no-network-prefix --listen --provider --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
-                --electrum)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --esplora)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --mempool)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
                 --data-dir)
                     COMPREPLY=()
                     if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
@@ -64,6 +52,14 @@ _bp-node() {
                     return 0
                     ;;
                 -l)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --provider)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -p)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

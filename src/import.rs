@@ -23,70 +23,36 @@
 
 //! Block importer interface organized into a reactor thread.
 
-use std::collections::VecDeque;
-use std::convert::Infallible;
-use std::error::Error;
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::SocketAddr;
 
 use bprpc::{BlockMsg, RemoteAddr, Session};
-use netservices::remotes::DisconnectReason;
-use netservices::service::ServiceController;
-use netservices::{Direction, NetAccept, NetTransport};
-use reactor::{Action, ResourceId, Timestamp};
-use strict_encoding::DecodeError;
+use netservices::client::{ClientDelegate, ConnectionDelegate, OnDisconnect};
+use netservices::{Frame, ImpossibleResource, NetTransport};
 
 const NAME: &str = "importer";
 
-pub struct RpcImport {
-    actions: VecDeque<Action<NetAccept<Session, TcpListener>, NetTransport<Session>>>,
-    clients: u16,
-}
+pub struct RpcImport {}
 
 impl RpcImport {
-    pub fn new() -> Self { Self { actions: none!(), clients: 0 } }
+    pub fn new() -> Self { Self {} }
 }
 
-impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcImport {
-    type InFrame = BlockMsg;
+impl ConnectionDelegate<RemoteAddr, Session> for RpcImport {
+    fn connect(&self, remote: &RemoteAddr) -> Session { todo!() }
 
-    fn should_accept(&mut self, _remote: &RemoteAddr, _time: Timestamp) -> bool {
-        // For now, we just do not allow more than 64k connections.
-        // In a future, we may also filter out known clients doing spam and DDoS attacks
-        self.clients < 0xFFFF
-    }
+    fn on_established(&self, remote: SocketAddr, attempt: usize) { todo!() }
 
-    fn establish_session(
-        &mut self,
-        _remote: RemoteAddr,
-        connection: TcpStream,
-        _time: Timestamp,
-    ) -> Result<Session, impl Error> {
-        self.clients += 1;
-        Result::<_, Infallible>::Ok(connection)
-    }
+    fn on_disconnect(&self, err: std::io::Error, attempt: usize) -> OnDisconnect { todo!() }
 
-    fn on_listening(&mut self, socket: SocketAddr) {
-        log::info!(target: NAME, "Listening on {socket}");
-    }
-
-    fn on_disconnected(&mut self, _: SocketAddr, _: Direction, _: &DisconnectReason) {
-        self.clients -= 1;
-    }
-
-    fn on_command(&mut self, _: ()) { unreachable!("there are no commands for this service") }
-
-    fn on_frame(&mut self, res_id: ResourceId, block: BlockMsg) {
-        log::debug!(target: NAME, "Processing block {} from {res_id}", block.header.block_hash());
-    }
-
-    fn on_frame_unparsable(&mut self, res_id: ResourceId, err: &DecodeError) {
-        log::error!(target: NAME, "Disconnecting {res_id} due to unparsable frame: {err}");
-        self.actions.push_back(Action::UnregisterTransport(res_id))
+    fn on_io_error(&self, err: reactor::Error<ImpossibleResource, NetTransport<Session>>) {
+        todo!()
     }
 }
 
-impl Iterator for RpcImport {
-    type Item = Action<NetAccept<Session, TcpListener>, NetTransport<Session>>;
+impl ClientDelegate<RemoteAddr, Session> for RpcImport {
+    type Reply = BlockMsg;
 
-    fn next(&mut self) -> Option<Self::Item> { self.actions.pop_front() }
+    fn on_reply(&mut self, block: Self::Reply) { todo!() }
+
+    fn on_reply_unparsable(&mut self, err: <Self::Reply as Frame>::Error) { todo!() }
 }

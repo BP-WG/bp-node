@@ -24,6 +24,9 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
+use bprpc::RemoteAddr;
+use bpwallet::Network;
+
 /// Final configuration resulting from data contained in config file environment
 /// variables and command-line options. For security reasons node key is kept
 /// separately.
@@ -33,5 +36,9 @@ pub struct Config {
     /// Data location
     pub data_dir: PathBuf,
 
+    pub network: Network,
+
     pub listening: Vec<SocketAddr>,
+
+    pub providers: Vec<RemoteAddr>,
 }

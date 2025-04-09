@@ -21,15 +21,14 @@ Register-ArgumentCompleter -Native -CommandName 'bp-node' -ScriptBlock {
 
     $completions = @(switch ($command) {
         'bp-node' {
-            [CompletionResult]::new('--electrum', '--electrum', [CompletionResultType]::ParameterName, 'Electrum server to use')
-            [CompletionResult]::new('--esplora', '--esplora', [CompletionResultType]::ParameterName, 'Esplora server to use')
-            [CompletionResult]::new('--mempool', '--mempool', [CompletionResultType]::ParameterName, 'Mempool server to use')
             [CompletionResult]::new('-d', '-d', [CompletionResultType]::ParameterName, 'Data directory path')
             [CompletionResult]::new('--data-dir', '--data-dir', [CompletionResultType]::ParameterName, 'Data directory path')
             [CompletionResult]::new('-n', '-n', [CompletionResultType]::ParameterName, 'Network to use')
             [CompletionResult]::new('--network', '--network', [CompletionResultType]::ParameterName, 'Network to use')
             [CompletionResult]::new('-l', '-l', [CompletionResultType]::ParameterName, 'l')
             [CompletionResult]::new('--listen', '--listen', [CompletionResultType]::ParameterName, 'listen')
+            [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'p')
+            [CompletionResult]::new('--provider', '--provider', [CompletionResultType]::ParameterName, 'provider')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Set verbosity level')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Set verbosity level')
             [CompletionResult]::new('--no-network-prefix', '--no-network-prefix', [CompletionResultType]::ParameterName, 'Do not add network prefix to the `--data-dir`')

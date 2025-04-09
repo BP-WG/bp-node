@@ -22,33 +22,20 @@
 // limitations under the License.
 
 #[macro_use]
-extern crate amplify;
-#[macro_use]
 extern crate log;
 #[macro_use]
 extern crate clap;
 
 mod opts;
 
-use amplify::IoError;
 pub use bpnode;
-use bpnode::{Config, RpcController};
+use bpnode::{Config, InitError, Runtime};
 use bpwallet::cli::LogLevel;
 use clap::Parser;
-use netservices::{NetAccept, service};
 
 use crate::opts::Opts;
 
-#[derive(Debug, Display, Error)]
-#[display(inner)]
-pub enum Error {
-    Rpc(IoError),
-
-    /// unable to create thread for {0}
-    Thread(&'static str),
-}
-
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), InitError> {
     let mut opts = Opts::parse();
     opts.process();
     LogLevel::from_verbosity_flag_count(opts.verbose).apply();
@@ -60,14 +47,5 @@ fn main() -> Result<(), Error> {
     // TODO: Update arguments basing on the configuration
     let conf = Config::from(opts);
 
-    let controller = RpcController::new();
-    let listen = conf.listening.iter().map(|addr| {
-        NetAccept::bind(addr).unwrap_or_else(|err| panic!("unable to bind to {addr}: {err}"))
-    });
-    service::Runtime::new(conf.listening[0].clone(), controller, listen)
-        .map_err(|err| Error::Rpc(err.into()))?
-        .join()
-        .map_err(|_| Error::Thread("RPC controller"))?;
-
-    Ok(())
+    Runtime::start(conf)?.run()
 }

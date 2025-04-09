@@ -28,9 +28,13 @@ mod config;
 mod rpc;
 mod import;
 mod blocks;
+mod runtime;
 pub mod db;
 
+pub use blocks::BlockProcessor;
 pub use config::Config;
+pub use import::RpcImport;
 pub use rpc::RpcController;
+pub use runtime::{InitError, Runtime};
 
 // Block file separator 0xD9B4BEF9

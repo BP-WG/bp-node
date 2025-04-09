@@ -15,15 +15,14 @@ _bp-node() {
 
     local context curcontext="$curcontext" state line
     _arguments "${_arguments_options[@]}" : \
-'--electrum=[Electrum server to use]' \
-'--esplora=[Esplora server to use]' \
-'--mempool=[Mempool server to use]' \
 '-d+[Data directory path]:DATA_DIR:_files -/' \
 '--data-dir=[Data directory path]:DATA_DIR:_files -/' \
 '-n+[Network to use]:NETWORK:_default' \
 '--network=[Network to use]:NETWORK:_default' \
 '*-l+[]:LISTEN:_default' \
 '*--listen=[]:LISTEN:_default' \
+'*-p+[]:PROVIDER:_default' \
+'*--provider=[]:PROVIDER:_default' \
 '*-v[Set verbosity level]' \
 '*--verbose[Set verbosity level]' \
 '--no-network-prefix[Do not add network prefix to the \`--data-dir\`]' \
