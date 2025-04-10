@@ -16,7 +16,7 @@ license = "Apache-2.0"
 amplify = "4.8.0"
 strict_encoding = "2.8.1"
 bp-std = "0.12.0-beta.5"
-bp-wallet = "0.12.0-beta.5"
+bp-wallet = { version = "0.12.0-beta.5", default-features = false }
 
 io-reactor = "0.6.0"
 cyphernet = { version = "0.5.2", features = ["tor", "dns", "ed25519", "p2p-ed25519"] }

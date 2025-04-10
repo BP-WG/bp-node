@@ -16,6 +16,9 @@ path = "src/main.rs"
 name = "bp-cli"
 required-features = ["cli"]
 
+[lib]
+name = "bpclient"
+
 [dependencies]
 amplify.workspace = true
 strict_encoding.workspace = true

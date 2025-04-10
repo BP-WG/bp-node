@@ -58,7 +58,7 @@ pub struct Status {
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
-#[display("{agent} v{version} on {network} (features: {features:08x}")]
+#[display("{agent} v{version} on {network} (features {features:08x})")]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = BP_RPC_LIB)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -78,4 +78,8 @@ pub struct Version {
     pub major: u16,
     pub minor: u16,
     pub patch: u16,
+}
+
+impl Version {
+    pub fn new(major: u16, minor: u16, patch: u16) -> Self { Self { major, minor, patch } }
 }

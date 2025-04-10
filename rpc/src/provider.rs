@@ -36,18 +36,13 @@ use crate::{AgentInfo, BP_RPC_LIB};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = BP_RPC_LIB, tags = custom)]
+#[strict_type(lib = BP_RPC_LIB, tags = custom, dumb = Self::Hello(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ExporterPub {
     /// Start session
     #[display("hello({0})")]
     #[strict_type(tag = 0x01)]
     Hello(AgentInfo),
-
-    /// Retrieve bloom filters for known block headers
-    #[display("getFilters()")]
-    #[strict_type(tag = 0x02, dumb)]
-    GetFilters,
 
     /// Send new block.
     #[display("block(...)")]

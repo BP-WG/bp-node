@@ -25,6 +25,7 @@ use std::any::Any;
 use std::io;
 use std::io::Error;
 use std::net::TcpStream;
+use std::process::exit;
 
 use amplify::confinement::TinyBlob;
 use bprpc::{RemoteAddr, Request, Response, Session};
@@ -60,7 +61,12 @@ impl ConnectionDelegate<RemoteAddr, Session> for Delegate {
     type Request = Request;
 
     fn connect(&mut self, remote: &RemoteAddr) -> Session {
-        TcpStream::connect(remote).expect("unable to connect to the server")
+        TcpStream::connect(remote).unwrap_or_else(|err| {
+            #[cfg(feature = "log")]
+            log::error!("Unable to connect BP Node {remote} due to {err}");
+            eprintln!("Unable to connect BP Node {remote}");
+            exit(1);
+        })
     }
 
     fn on_established(&mut self, _node_id: <Session as NetSession>::Artifact, _attempt: usize) {

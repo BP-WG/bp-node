@@ -107,8 +107,11 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for BlockImporter {
         let client = self.providers.get_mut(&remote).expect("must be known");
         client.last_seen = Timestamp::now().as_millis();
         match msg {
-            ExporterPub::Hello(_) => todo!(),
-            ExporterPub::GetFilters => todo!(),
+            ExporterPub::Hello(agent) => {
+                // TODO: Check that network match; disconnect otherwise
+                log::debug!("Received hello from {remote}: {agent}");
+                client.agent = Some(agent);
+            }
             ExporterPub::Block(block) => {
                 let block_id = block.header.block_hash();
                 log::debug!("Received block {block_id} from {remote}");

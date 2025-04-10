@@ -26,6 +26,7 @@ extern crate amplify;
 #[macro_use]
 extern crate strict_encoding;
 
+pub use ::bprpc as rpc;
 mod client;
 pub mod exporter;
 

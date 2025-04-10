@@ -20,15 +20,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[macro_use]
+extern crate strict_encoding;
+
 use std::io::{Read, Seek};
 use std::path::PathBuf;
 use std::process::exit;
-use std::{fs, io};
+use std::{fs, io, thread};
 
 use bc::{Block, ConsensusDecode};
-use bprpc::RemoteAddr;
+use bpclient::exporter::BlockExporter;
+use bpclient::rpc::{AgentInfo, ExporterPub, RemoteAddr, Version};
 use clap::Parser;
+use invoice::Network;
 use loglevel::LogLevel;
+use netservices::client::Client;
+use strict_encoding::Ident;
+
+pub const AGENT: &str = "BC_BP";
 
 pub const BLOCK_SEPARATOR: [u8; 4] = [0xF9, 0xBE, 0xB4, 0xD9];
 
@@ -43,16 +52,19 @@ pub struct Args {
     #[arg(short, long, action = clap::ArgAction::Count)]
     pub verbose: u8,
 
+    #[arg(short, long, default_value = "testnet4")]
+    pub network: Network,
+
     /// Data directory for Bitcoin Core blocks
     #[arg(short, long, default_value = "/var/lib/bitcoin/blocks")]
     pub data_dir: PathBuf,
 
     /// Bitcoin Core RPC address
-    #[arg(long, default_value = "http://127.0.0.1:8332")]
+    #[arg(long, default_value = "127.0.0.1:8332")]
     pub bitcoin_core: RemoteAddr,
 
     /// BP Node block import interface address
-    #[arg(long, default_value = "http://127.0.0.1:42500")]
+    #[arg(long, default_value = "127.0.0.1:42500")]
     pub bp_node: RemoteAddr,
 }
 
@@ -61,6 +73,31 @@ fn main() -> Result<(), io::Error> {
     LogLevel::from_verbosity_flag_count(args.verbose).apply();
     log::debug!("Command-line arguments: {:#?}", &args);
 
+    log::info!("Connecting to BP Node at {}", args.bp_node);
+    let client =
+        Client::new(BlockExporter::new(), args.bp_node.clone()).expect("Unable to create client");
+
+    let agent: AgentInfo = AgentInfo {
+        agent: ident!(AGENT),
+        version: Version::new(0, 1, 0),
+        network: Ident::try_from(args.network.to_string()).unwrap(),
+        features: 0,
+    };
+    if let Err(err) = client.send(ExporterPub::Hello(agent)) {
+        log::error!("Unable to send hello message to BP Node due to {err}");
+        exit(1);
+    }
+
+    thread::spawn(move || {
+        read_blocks(client, args);
+    })
+    .join()
+    .expect("Unable to join fs thread");
+
+    Ok(())
+}
+
+fn read_blocks(client: Client<ExporterPub>, args: Args) {
     log::info!("Reading block files in '{}'", args.data_dir.display());
     if !fs::exists(&args.data_dir).expect("Unable to access data directory") {
         log::error!("Data directory '{}' does not exist", args.data_dir.display());
@@ -113,14 +150,14 @@ fn main() -> Result<(), io::Error> {
             }
 
             // Reading block, checking its length
-            let pos = file.stream_position()?;
-            file.read_exact(&mut buf)?;
+            let pos = file.stream_position().expect("Unable to get file position");
+            file.read_exact(&mut buf).expect("Broken block file");
             let len = u32::from_le_bytes(buf) as u64;
             let block = Block::consensus_decode(&mut file).unwrap_or_else(|err| {
                 log::error!("Unable to decode block #{block_no} due to {err}");
                 exit(6);
             });
-            let new_pos = file.stream_position()?;
+            let new_pos = file.stream_position().expect("Unable to get file position");
             if new_pos != pos + len + 4 {
                 log::error!(
                     "Invalid block length for block #{block_no}; expected {len}, got {}",
@@ -134,6 +171,11 @@ fn main() -> Result<(), io::Error> {
                 "Processing block #{block_no} {} ({len} bytes, {txes} transactions)",
                 block.block_hash(),
             );
+
+            if let Err(err) = client.send(ExporterPub::Block(block)) {
+                log::error!("Unable to send block #{block_no} due to {err}");
+                exit(8);
+            }
 
             block_no += 1;
             total_blocks += 1;
@@ -158,5 +200,5 @@ fn main() -> Result<(), io::Error> {
          processed"
     );
 
-    Ok(())
+    client.terminate().expect("Unable to terminate connection");
 }
