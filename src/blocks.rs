@@ -26,9 +26,9 @@
 use std::net::{SocketAddr, TcpStream};
 use std::process::exit;
 
-use amplify::{ByteArray, FromSliceError};
+use amplify::{ByteArray, FromSliceError, Wrapper};
 use bprpc::{BlockMsg, RemoteAddr, Session};
-use bpwallet::BlockHash;
+use bpwallet::{Block, BlockHash};
 use crossbeam_channel::{RecvError, SendError};
 use microservices::USender;
 use netservices::client::{ClientDelegate, ConnectionDelegate, OnDisconnect};
@@ -49,7 +49,7 @@ pub struct BlockImporter {
 impl BlockImporter {
     pub fn new(db: USender<DbMsg>, remote: RemoteAddr) -> Self { Self { db, provider: remote } }
 
-    fn process_block(&mut self, id: BlockHash, block: BlockMsg) -> Result<usize, BlockProcError> {
+    fn process_block(&mut self, id: BlockHash, block: Block) -> Result<usize, BlockProcError> {
         let (tx, rx) = crossbeam_channel::bounded(1);
         self.db.send(DbMsg::Write(tx))?;
         let db = rx.recv()?;
@@ -148,7 +148,7 @@ impl ClientDelegate<RemoteAddr, Session> for BlockImporter {
     fn on_reply(&mut self, block: BlockMsg) {
         let block_id = block.header.block_hash();
         log::debug!("Received block {block_id} from {}", self.provider);
-        match self.process_block(block_id, block) {
+        match self.process_block(block_id, block.into_inner()) {
             Err(err) => {
                 log::error!(target: NAME, "{err}");
                 log::warn!(target: NAME, "Block {block_id} got dropped due to database connectivity issue");

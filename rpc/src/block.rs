@@ -23,9 +23,8 @@
 
 use std::io::{Read, Write};
 
-use amplify::IoError;
-use amplify::confinement::{SmallVec, U24 as U24MAX};
-use bpstd::{BlockHeader, ConsensusDecode, ConsensusDecodeError, ConsensusEncode, Tx};
+use amplify::confinement::U24 as U24MAX;
+use bpstd::Block;
 use netservices::Frame;
 use strict_encoding::{
     DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
@@ -33,15 +32,13 @@ use strict_encoding::{
 
 use crate::BP_RPC_LIB;
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
+#[derive(Wrapper, Clone, Eq, PartialEq, Hash, Debug, Display, From)]
+#[wrapper(Deref)]
 #[display("block(...)")]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = BP_RPC_LIB)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BlockMsg {
-    pub header: BlockHeader,
-    pub transactions: SmallVec<Tx>,
-}
+pub struct BlockMsg(#[from] Block);
 
 impl Frame for BlockMsg {
     type Error = DecodeError;
@@ -60,12 +57,4 @@ impl Frame for BlockMsg {
         self.strict_encode(writer)?;
         Ok(())
     }
-}
-
-impl ConsensusEncode for BlockMsg {
-    fn consensus_encode(&self, writer: &mut impl Write) -> Result<usize, IoError> { todo!() }
-}
-
-impl ConsensusDecode for BlockMsg {
-    fn consensus_decode(reader: &mut impl Read) -> Result<Self, ConsensusDecodeError> { todo!() }
 }

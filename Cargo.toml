@@ -98,6 +98,8 @@ server = ["dep:dotenv", "dep:clap", "dep:settings", "dep:configure_me", "dep:she
 spec = "config_spec.toml"
 
 [patch.crates-io]
+bp-consensus = { git = "https://github.com/BP-WG/bp-core", branch = "v0.12" }
+
 io-reactor = { git = "https://github.com/rust-amplify/io-reactor", branch = "v0.6" }
 cyphergraphy = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
 cypheraddr = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
