@@ -33,15 +33,17 @@ use netservices::client::{
 };
 use netservices::{Frame, ImpossibleResource, NetSession, NetTransport};
 
-pub struct Delegate;
+pub struct Delegate {
+    cb: fn(Response),
+}
 
 pub struct BpClient {
     inner: Client<Request>,
 }
 
 impl BpClient {
-    pub fn new(remote: RemoteAddr) -> io::Result<Self> {
-        let delegate = Delegate;
+    pub fn new(remote: RemoteAddr, cb: fn(Response)) -> io::Result<Self> {
+        let delegate = Delegate { cb };
         let inner = Client::new(delegate, remote)?;
         Ok(Self { inner })
     }
@@ -83,15 +85,7 @@ impl ClientDelegate<RemoteAddr, Session> for Delegate {
     fn on_reply(&mut self, reply: Self::Reply) {
         #[cfg(feature = "log")]
         log::debug!("Received reply: {reply}");
-        match reply {
-            Response::Failure(failure) => {
-                println!("Failure: {failure}");
-            }
-            Response::Pong(_noise) => {}
-            Response::Status(status) => {
-                println!("Status: {status}");
-            }
-        }
+        (self.cb)(reply);
     }
 
     fn on_reply_unparsable(&mut self, err: <Self::Reply as Frame>::Error) {

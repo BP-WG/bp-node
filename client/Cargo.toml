@@ -26,6 +26,7 @@ netservices.workspace = true
 clap = { workspace = true, optional = true }
 log = { workspace = true, optional = true }
 shellexpand = { workspace = true, optional = true }
+serde_yaml = { workspace = true, optional = true }
 
 [build-dependencies]
 amplify.workspace = true
@@ -37,5 +38,5 @@ configure_me_codegen.workspace = true
 [features]
 default = ["cli"]
 all = ["log", "cli"]
-cli = ["log", "dep:clap", "dep:shellexpand", "dep:bp-wallet"]
+cli = ["log", "dep:clap", "dep:shellexpand", "dep:bp-wallet", "dep:serde_yaml"]
 log = ["dep:log", "io-reactor/log", "netservices/log"]

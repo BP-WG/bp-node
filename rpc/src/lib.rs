@@ -36,8 +36,8 @@ mod connectivity;
 mod provider;
 
 pub use connectivity::{RemoteAddr, Session};
-pub use data::{Failure, Status};
-pub use provider::{ExporterPub, FiltersMsg, HelloMsg, ImporterReply, Version};
+pub use data::{AgentInfo, ClientInfo, Failure, Status, Version};
+pub use provider::{ExporterPub, FiltersMsg, ImporterReply};
 pub use request::Request;
 pub use response::Response;
 

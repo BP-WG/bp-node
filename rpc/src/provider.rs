@@ -28,11 +28,11 @@ use amplify::confinement::{TinyOrdMap, U24 as U24MAX};
 use bpstd::{Block, BlockHash};
 use netservices::Frame;
 use strict_encoding::{
-    DecodeError, Ident, StreamReader, StreamWriter, StrictDecode, StrictDumb, StrictEncode,
-    StrictReader, StrictWriter,
+    DecodeError, StreamReader, StreamWriter, StrictDecode, StrictDumb, StrictEncode, StrictReader,
+    StrictWriter,
 };
 
-use crate::BP_RPC_LIB;
+use crate::{AgentInfo, BP_RPC_LIB};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
@@ -42,7 +42,7 @@ pub enum ExporterPub {
     /// Start session
     #[display("hello({0})")]
     #[strict_type(tag = 0x01)]
-    Hello(HelloMsg),
+    Hello(AgentInfo),
 
     /// Retrieve bloom filters for known block headers
     #[display("getFilters()")]
@@ -104,50 +104,13 @@ impl Frame for ImporterReply {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
-#[display("{agent} v{version} (features: {features:08x}")]
-#[derive(StrictType, StrictEncode, StrictDecode)]
-#[strict_type(lib = BP_RPC_LIB)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct HelloMsg {
-    pub agent: Ident,
-    pub version: Version,
-    pub features: u64,
-    pub network: Ident,
-    // Backend used by importer (Bitcoin Core etc)
-    pub uses: Ident,
-}
-
-impl StrictDumb for HelloMsg {
-    fn strict_dumb() -> Self {
-        Self {
-            agent: strict_dumb!(),
-            version: strict_dumb!(),
-            features: strict_dumb!(),
-            network: strict_dumb!(),
-            uses: strict_dumb!(),
-        }
-    }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display, Default)]
-#[display("{major}.{minor}.{patch}")]
-#[derive(StrictType, StrictEncode, StrictDecode)]
-#[strict_type(lib = BP_RPC_LIB)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Version {
-    pub major: u16,
-    pub minor: u16,
-    pub patch: u16,
-}
-
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = BP_RPC_LIB)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct FiltersMsg {
     #[cfg_attr(feature = "serde", serde(flatten))]
-    pub hello: HelloMsg,
+    pub hello: AgentInfo,
     pub height: u32,
     pub timestamp: u32,
     pub block_hash: BlockHash,

@@ -340,6 +340,7 @@ dependencies = [
  "io-reactor",
  "log",
  "netservices",
+ "serde_yaml",
  "shellexpand",
  "strict_encoding",
 ]
@@ -902,6 +903,7 @@ dependencies = [
  "amplify",
  "base32",
  "cyphergraphy",
+ "serde",
  "sha3",
 ]
 
@@ -1563,7 +1565,7 @@ dependencies = [
 [[package]]
 name = "netservices"
 version = "0.12.0-beta.1"
-source = "git+https://github.com/cyphernet-labs/netservices.rs?branch=server#0276cd67cbceaa996c6e597a3508caa69facd60e"
+source = "git+https://github.com/cyphernet-labs/netservices.rs?branch=server#0202c3f5227bfaafcbd9e77cdb6897ebc702961d"
 dependencies = [
  "amplify",
  "cyphernet",

@@ -21,40 +21,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::convert::Infallible;
 use std::error::Error;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
-use bprpc::{ExporterPub, RemoteAddr, Session};
+use bprpc::{ClientInfo, ExporterPub, ImporterReply, RemoteAddr, Session};
+use netservices::Direction;
 use netservices::remotes::DisconnectReason;
-use netservices::service::ServiceController;
-use netservices::{Direction, NetAccept, NetTransport};
-use reactor::{Action, ResourceId, Timestamp};
+use netservices::service::{ServiceCommand, ServiceController};
+use reactor::Timestamp;
 use strict_encoding::DecodeError;
 
 use crate::BlockProcessor;
 
-const MAX_PROVIDERS: u16 = 0x10;
+// TODO: Make this configuration parameter
+const MAX_PROVIDERS: usize = 0x10;
 const NAME: &str = "importer";
 
 pub struct BlockImporter {
     processor: BlockProcessor,
-    actions: VecDeque<Action<NetAccept<Session, TcpListener>, NetTransport<Session>>>,
-    providers: u16,
+    commands: VecDeque<ServiceCommand<SocketAddr, ImporterReply>>,
+    providers: HashMap<SocketAddr, ClientInfo>,
 }
 
 impl BlockImporter {
     pub fn new(processor: BlockProcessor) -> Self {
-        Self { processor, actions: none!(), providers: 0 }
+        Self { processor, commands: none!(), providers: none!() }
     }
 }
 
 impl ServiceController<RemoteAddr, Session, TcpListener, ()> for BlockImporter {
     type InFrame = ExporterPub;
+    type OutFrame = ImporterReply;
 
     fn should_accept(&mut self, _remote: &RemoteAddr, _time: Timestamp) -> bool {
-        self.providers < MAX_PROVIDERS
+        self.providers.len() < MAX_PROVIDERS
     }
 
     fn establish_session(
@@ -64,7 +66,6 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for BlockImporter {
         _time: Timestamp,
     ) -> Result<Session, impl Error> {
         log::info!(target: NAME, "New block provider connected from {remote}");
-        self.providers += 1;
         Result::<_, Infallible>::Ok(connection)
     }
 
@@ -72,20 +73,45 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for BlockImporter {
         log::info!(target: NAME, "Listening on {socket}");
     }
 
+    fn on_established(
+        &mut self,
+        addr: SocketAddr,
+        _remote: RemoteAddr,
+        direction: Direction,
+        time: Timestamp,
+    ) {
+        debug_assert_eq!(direction, Direction::Inbound);
+        if self
+            .providers
+            .insert(addr, ClientInfo {
+                agent: None,
+                connected: time.as_millis(),
+                last_seen: time.as_millis(),
+            })
+            .is_some()
+        {
+            panic!("Provider {addr} already connected!");
+        };
+    }
+
     fn on_disconnected(&mut self, addr: SocketAddr, _: Direction, reason: &DisconnectReason) {
-        log::warn!(target: NAME, "Block provider att {addr} got disconnected due to {reason}");
-        self.providers -= 1;
+        let client = self.providers.remove(&addr).unwrap_or_else(|| {
+            panic!("Block provider at {addr} got disconnected but not found in providers list");
+        });
+        log::warn!(target: NAME, "Block provider at {addr} got disconnected due to {reason} ({})", client.agent.map(|a| a.to_string()).unwrap_or(none!()));
     }
 
     fn on_command(&mut self, _: ()) { unreachable!("there are no commands for this service") }
 
-    fn on_frame(&mut self, res_id: ResourceId, msg: ExporterPub) {
+    fn on_frame(&mut self, remote: SocketAddr, msg: ExporterPub) {
+        let client = self.providers.get_mut(&remote).expect("must be known");
+        client.last_seen = Timestamp::now().as_millis();
         match msg {
-            ExporterPub::Hello(_) => {}
-            ExporterPub::GetFilters => {}
+            ExporterPub::Hello(_) => todo!(),
+            ExporterPub::GetFilters => todo!(),
             ExporterPub::Block(block) => {
                 let block_id = block.header.block_hash();
-                log::debug!("Received block {block_id} from {res_id}");
+                log::debug!("Received block {block_id} from {remote}");
                 match self.processor.process_block(block_id, block) {
                     Err(err) => {
                         log::error!(target: NAME, "{err}");
@@ -101,14 +127,14 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for BlockImporter {
         }
     }
 
-    fn on_frame_unparsable(&mut self, res_id: ResourceId, err: &DecodeError) {
-        log::error!(target: NAME, "Disconnecting block provider {res_id} due to unparsable frame: {err}");
-        self.actions.push_back(Action::UnregisterTransport(res_id))
+    fn on_frame_unparsable(&mut self, remote: SocketAddr, err: &DecodeError) {
+        log::error!(target: NAME, "Disconnecting block provider {remote} due to unparsable frame: {err}");
+        self.commands.push_back(ServiceCommand::Disconnect(remote))
     }
 }
 
 impl Iterator for BlockImporter {
-    type Item = Action<NetAccept<Session, TcpListener>, NetTransport<Session>>;
+    type Item = ServiceCommand<SocketAddr, ImporterReply>;
 
-    fn next(&mut self) -> Option<Self::Item> { self.actions.pop_front() }
+    fn next(&mut self) -> Option<Self::Item> { self.commands.pop_front() }
 }

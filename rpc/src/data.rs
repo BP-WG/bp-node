@@ -21,7 +21,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use amplify::confinement::{TinyOrdMap, TinyString};
+use amplify::confinement::{SmallVec, TinyOrdMap, TinyString};
+use strict_encoding::{Ident, StrictDumb};
 
 use crate::BP_RPC_LIB;
 
@@ -36,11 +37,45 @@ pub struct Failure {
     pub details: TinyOrdMap<TinyString, TinyString>,
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
-#[display("clients={clients}")]
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = BP_RPC_LIB)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct ClientInfo {
+    pub agent: Option<AgentInfo>,
+    /// Millisecond-based timestamp
+    pub connected: u64,
+    /// Millisecond-based timestamp
+    pub last_seen: u64,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = BP_RPC_LIB)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Status {
-    pub clients: u16,
+    pub clients: SmallVec<ClientInfo>,
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
+#[display("{agent} v{version} on {network} (features: {features:08x}")]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = BP_RPC_LIB)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct AgentInfo {
+    pub agent: Ident,
+    pub version: Version,
+    pub network: Ident,
+    pub features: u64,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display, Default)]
+#[display("{major}.{minor}.{patch}")]
+#[derive(StrictType, StrictEncode, StrictDecode)]
+#[strict_type(lib = BP_RPC_LIB)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Version {
+    pub major: u16,
+    pub minor: u16,
+    pub patch: u16,
 }

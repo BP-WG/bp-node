@@ -34,6 +34,7 @@ mod args;
 mod client;
 mod command;
 
+use bprpc::Response;
 use bpwallet::cli::{ExecError, LogLevel};
 use clap::Parser;
 
@@ -45,7 +46,19 @@ fn main() -> Result<(), ExecError> {
     LogLevel::from_verbosity_flag_count(args.verbose).apply();
     trace!("Command-line arguments: {:#?}", &args);
 
-    let client = BpClient::new(args.remote)?;
+    let client = BpClient::new(args.remote, cb)?;
 
     args.command.exec(client)
+}
+
+fn cb(reply: Response) {
+    match reply {
+        Response::Failure(failure) => {
+            println!("Failure: {failure}");
+        }
+        Response::Pong(_noise) => {}
+        Response::Status(status) => {
+            println!("{}", serde_yaml::to_string(&status).unwrap());
+        }
+    }
 }

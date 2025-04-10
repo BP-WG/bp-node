@@ -27,6 +27,7 @@ redb = "2.4.0"
 crossbeam-channel = "0.5.15"
 
 serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9.34"
 
 clap = { version = "4.4.8", features = ["derive", "env"] }
 clap_complete = "4.5.7"

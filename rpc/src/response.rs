@@ -31,7 +31,7 @@ use strict_encoding::{
 
 use crate::{BP_RPC_LIB, Failure, Status};
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
+#[derive(Clone, Eq, PartialEq, Debug, Display)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = BP_RPC_LIB, tags = custom, dumb = Self::Pong(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -45,7 +45,7 @@ pub enum Response {
     Pong(TinyBlob),
 
     #[strict_type(tag = 0x02)]
-    #[display("status({0})")]
+    #[display("status(...)")]
     Status(Status),
 }
 
