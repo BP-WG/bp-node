@@ -30,14 +30,14 @@ use std::fs;
 use std::process::{ExitCode, Termination, exit};
 
 pub use bpnode;
-use bpnode::{Config, InitError, PATH_INDEXDB, Runtime};
+use bpnode::{Broker, BrokerError, Config, PATH_INDEXDB};
 use clap::Parser;
 use loglevel::LogLevel;
 use redb::Database;
 
 use crate::opts::{Command, Opts};
 
-struct Status(Result<(), InitError>);
+struct Status(Result<(), BrokerError>);
 
 impl Termination for Status {
     fn report(self) -> ExitCode {
@@ -88,7 +88,7 @@ fn main() -> Status {
         }
         None => {
             let conf = Config::from(opts);
-            Status(Runtime::start(conf).and_then(|runtime| runtime.run()))
+            Status(Broker::start(conf).and_then(|runtime| runtime.run()))
         }
     }
 }

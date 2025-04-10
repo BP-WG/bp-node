@@ -26,15 +26,39 @@ use strict_encoding::{Ident, StrictDumb};
 
 use crate::BP_RPC_LIB;
 
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Display)]
+#[display(doc_comments)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = BP_RPC_LIB, tags = repr, into_u8, try_from_u8)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+#[repr(u8)]
+pub enum FailureCode {
+    /// Network mismatch
+    #[strict_type(dumb)]
+    NetworkMismatch = 1,
+}
+
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
 #[display("code={code}, message={message}, details={details:?}")]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = BP_RPC_LIB)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Failure {
-    pub code: u16,
+    pub code: u8,
     pub message: TinyString,
     pub details: TinyOrdMap<TinyString, TinyString>,
+}
+
+impl Failure {
+    pub fn new(code: FailureCode) -> Self {
+        Self {
+            code: code.into(),
+            message: TinyString::from_checked(code.to_string()),
+            details: Default::default(),
+        }
+    }
+
+    pub fn network_mismatch() -> Self { Self::new(FailureCode::NetworkMismatch) }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

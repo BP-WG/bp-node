@@ -24,6 +24,7 @@
 use std::io::{Read, Write};
 
 use amplify::confinement::{TinyBlob, U24 as U24MAX};
+use bpstd::Txid;
 use netservices::Frame;
 use strict_encoding::{
     DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
@@ -37,16 +38,20 @@ use crate::{BP_RPC_LIB, Failure, Status};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Response {
     #[strict_type(tag = 0x00)]
-    #[display("failure({0})")]
+    #[display("FAILURE({0})")]
     Failure(Failure),
 
     #[strict_type(tag = 0x01)]
-    #[display("pong(...)")]
+    #[display("PONG")]
     Pong(TinyBlob),
 
     #[strict_type(tag = 0x02)]
-    #[display("status(...)")]
+    #[display("STATUS")]
     Status(Status),
+
+    #[strict_type(tag = 0x10)]
+    #[display("MINED({0})")]
+    Mined(Txid),
 }
 
 impl Frame for Response {

@@ -30,26 +30,39 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 
 use amplify::confinement::SmallVec;
 use bprpc::{ClientInfo, RemoteAddr, Request, Response, Session, Status};
+use bpwallet::Network;
+use crossbeam_channel::Sender;
 use netservices::Direction;
 use netservices::remotes::DisconnectReason;
 use netservices::service::{ServiceCommand, ServiceController};
 use reactor::Timestamp;
 use strict_encoding::DecodeError;
 
+use crate::{BrokerRpcMsg, TrackReq};
+
 // TODO: Make this configuration parameter
 const MAX_CLIENTS: usize = 0xFFFF;
 const NAME: &str = "rpc";
 
+#[derive(Clone, Debug)]
+pub enum RpcCmd {
+    Send(SocketAddr, Response),
+}
+
 pub struct RpcController {
+    network: Network,
+    broker: Sender<BrokerRpcMsg>,
     actions: VecDeque<ServiceCommand<SocketAddr, Response>>,
     clients: HashMap<SocketAddr, ClientInfo>,
 }
 
 impl RpcController {
-    pub fn new() -> Self { Self { actions: none!(), clients: none!() } }
+    pub fn new(network: Network, broker: Sender<BrokerRpcMsg>) -> Self {
+        Self { network, broker, actions: none!(), clients: none!() }
+    }
 }
 
-impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcController {
+impl ServiceController<RemoteAddr, Session, TcpListener, RpcCmd> for RpcController {
     type InFrame = Request;
     type OutFrame = Response;
 
@@ -93,14 +106,23 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcController {
         };
     }
 
-    fn on_disconnected(&mut self, addr: SocketAddr, _: Direction, reason: &DisconnectReason) {
-        let client = self.clients.remove(&addr).unwrap_or_else(|| {
-            panic!("Client at {addr} got disconnected but not found in providers list");
+    fn on_disconnected(&mut self, remote: SocketAddr, _: Direction, reason: &DisconnectReason) {
+        let client = self.clients.remove(&remote).unwrap_or_else(|| {
+            panic!("Client at {remote} got disconnected but not found in providers list");
         });
-        log::warn!(target: NAME, "Client at {addr} got disconnected due to {reason} ({})", client.agent.map(|a| a.to_string()).unwrap_or(none!()));
+        log::warn!(target: NAME, "Client at {remote} got disconnected due to {reason} ({})", client.agent.map(|a| a.to_string()).unwrap_or(none!()));
+        self.broker
+            .send(BrokerRpcMsg::UntrackAll(remote))
+            .expect("Unable to communicate to broker");
     }
 
-    fn on_command(&mut self, _: ()) { unreachable!("there are no commands for this service") }
+    fn on_command(&mut self, cmd: RpcCmd) {
+        match cmd {
+            RpcCmd::Send(remote, response) => self
+                .actions
+                .push_back(ServiceCommand::Send(remote, response)),
+        }
+    }
 
     fn on_frame(&mut self, remote: SocketAddr, req: Request) {
         log::debug!(target: NAME, "Processing `{req}`");
@@ -109,18 +131,23 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for RpcController {
         client.last_seen = Timestamp::now().as_millis();
 
         let response = match req {
-            Request::Ping(noise) => Response::Pong(noise),
-            Request::Noop => {
-                // Do nothing
-                return;
-            }
-            Request::Status => Response::Status(Status {
+            // TODO: Check that networks match
+            Request::Ping(noise) => Some(Response::Pong(noise)),
+            Request::Status => Some(Response::Status(Status {
                 clients: SmallVec::from_iter_checked(self.clients.values().cloned()),
-            }),
+            })),
+            Request::TrackTxids(filters) => {
+                self.broker
+                    .send(BrokerRpcMsg::Track(remote, TrackReq::TrackTxids(filters)))
+                    .expect("Unable to communicate to broker");
+                None
+            }
         };
-        log::debug!(target: NAME, "Sending `{response}` to {remote}");
-        self.actions
-            .push_back(ServiceCommand::Send(remote, response));
+        if let Some(response) = response {
+            log::debug!(target: NAME, "Sending `{response}` to {remote}");
+            self.actions
+                .push_back(ServiceCommand::Send(remote, response));
+        }
     }
 
     fn on_frame_unparsable(&mut self, remote: SocketAddr, err: &DecodeError) {

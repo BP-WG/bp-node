@@ -92,6 +92,10 @@ impl ClientDelegate<RemoteAddr, Session> for BlockExporter {
                 self.filters = filters;
                 self.filters_received = true;
             }
+            ImporterReply::Error(failure) => {
+                log::error!(target: NAME, "Received error from BP Node: {failure}");
+                self.disconnect();
+            }
         }
     }
 

@@ -898,7 +898,7 @@ checksum = "b916ba8ce9e4182696896f015e8a5ae6081b305f74690baa8465e35f5a142ea4"
 [[package]]
 name = "cypheraddr"
 version = "0.4.0"
-source = "git+https://github.com/cyphernet-labs/cyphernet.rs?branch=master#f42396139a6321615dd651bc09073052add14a05"
+source = "git+https://github.com/cyphernet-labs/cyphernet.rs?branch=master#888ee2a3468c8bbfdc868238fd67505401aa0ee4"
 dependencies = [
  "amplify",
  "base32",
@@ -910,7 +910,7 @@ dependencies = [
 [[package]]
 name = "cyphergraphy"
 version = "0.3.0"
-source = "git+https://github.com/cyphernet-labs/cyphernet.rs?branch=master#f42396139a6321615dd651bc09073052add14a05"
+source = "git+https://github.com/cyphernet-labs/cyphernet.rs?branch=master#888ee2a3468c8bbfdc868238fd67505401aa0ee4"
 dependencies = [
  "amplify",
  "ec25519",
@@ -1565,7 +1565,7 @@ dependencies = [
 [[package]]
 name = "netservices"
 version = "0.12.0-beta.1"
-source = "git+https://github.com/cyphernet-labs/netservices.rs?branch=server#0202c3f5227bfaafcbd9e77cdb6897ebc702961d"
+source = "git+https://github.com/cyphernet-labs/netservices.rs?branch=develop#0f2f0921ed8af864ed7aa7b4872b4e848c7d9dd1"
 dependencies = [
  "amplify",
  "cyphernet",

@@ -23,7 +23,8 @@
 
 use std::io::{Read, Write};
 
-use amplify::confinement::{TinyBlob, U24 as U24MAX};
+use amplify::Bytes32;
+use amplify::confinement::{TinyBlob, TinyOrdSet, U24 as U24MAX};
 use netservices::Frame;
 use strict_encoding::{
     DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
@@ -32,20 +33,22 @@ use strict_encoding::{
 use crate::BP_RPC_LIB;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
-#[display(lowercase)]
+#[display(UPPERCASE)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = BP_RPC_LIB, tags = custom)]
+#[strict_type(lib = BP_RPC_LIB, tags = custom, dumb = Self::Ping(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Request {
-    #[display("ping(...)")]
+    #[display("PING")]
     #[strict_type(tag = 0x00)]
     Ping(TinyBlob),
 
-    #[strict_type(tag = 0x01, dumb)]
-    Noop,
-
     #[strict_type(tag = 0x02)]
     Status,
+
+    /// Subscribe to all txid mining status updates matching the provided set of Bloom filters.
+    #[display("TRACK_TXIDS")]
+    #[strict_type(tag = 0x04)]
+    TrackTxids(TinyOrdSet<Bytes32>),
 }
 
 impl Frame for Request {

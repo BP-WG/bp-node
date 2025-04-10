@@ -106,4 +106,4 @@ io-reactor = { git = "https://github.com/rust-amplify/io-reactor", branch = "v0.
 cyphergraphy = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
 cypheraddr = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
 microservices = { git = "https://github.com/cyphernet-labs/microservices.rs", branch = "master" }
-netservices = { git = "https://github.com/cyphernet-labs/netservices.rs", branch = "server" }
+netservices = { git = "https://github.com/cyphernet-labs/netservices.rs", branch = "develop" }

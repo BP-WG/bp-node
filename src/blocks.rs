@@ -23,12 +23,15 @@
 
 //! Block importer interface organized into a reactor thread.
 
-use amplify::{ByteArray, FromSliceError};
+use std::collections::HashSet;
+
+use amplify::{ByteArray, Bytes32, FromSliceError};
 use bpwallet::{Block, BlockHash};
-use crossbeam_channel::{RecvError, SendError};
+use crossbeam_channel::{RecvError, SendError, Sender};
 use microservices::USender;
 use redb::{CommitError, ReadableTable, StorageError, TableError};
 
+use crate::ImporterMsg;
 use crate::db::{
     DbBlockHeader, DbMsg, DbTx, REC_TXNO, TABLE_BLKS, TABLE_MAIN, TABLE_TXES, TABLE_TXIDS, TxNo,
 };
@@ -37,10 +40,20 @@ const NAME: &str = "blockproc";
 
 pub struct BlockProcessor {
     db: USender<DbMsg>,
+    broker: Sender<ImporterMsg>,
+    tracking: HashSet<Bytes32>,
 }
 
 impl BlockProcessor {
-    pub fn new(db: USender<DbMsg>) -> Self { Self { db } }
+    pub fn new(db: USender<DbMsg>, broker: Sender<ImporterMsg>) -> Self {
+        Self { db, tracking: none!(), broker }
+    }
+
+    pub fn track(&mut self, filters: Vec<Bytes32>) { self.tracking.extend(filters); }
+
+    pub fn untrack(&mut self, filters: Vec<Bytes32>) {
+        self.tracking.retain(|filter| !filters.contains(filter));
+    }
 
     pub fn process_block(&mut self, id: BlockHash, block: Block) -> Result<usize, BlockProcError> {
         let (tx, rx) = crossbeam_channel::bounded(1);
@@ -87,6 +100,11 @@ impl BlockProcessor {
                     .insert(txno, DbTx::from(tx))
                     .map_err(BlockProcError::TxesStorage)?;
 
+                // TODO: If txid match `tracking` Bloom filters, send information to the broker
+                if false {
+                    self.broker.send(ImporterMsg::Mined(txid))?;
+                }
+
                 count += 1;
             }
 
@@ -115,7 +133,11 @@ impl BlockProcessor {
 pub enum BlockProcError {
     /// Unable to connect to database: {0}
     #[from]
-    Send(SendError<DbMsg>),
+    DbSend(SendError<DbMsg>),
+
+    /// Broken broker link: {0}
+    #[from]
+    BrokerSend(SendError<ImporterMsg>),
 
     /// Unable to obtain database transaction: {0}
     #[from]

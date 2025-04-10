@@ -32,7 +32,7 @@ use strict_encoding::{
     StrictWriter,
 };
 
-use crate::{AgentInfo, BP_RPC_LIB};
+use crate::{AgentInfo, BP_RPC_LIB, Failure};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
@@ -40,25 +40,28 @@ use crate::{AgentInfo, BP_RPC_LIB};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ExporterPub {
     /// Start session
-    #[display("hello({0})")]
+    #[display("HELLO({0})")]
     #[strict_type(tag = 0x01)]
     Hello(AgentInfo),
 
     /// Send new block.
-    #[display("block(...)")]
+    #[display("BLOCK")]
     #[strict_type(tag = 0x04)]
     Block(Block),
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
-#[display(lowercase)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = BP_RPC_LIB, tags = custom, dumb = Self::Filters(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ImporterReply {
-    #[display("filters(...)")]
+    #[display("FILTERS")]
     #[strict_type(tag = 0x02)]
     Filters(FiltersMsg),
+
+    #[display("ERROR({0})")]
+    #[strict_type(tag = 0xFE)]
+    Error(Failure),
 }
 
 impl Frame for ExporterPub {
@@ -83,7 +86,7 @@ impl Frame for ExporterPub {
 impl Frame for ImporterReply {
     type Error = DecodeError;
 
-    fn unmarshall(reader: impl Read) -> Result<Option<Self>, Self::Error> {
+    fn unmarshall(reader: impl Read) -> Result<Option<Self>, DecodeError> {
         let mut reader = StrictReader::with(StreamReader::new::<U24MAX>(reader));
         match Self::strict_decode(&mut reader) {
             Ok(request) => Ok(Some(request)),
@@ -92,7 +95,7 @@ impl Frame for ImporterReply {
         }
     }
 
-    fn marshall(&self, writer: impl Write) -> Result<(), Self::Error> {
+    fn marshall(&self, writer: impl Write) -> Result<(), DecodeError> {
         let writer = StrictWriter::with(StreamWriter::new::<U24MAX>(writer));
         self.strict_encode(writer)?;
         Ok(())

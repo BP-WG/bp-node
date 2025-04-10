@@ -25,8 +25,13 @@ use std::collections::{HashMap, VecDeque};
 use std::convert::Infallible;
 use std::error::Error;
 use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::str::FromStr;
 
-use bprpc::{ClientInfo, ExporterPub, ImporterReply, RemoteAddr, Session};
+use amplify::Bytes32;
+use bprpc::{ClientInfo, ExporterPub, Failure, ImporterReply, RemoteAddr, Session};
+use bpwallet::{Network, Txid};
+use crossbeam_channel::Sender;
+use microservices::USender;
 use netservices::Direction;
 use netservices::remotes::DisconnectReason;
 use netservices::service::{ServiceCommand, ServiceController};
@@ -34,24 +39,42 @@ use reactor::Timestamp;
 use strict_encoding::DecodeError;
 
 use crate::BlockProcessor;
+use crate::db::DbMsg;
 
 // TODO: Make this configuration parameter
 const MAX_PROVIDERS: usize = 0x10;
 const NAME: &str = "importer";
 
+#[derive(Debug, Display)]
+pub enum ImporterCmd {
+    #[display("TRACK")]
+    TrackTxid(Vec<Bytes32>),
+
+    #[display("UNTRACK")]
+    Untrack(Vec<Bytes32>),
+}
+
+#[derive(Debug, Display)]
+pub enum ImporterMsg {
+    #[display("MINED({0})")]
+    Mined(Txid),
+}
+
 pub struct BlockImporter {
+    network: Network,
     processor: BlockProcessor,
     commands: VecDeque<ServiceCommand<SocketAddr, ImporterReply>>,
     providers: HashMap<SocketAddr, ClientInfo>,
 }
 
 impl BlockImporter {
-    pub fn new(processor: BlockProcessor) -> Self {
-        Self { processor, commands: none!(), providers: none!() }
+    pub fn new(network: Network, db: USender<DbMsg>, broker: Sender<ImporterMsg>) -> Self {
+        let processor = BlockProcessor::new(db, broker);
+        Self { network, processor, commands: none!(), providers: none!() }
     }
 }
 
-impl ServiceController<RemoteAddr, Session, TcpListener, ()> for BlockImporter {
+impl ServiceController<RemoteAddr, Session, TcpListener, ImporterCmd> for BlockImporter {
     type InFrame = ExporterPub;
     type OutFrame = ImporterReply;
 
@@ -101,16 +124,34 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for BlockImporter {
         log::warn!(target: NAME, "Block provider at {addr} got disconnected due to {reason} ({})", client.agent.map(|a| a.to_string()).unwrap_or(none!()));
     }
 
-    fn on_command(&mut self, _: ()) { unreachable!("there are no commands for this service") }
+    fn on_command(&mut self, cmd: ImporterCmd) {
+        match cmd {
+            ImporterCmd::TrackTxid(filters) => {
+                self.processor.track(filters);
+            }
+            ImporterCmd::Untrack(filters) => {
+                self.processor.untrack(filters);
+            }
+        }
+    }
 
     fn on_frame(&mut self, remote: SocketAddr, msg: ExporterPub) {
         let client = self.providers.get_mut(&remote).expect("must be known");
         client.last_seen = Timestamp::now().as_millis();
         match msg {
             ExporterPub::Hello(agent) => {
-                // TODO: Check that network match; disconnect otherwise
                 log::debug!("Received hello from {remote}: {agent}");
+                let network = Network::from_str(agent.network.as_str());
                 client.agent = Some(agent);
+
+                if Ok(self.network) != network {
+                    log::warn!(target: NAME, "Block provider at {remote} got disconnected due to network mismatch");
+                    self.commands.push_back(ServiceCommand::Send(
+                        remote,
+                        ImporterReply::Error(Failure::network_mismatch()),
+                    ));
+                    self.commands.push_back(ServiceCommand::Disconnect(remote))
+                }
             }
             ExporterPub::Block(block) => {
                 let block_id = block.header.block_hash();

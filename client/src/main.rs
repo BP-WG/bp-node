@@ -60,5 +60,8 @@ fn cb(reply: Response) {
         Response::Status(status) => {
             println!("{}", serde_yaml::to_string(&status).unwrap());
         }
+        Response::Mined(txid) => {
+            println!("Mined {txid}");
+        }
     }
 }
