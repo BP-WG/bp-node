@@ -18,6 +18,7 @@ required-features = ["cli"]
 
 [dependencies]
 amplify.workspace = true
+strict_encoding.workspace = true
 bp-wallet = { workspace = true, optional = true, features = ["cli"] }
 bp-rpc = { version = "0.12.0-alpha.1", path = "../rpc" }
 io-reactor.workspace = true

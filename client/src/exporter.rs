@@ -21,50 +21,87 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::VecDeque;
 use std::net::{SocketAddr, TcpStream};
 use std::process::exit;
 
-use bprpc::{BlockMsg, RemoteAddr, Session};
-use netservices::client::{ClientDelegate, ConnectionDelegate, OnDisconnect};
+use bprpc::{ExporterPub, FiltersMsg, ImporterReply, RemoteAddr, Session};
+use netservices::client::{ClientCommand, ClientDelegate, ConnectionDelegate, OnDisconnect};
 use netservices::{Frame, ImpossibleResource, NetTransport};
 
 const NAME: &str = "exporter";
 
 pub struct BlockExporter {
-    pub provider: RemoteAddr,
+    commands: VecDeque<ClientCommand<ExporterPub>>,
+    filters: FiltersMsg,
+    filters_received: bool,
+}
+
+impl BlockExporter {
+    pub fn new() -> Self {
+        Self {
+            commands: none!(),
+            filters: strict_dumb!(),
+            filters_received: false,
+        }
+    }
+
+    pub fn disconnect(&mut self) {
+        self.commands.clear();
+        self.commands.push_back(ClientCommand::Terminate);
+    }
 }
 
 impl ConnectionDelegate<RemoteAddr, Session> for BlockExporter {
-    fn connect(&self, remote: &RemoteAddr) -> Session {
-        debug_assert_eq!(remote, &self.provider);
+    type Request = ExporterPub;
+
+    fn connect(&mut self, remote: &RemoteAddr) -> Session {
         TcpStream::connect(remote).unwrap_or_else(|err| {
-            log::error!(target: NAME, "Unable to connect blockchain provider {remote} due to {err}");
+            log::error!(target: NAME, "Unable to connect BP Node {remote} due to {err}");
             log::warn!(target: NAME, "Stopping RPC import thread");
             exit(1);
         })
     }
 
-    fn on_established(&self, remote: SocketAddr, _attempt: usize) {
-        log::info!(target: NAME, "Connected to blockchain provider {} ({remote})", self.provider);
+    fn on_established(&mut self, remote: SocketAddr, _attempt: usize) {
+        log::info!(target: NAME, "Connected to BP Node {remote}, sending `hello(...)`");
     }
 
-    fn on_disconnect(&self, err: std::io::Error, _attempt: usize) -> OnDisconnect {
-        log::error!(target: NAME, "Blockchain provider {} got disconnected due to {err}", self.provider);
-        log::warn!(target: NAME, "Stopping RPC import thread");
+    fn on_disconnect(&mut self, err: std::io::Error, _attempt: usize) -> OnDisconnect {
+        log::error!(target: NAME, "BP Node got disconnected due to {err}");
         exit(1)
     }
 
-    fn on_io_error(&self, err: reactor::Error<ImpossibleResource, NetTransport<Session>>) {
-        log::error!(target: NAME, "I/O error in communicating with blockchain provider {}: {err}", self.provider);
+    fn on_io_error(&mut self, err: reactor::Error<ImpossibleResource, NetTransport<Session>>) {
+        log::error!(target: NAME, "I/O error in communicating with BP Node: {err}");
+        self.disconnect();
     }
 }
 
 impl ClientDelegate<RemoteAddr, Session> for BlockExporter {
-    type Reply = BlockMsg;
+    type Reply = ImporterReply;
 
-    fn on_reply(&mut self, block: BlockMsg) { todo!() }
+    fn on_reply(&mut self, msg: ImporterReply) {
+        match msg {
+            ImporterReply::Filters(filters) => {
+                if self.filters_received {
+                    log::warn!(target: NAME, "Received duplicate filters");
+                } else {
+                    log::info!(target: NAME, "Received filters");
+                }
+                self.filters = filters;
+                self.filters_received = true;
+            }
+        }
+    }
 
     fn on_reply_unparsable(&mut self, err: <Self::Reply as Frame>::Error) {
-        log::error!("Invalid message from blockchain provider {}: {err}", self.provider);
+        log::error!("Invalid message from BP Node: {err}");
     }
+}
+
+impl Iterator for BlockExporter {
+    type Item = ClientCommand<ExporterPub>;
+
+    fn next(&mut self) -> Option<Self::Item> { self.commands.pop_front() }
 }

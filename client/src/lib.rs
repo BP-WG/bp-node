@@ -21,6 +21,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[macro_use]
+extern crate amplify;
+#[macro_use]
+extern crate strict_encoding;
+
 mod client;
 pub mod exporter;
 

@@ -21,7 +21,7 @@ bp-wallet = "0.12.0-beta.5"
 io-reactor = "0.6.0"
 cyphernet = { version = "0.5.2", features = ["tor", "dns", "ed25519", "p2p-ed25519"] }
 microservices = { version = "0.12.0" }
-netservices = { version = "0.11.0", features = ["eidolon", "reactor"] }
+netservices = { version = "0.12.0-beta.1", features = ["eidolon", "reactor"] }
 
 redb = "2.4.0"
 crossbeam-channel = "0.5.15"

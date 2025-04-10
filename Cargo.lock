@@ -341,6 +341,7 @@ dependencies = [
  "log",
  "netservices",
  "shellexpand",
+ "strict_encoding",
 ]
 
 [[package]]
@@ -1561,8 +1562,8 @@ dependencies = [
 
 [[package]]
 name = "netservices"
-version = "0.11.0"
-source = "git+https://github.com/cyphernet-labs/netservices.rs?branch=server#4963245931b90ca801f66e7ac3a681b02b48bfda"
+version = "0.12.0-beta.1"
+source = "git+https://github.com/cyphernet-labs/netservices.rs?branch=server#0276cd67cbceaa996c6e597a3508caa69facd60e"
 dependencies = [
  "amplify",
  "cyphernet",
@@ -1997,9 +1998,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.25"
+version = "0.23.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "822ee9188ac4ec04a2f0531e55d035fb2de73f18b41a63c70c2712503b6fb13c"
+checksum = "df51b5869f3a441595eac5e8ff14d486ff285f7b8c0df8770e49c3b56351f0f0"
 dependencies = [
  "aws-lc-rs",
  "log",
@@ -2230,6 +2231,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fd36b71bb44ca146be0b2185ed6c6deb3684cc0d5c3a94284e97fe7fa6a642f"
 dependencies = [
  "amplify",
+ "serde",
  "strict_encoding_derive",
  "wasm-bindgen",
 ]

@@ -26,8 +26,7 @@ use std::convert::Infallible;
 use std::error::Error;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
-use amplify::Wrapper;
-use bprpc::{BlockMsg, RemoteAddr, Session};
+use bprpc::{ExporterPub, RemoteAddr, Session};
 use netservices::remotes::DisconnectReason;
 use netservices::service::ServiceController;
 use netservices::{Direction, NetAccept, NetTransport};
@@ -52,7 +51,7 @@ impl BlockImporter {
 }
 
 impl ServiceController<RemoteAddr, Session, TcpListener, ()> for BlockImporter {
-    type InFrame = BlockMsg;
+    type InFrame = ExporterPub;
 
     fn should_accept(&mut self, _remote: &RemoteAddr, _time: Timestamp) -> bool {
         self.providers < MAX_PROVIDERS
@@ -80,16 +79,24 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ()> for BlockImporter {
 
     fn on_command(&mut self, _: ()) { unreachable!("there are no commands for this service") }
 
-    fn on_frame(&mut self, res_id: ResourceId, block: BlockMsg) {
-        let block_id = block.header.block_hash();
-        log::debug!("Received block {block_id} from {res_id}");
-        match self.processor.process_block(block_id, block.into_inner()) {
-            Err(err) => {
-                log::error!(target: NAME, "{err}");
-                log::warn!(target: NAME, "Block {block_id} got dropped due to database connectivity issue");
-            }
-            Ok(count) => {
-                log::debug!("Successfully processed block {block_id}; {count} transactions added");
+    fn on_frame(&mut self, res_id: ResourceId, msg: ExporterPub) {
+        match msg {
+            ExporterPub::Hello(_) => {}
+            ExporterPub::GetFilters => {}
+            ExporterPub::Block(block) => {
+                let block_id = block.header.block_hash();
+                log::debug!("Received block {block_id} from {res_id}");
+                match self.processor.process_block(block_id, block) {
+                    Err(err) => {
+                        log::error!(target: NAME, "{err}");
+                        log::warn!(target: NAME, "Block {block_id} got dropped due to database connectivity issue");
+                    }
+                    Ok(count) => {
+                        log::debug!(
+                            "Successfully processed block {block_id}; {count} transactions added"
+                        );
+                    }
+                }
             }
         }
     }

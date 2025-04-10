@@ -28,7 +28,9 @@ use std::net::TcpStream;
 
 use amplify::confinement::TinyBlob;
 use bprpc::{RemoteAddr, Request, Response, Session};
-use netservices::client::{Client, ClientDelegate, ConnectionDelegate, OnDisconnect};
+use netservices::client::{
+    Client, ClientCommand, ClientDelegate, ConnectionDelegate, OnDisconnect,
+};
 use netservices::{Frame, ImpossibleResource, NetSession, NetTransport};
 
 pub struct Delegate;
@@ -53,22 +55,24 @@ impl BpClient {
 }
 
 impl ConnectionDelegate<RemoteAddr, Session> for Delegate {
-    fn connect(&self, remote: &RemoteAddr) -> Session {
+    type Request = Request;
+
+    fn connect(&mut self, remote: &RemoteAddr) -> Session {
         TcpStream::connect(remote).expect("unable to connect to the server")
     }
 
-    fn on_established(&self, _node_id: <Session as NetSession>::Artifact, _attempt: usize) {
+    fn on_established(&mut self, _node_id: <Session as NetSession>::Artifact, _attempt: usize) {
         #[cfg(feature = "log")]
         log::info!("connection to the server is established");
     }
 
-    fn on_disconnect(&self, err: Error, _attempt: usize) -> OnDisconnect {
+    fn on_disconnect(&mut self, err: Error, _attempt: usize) -> OnDisconnect {
         #[cfg(feature = "log")]
         log::error!("disconnected due to {err}");
         OnDisconnect::Terminate
     }
 
-    fn on_io_error(&self, err: reactor::Error<ImpossibleResource, NetTransport<Session>>) {
+    fn on_io_error(&mut self, err: reactor::Error<ImpossibleResource, NetTransport<Session>>) {
         panic!("I/O error: {err}")
     }
 }
@@ -97,40 +101,8 @@ impl ClientDelegate<RemoteAddr, Session> for Delegate {
     }
 }
 
-/*
-impl RpcDelegate<RemoteAddr, Session> for Delegate {
-    type Reply = Response;
+impl Iterator for Delegate {
+    type Item = ClientCommand<Request>;
 
-    fn on_msg_error(&self, err: impl std::error::Error) {
-        #[cfg(feature = "log")]
-        log::error!("received error message: {err}");
-        panic!("received error message: {err}")
-    }
-
-    fn on_reply(&mut self, reply: Self::Reply) {
-        #[cfg(feature = "log")]
-        log::debug!("received reply: {reply}");
-        match reply {
-            Response::Failure(failure) => {
-                println!("Failure: {failure}");
-            }
-            Response::Pong(_noise) => {}
-            Response::Status(status) => {
-                println!("Status: {status}");
-            }
-        }
-    }
+    fn next(&mut self) -> Option<Self::Item> { None }
 }
-
-impl RpcPubDelegate<RemoteAddr, Session> for Delegate {
-    type PubMsg = PubMessage;
-
-    fn on_msg_pub(&self, id: u16, msg: PubMessage) {
-        #[cfg(feature = "log")]
-        log::debug!("received pub message #{id}: {msg}");
-        match msg {
-            PubMessage::ReversePing(_nois) => {}
-        }
-    }
-}
-*/
