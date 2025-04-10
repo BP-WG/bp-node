@@ -38,11 +38,10 @@ The node daemon has the following components:
 
 - **RPC**: reactor-based thread managing incoming client connections, notifying them about changes
   to the subscribed information;
-- **Block importer**: a client connecting an integration service (see below) to bitcoin blockchain
-  provider (Bitcoin Core, other Bitcoin nodes or indexers) receiving downloaded and new blocks;
-- **Block processor**, a worker pool parsing new blocks coming from the integrated providers into
-  database;
 - **Persistence**, an embedded ReDB database;
+- **Block importer**: a client connecting an integration service (see below) to bitcoin blockchain
+  provider (Bitcoin Core, other Bitcoin nodes or indexers) receiving downloaded and new blocks and
+  adding them into the database;
 - **Query worker pool**, running queries for the client subscriptions in the database.
 
 In order to operate one also needs to provide a node with an interface to bitcoin blocks integrating
@@ -50,6 +49,8 @@ it with either Bitcoin Core, or any other node or indexer.
 
 By default, the node exposes a binary RPC API over TCP, which can be exposed as more high-level APIs
 (HTTP REST, Websocket-based or JSON-RPC) using special adaptor services.
+
+![Service Architecture](docs/assets/architecture.png)
 
 ## OS Support
 
