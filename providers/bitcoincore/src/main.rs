@@ -52,7 +52,7 @@ pub struct Args {
     pub bitcoin_core: RemoteAddr,
 
     /// BP Node block import interface address
-    #[arg(long, default_value = "http://127.0.0.1:43548")]
+    #[arg(long, default_value = "http://127.0.0.1:42500")]
     pub bp_node: RemoteAddr,
 }
 

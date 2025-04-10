@@ -33,7 +33,7 @@ pub struct Args {
     #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     pub verbose: u8,
 
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "127.0.0.1:4250")]
     pub remote: RemoteAddr,
 
     /// Command to execute

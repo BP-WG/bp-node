@@ -45,12 +45,12 @@ pub struct Opts {
     pub general: GeneralOpts,
 
     /// Address(es) to listen for client RPC connections
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "127.0.0.1:4250")] // Port - ASCII 'BP'
     pub listen: Vec<SocketAddr>,
 
     /// Address(es) to listen for block provider connections
-    #[arg(short, long)]
-    pub provider: Vec<SocketAddr>,
+    #[arg(short, long, default_value = "127.0.0.1:42500")]
+    pub blocks: Vec<SocketAddr>,
 
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -79,7 +79,7 @@ impl From<Opts> for Config {
             data_dir: opts.general.data_dir,
             network: opts.general.network,
             rpc: opts.listen,
-            import: opts.provider,
+            import: opts.blocks,
         }
     }
 }

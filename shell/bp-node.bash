@@ -31,7 +31,7 @@ _bp-node() {
 
     case "${cmd}" in
         bp__node)
-            opts="-v -d -n -l -p -h -V --verbose --data-dir --network --no-network-prefix --listen --provider --help --version init help"
+            opts="-v -d -n -l -b -h -V --verbose --data-dir --network --no-network-prefix --listen --blocks --help --version init help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -67,11 +67,11 @@ _bp-node() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
-                --provider)
+                --blocks)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
-                -p)
+                -b)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

@@ -21,8 +21,8 @@ _bp-node() {
 '--network=[Network to use]:NETWORK:_default' \
 '*-l+[Address(es) to listen for client RPC connections]:LISTEN:_default' \
 '*--listen=[Address(es) to listen for client RPC connections]:LISTEN:_default' \
-'*-p+[Address(es) to listen for block provider connections]:PROVIDER:_default' \
-'*--provider=[Address(es) to listen for block provider connections]:PROVIDER:_default' \
+'*-b+[Address(es) to listen for block provider connections]:BLOCKS:_default' \
+'*--blocks=[Address(es) to listen for block provider connections]:BLOCKS:_default' \
 '*-v[Set verbosity level]' \
 '*--verbose[Set verbosity level]' \
 '--no-network-prefix[Do not add network prefix to the \`--data-dir\`]' \
