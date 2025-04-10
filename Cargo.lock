@@ -468,6 +468,7 @@ dependencies = [
  "dotenv",
  "io-reactor",
  "log",
+ "loglevel",
  "microservices",
  "netservices",
  "redb",
@@ -1484,6 +1485,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 dependencies = [
  "value-bag",
+]
+
+[[package]]
+name = "loglevel"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccc760e418548f0300d59462c60d352a6a71c656ba0c44887045338a0ae8b181"
+dependencies = [
+ "amplify",
+ "env_logger",
+ "log",
 ]
 
 [[package]]

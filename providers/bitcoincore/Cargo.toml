@@ -11,6 +11,10 @@ edition = "2024"
 rust-version = "1.85.0"
 license = "Apache-2.0"
 
+[[bin]]
+name = "bp-bc-import"
+path = "src/main.rs"
+
 [dependencies]
 bp-consensus = { version = "0.12.0-beta.5" }
 bp-rpc = { version = "0.12.0-alpha.1" }
@@ -19,6 +23,8 @@ microservices = { version = "0.12.0" }
 netservices = { version = "0.11.0", features = ["eidolon", "reactor"] }
 crossbeam-channel = "0.5.15"
 clap = { version = "4.4.8", features = ["derive", "env"] }
+log = { version = "0.4.27" }
+loglevel = { version = "0.2.0" }
 
 [patch.crates-io]
 io-reactor = { git = "https://github.com/rust-amplify/io-reactor", branch = "v0.6" }
@@ -27,4 +33,5 @@ cypheraddr = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = 
 microservices = { git = "https://github.com/cyphernet-labs/microservices.rs", branch = "master" }
 netservices = { git = "https://github.com/cyphernet-labs/netservices.rs", branch = "server" }
 
+bp-consensus = { git = "https://github.com/BP-WG/bp-core", branch = "v0.12" }
 bp-rpc = { git = "https://github.com/BP-WG/bp-node", branch = "master" }

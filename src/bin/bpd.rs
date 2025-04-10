@@ -31,8 +31,8 @@ use std::process::{ExitCode, Termination, exit};
 
 pub use bpnode;
 use bpnode::{Config, InitError, PATH_INDEXDB, Runtime};
-use bpwallet::cli::LogLevel;
 use clap::Parser;
+use loglevel::LogLevel;
 use redb::Database;
 
 use crate::opts::{Command, Opts};

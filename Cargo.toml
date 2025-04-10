@@ -30,8 +30,8 @@ serde = { version = "1", features = ["derive"] }
 
 clap = { version = "4.4.8", features = ["derive", "env"] }
 clap_complete = "4.5.7"
-log = { version = "0.4", features = ["max_level_trace", "release_max_level_debug"] }
-env_logger = { version = "0.11.3" }
+log = { version = "0.4" }
+loglevel = { version = "0.2.0" }
 shellexpand = { version = "3.1.0" }
 dotenv = { version = "0.15" }
 settings = { version = "0.14", package = "config" }
@@ -70,6 +70,7 @@ netservices = { workspace = true, features = ["log"] }
 redb.workspace = true
 crossbeam-channel.workspace = true
 log.workspace = true
+loglevel.workspace = true
 clap = { workspace = true, optional = true }
 shellexpand = { workspace = true, optional = true }
 settings = { workspace = true, optional = true }
