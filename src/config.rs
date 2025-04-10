@@ -24,7 +24,6 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use bprpc::RemoteAddr;
 use bpwallet::Network;
 
 /// Final configuration resulting from data contained in config file environment
@@ -38,7 +37,7 @@ pub struct Config {
 
     pub network: Network,
 
-    pub listening: Vec<SocketAddr>,
+    pub rpc: Vec<SocketAddr>,
 
-    pub providers: Vec<RemoteAddr>,
+    pub import: Vec<SocketAddr>,
 }

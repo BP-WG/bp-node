@@ -24,15 +24,14 @@
 use std::time::Duration;
 
 use amplify::IoError;
-use bprpc::BlockMsg;
 use bpwallet::Network;
 use microservices::UThread;
-use netservices::client::Client;
 use netservices::{NetAccept, service};
 use redb::DatabaseError;
 
 use crate::db::IndexDb;
-use crate::{BlockImporter, Config, RpcController};
+use crate::importer::BlockImporter;
+use crate::{BlockProcessor, Config, RpcController};
 
 pub const PATH_INDEXDB: &str = "bp-index";
 
@@ -43,6 +42,11 @@ pub enum InitError {
     ///
     /// {0}
     Rpc(IoError),
+
+    /// unable to initialize importing service.
+    ///
+    /// {0}
+    Import(IoError),
 
     /// unable to initialize block importing service.
     ///
@@ -64,7 +68,7 @@ pub enum InitError {
 pub struct Runtime {
     network: Network,
     rpc: service::Runtime<()>,
-    importers: Vec<Client<BlockMsg>>,
+    importer: service::Runtime<()>,
     db: UThread<IndexDb>,
 }
 
@@ -78,34 +82,34 @@ impl Runtime {
         let indexdb = IndexDb::new(&conf.data_dir.join(PATH_INDEXDB))?;
         let db = UThread::new(indexdb, TIMEOUT);
 
-        let mut importers = Vec::new();
-        for provider in &conf.providers {
-            log::info!("Connecting to block provider {provider}...");
-            let controller = BlockImporter::new(db.sender(), provider.clone());
-            let importer = Client::new(controller, provider.clone())
-                .map_err(|err| InitError::Importer(err.into()))?;
-            importers.push(importer);
-        }
+        log::info!("Starting block importer thread...");
+        let processor = BlockProcessor::new(db.sender());
+        let controller = BlockImporter::new(processor);
+        let listen = conf.import.iter().map(|addr| {
+            NetAccept::bind(addr).unwrap_or_else(|err| panic!("unable to bind to {addr}: {err}"))
+        });
+        let importer = service::Runtime::new(conf.import[0].clone(), controller, listen)
+            .map_err(|err| InitError::Import(err.into()))?;
 
         log::info!("Starting RPC server thread...");
         let controller = RpcController::new();
-        let listen = conf.listening.iter().map(|addr| {
+        let listen = conf.rpc.iter().map(|addr| {
             NetAccept::bind(addr).unwrap_or_else(|err| panic!("unable to bind to {addr}: {err}"))
         });
-        let rpc = service::Runtime::new(conf.listening[0].clone(), controller, listen)
+        let rpc = service::Runtime::new(conf.rpc[0].clone(), controller, listen)
             .map_err(|err| InitError::Rpc(err.into()))?;
 
         log::info!("Launch completed successfully");
-        Ok(Self { network: conf.network, rpc, importers, db })
+        Ok(Self { network: conf.network, rpc, importer, db })
     }
 
     pub fn run(self) -> Result<(), InitError> {
+        self.importer
+            .join()
+            .map_err(|_| InitError::Thread("importer service"))?;
         self.rpc
             .join()
             .map_err(|_| InitError::Thread("RPC server"))?;
-        for importer in self.importers {
-            importer.join().map_err(|_| InitError::Thread("importer"))?;
-        }
         Ok(())
     }
 }

@@ -23,33 +23,26 @@
 
 //! Block importer interface organized into a reactor thread.
 
-use std::net::{SocketAddr, TcpStream};
-use std::process::exit;
-
-use amplify::{ByteArray, FromSliceError, Wrapper};
-use bprpc::{BlockMsg, RemoteAddr, Session};
+use amplify::{ByteArray, FromSliceError};
 use bpwallet::{Block, BlockHash};
 use crossbeam_channel::{RecvError, SendError};
 use microservices::USender;
-use netservices::client::{ClientDelegate, ConnectionDelegate, OnDisconnect};
-use netservices::{Frame, ImpossibleResource, NetTransport};
 use redb::{CommitError, ReadableTable, StorageError, TableError};
 
 use crate::db::{
     DbBlockHeader, DbMsg, DbTx, REC_TXNO, TABLE_BLKS, TABLE_MAIN, TABLE_TXES, TABLE_TXIDS, TxNo,
 };
 
-const NAME: &str = "importer";
+const NAME: &str = "blockproc";
 
-pub struct BlockImporter {
+pub struct BlockProcessor {
     db: USender<DbMsg>,
-    provider: RemoteAddr,
 }
 
-impl BlockImporter {
-    pub fn new(db: USender<DbMsg>, remote: RemoteAddr) -> Self { Self { db, provider: remote } }
+impl BlockProcessor {
+    pub fn new(db: USender<DbMsg>) -> Self { Self { db } }
 
-    fn process_block(&mut self, id: BlockHash, block: Block) -> Result<usize, BlockProcError> {
+    pub fn process_block(&mut self, id: BlockHash, block: Block) -> Result<usize, BlockProcError> {
         let (tx, rx) = crossbeam_channel::bounded(1);
         self.db.send(DbMsg::Write(tx))?;
         let db = rx.recv()?;
@@ -117,56 +110,9 @@ impl BlockImporter {
     }
 }
 
-impl ConnectionDelegate<RemoteAddr, Session> for BlockImporter {
-    fn connect(&self, remote: &RemoteAddr) -> Session {
-        debug_assert_eq!(remote, &self.provider);
-        TcpStream::connect(remote).unwrap_or_else(|err| {
-            log::error!(target: NAME, "Unable to connect blockchain provider {remote} due to {err}");
-            log::warn!(target: NAME, "Stopping RPC import thread");
-            exit(1);
-        })
-    }
-
-    fn on_established(&self, remote: SocketAddr, _attempt: usize) {
-        log::info!(target: NAME, "Connected to blockchain provider {} ({remote})", self.provider);
-    }
-
-    fn on_disconnect(&self, err: std::io::Error, _attempt: usize) -> OnDisconnect {
-        log::error!(target: NAME, "Blockchain provider {} got disconnected due to {err}", self.provider);
-        log::warn!(target: NAME, "Stopping RPC import thread");
-        exit(1)
-    }
-
-    fn on_io_error(&self, err: reactor::Error<ImpossibleResource, NetTransport<Session>>) {
-        log::error!(target: NAME, "I/O error in communicating with blockchain provider {}: {err}", self.provider);
-    }
-}
-
-impl ClientDelegate<RemoteAddr, Session> for BlockImporter {
-    type Reply = BlockMsg;
-
-    fn on_reply(&mut self, block: BlockMsg) {
-        let block_id = block.header.block_hash();
-        log::debug!("Received block {block_id} from {}", self.provider);
-        match self.process_block(block_id, block.into_inner()) {
-            Err(err) => {
-                log::error!(target: NAME, "{err}");
-                log::warn!(target: NAME, "Block {block_id} got dropped due to database connectivity issue");
-            }
-            Ok(count) => {
-                log::debug!("Successfully processed block {block_id}; {count} transactions added");
-            }
-        }
-    }
-
-    fn on_reply_unparsable(&mut self, err: <Self::Reply as Frame>::Error) {
-        log::error!("Invalid message from blockchain provider {}: {err}", self.provider);
-    }
-}
-
 #[derive(Debug, Display, Error, From)]
 #[display(doc_comments)]
-enum BlockProcError {
+pub enum BlockProcError {
     /// Unable to connect to database: {0}
     #[from]
     Send(SendError<DbMsg>),

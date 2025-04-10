@@ -29,8 +29,9 @@ mod rpc;
 mod blocks;
 mod runtime;
 pub mod db;
+mod importer;
 
-pub use blocks::BlockImporter;
+pub use blocks::{BlockProcError, BlockProcessor};
 pub use config::Config;
 pub use rpc::RpcController;
 pub use runtime::{InitError, PATH_INDEXDB, Runtime};

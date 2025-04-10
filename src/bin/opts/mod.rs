@@ -24,7 +24,6 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use bprpc::RemoteAddr;
 use bpwallet::cli::GeneralOpts;
 
 use crate::bpnode::Config;
@@ -45,11 +44,13 @@ pub struct Opts {
     #[command(flatten)]
     pub general: GeneralOpts,
 
+    /// Address(es) to listen for client RPC connections
     #[arg(short, long)]
     pub listen: Vec<SocketAddr>,
 
+    /// Address(es) to listen for block provider connections
     #[arg(short, long)]
-    pub provider: Vec<RemoteAddr>,
+    pub provider: Vec<SocketAddr>,
 
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -77,8 +78,8 @@ impl From<Opts> for Config {
         Config {
             data_dir: opts.general.data_dir,
             network: opts.general.network,
-            listening: opts.listen,
-            providers: opts.provider,
+            rpc: opts.listen,
+            import: opts.provider,
         }
     }
 }

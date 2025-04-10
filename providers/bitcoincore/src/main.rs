@@ -37,7 +37,7 @@ pub const BLOCK_SEPARATOR: [u8; 4] = [0xF9, 0xBE, 0xB4, 0xD9];
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[command(author, version, about)]
 pub struct Args {
-    /// Set verbosity level.
+    /// Set verbosity level
     ///
     /// Can be used multiple times to increase verbosity.
     #[arg(short, long, action = clap::ArgAction::Count)]

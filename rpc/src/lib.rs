@@ -32,14 +32,12 @@ extern crate serde;
 mod request;
 mod response;
 mod data;
-mod pub_msg;
 mod connectivity;
-mod block;
+mod provider;
 
-pub use block::BlockMsg;
 pub use connectivity::{RemoteAddr, Session};
 pub use data::{Failure, Status};
-pub use pub_msg::PubMessage;
+pub use provider::BlockMsg;
 pub use request::Request;
 pub use response::Response;
 

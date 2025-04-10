@@ -22,5 +22,6 @@
 // limitations under the License.
 
 mod client;
+pub mod exporter;
 
 pub use client::{BpClient, Delegate};

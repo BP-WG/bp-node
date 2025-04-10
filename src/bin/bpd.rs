@@ -60,7 +60,7 @@ fn main() -> Status {
     match opts.command {
         Some(Command::Init) => {
             eprint!("Initializing ... ");
-            let mut index_path = opts.general.data_dir.join(PATH_INDEXDB);
+            let index_path = opts.general.data_dir.join(PATH_INDEXDB);
             match fs::exists(&index_path) {
                 Err(err) => {
                     eprintln!("unable to access path '{}': {err}", index_path.display());

@@ -19,10 +19,10 @@ _bp-node() {
 '--data-dir=[Data directory path]:DATA_DIR:_files -/' \
 '-n+[Network to use]:NETWORK:_default' \
 '--network=[Network to use]:NETWORK:_default' \
-'*-l+[]:LISTEN:_default' \
-'*--listen=[]:LISTEN:_default' \
-'*-p+[]:PROVIDER:_default' \
-'*--provider=[]:PROVIDER:_default' \
+'*-l+[Address(es) to listen for client RPC connections]:LISTEN:_default' \
+'*--listen=[Address(es) to listen for client RPC connections]:LISTEN:_default' \
+'*-p+[Address(es) to listen for block provider connections]:PROVIDER:_default' \
+'*--provider=[Address(es) to listen for block provider connections]:PROVIDER:_default' \
 '*-v[Set verbosity level]' \
 '*--verbose[Set verbosity level]' \
 '--no-network-prefix[Do not add network prefix to the \`--data-dir\`]' \
