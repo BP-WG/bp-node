@@ -25,8 +25,8 @@
 
 use std::collections::HashSet;
 
-use amplify::{ByteArray, FromSliceError};
 use bprpc::BloomFilter32;
+use amplify::{ByteArray, FromSliceError, hex};
 use bpwallet::{Block, BlockHash};
 use crossbeam_channel::{RecvError, SendError, Sender};
 use microservices::USender;
@@ -34,7 +34,9 @@ use redb::{CommitError, ReadableTable, StorageError, TableError};
 
 use crate::ImporterMsg;
 use crate::db::{
-    DbBlockHeader, DbMsg, DbTx, REC_TXNO, TABLE_BLKS, TABLE_MAIN, TABLE_TXES, TABLE_TXIDS, TxNo,
+    BlockId, DbBlockHeader, DbMsg, DbTx, REC_BLOCKID, REC_CHAIN, REC_ORPHANS, REC_TXNO, TABLE_BLKS,
+    TABLE_BLOCK_SPENDS, TABLE_BLOCKIDS, TABLE_CHAIN, TABLE_HEIGHTS, TABLE_INPUTS, TABLE_MAIN,
+    TABLE_OUTS, TABLE_SPKS, TABLE_TX_BLOCKS, TABLE_TXES, TABLE_TXIDS, TABLE_UTXOS, TxNo,
 };
 
 const NAME: &str = "blockproc";
@@ -61,6 +63,7 @@ impl BlockProcessor {
         self.db.send(DbMsg::Write(tx))?;
         let db = rx.recv()?;
 
+        // Get current transaction number
         let mut txno = {
             let main = db
                 .open_table(TABLE_MAIN)
@@ -72,8 +75,31 @@ impl BlockProcessor {
             TxNo::from_slice(rec.value()).map_err(BlockProcError::TxNoInvalid)?
         };
 
+        // Get or create the next block ID
+        let mut blockid = {
+            let main = db
+                .open_table(TABLE_MAIN)
+                .map_err(BlockProcError::MainTable)?;
+            match main
+                .get(REC_BLOCKID)
+                .map_err(|e| BlockProcError::Custom(format!("Block ID lookup error: {}", e)))?
+            {
+                Some(rec) => {
+                    // Parse bytes into BlockId using from_bytes method
+                    let mut bid = BlockId::from_bytes(rec.value());
+                    bid.inc_assign();
+                    bid
+                }
+                None => BlockId::start(),
+            }
+        };
+
         let mut count = 0;
         let process = || -> Result<(), BlockProcError> {
+            // Get previous block hash for chain validation
+            let prev_hash = block.header.prev_block_hash;
+
+            // Store block header
             let mut table = db
                 .open_table(TABLE_BLKS)
                 .map_err(BlockProcError::BlockTable)?;
@@ -81,23 +107,141 @@ impl BlockProcessor {
                 .insert(id.to_byte_array(), DbBlockHeader::from(block.header))
                 .map_err(BlockProcError::BlockStorage)?;
 
+            // Map block hash to block ID
+            let mut blockids_table = db
+                .open_table(TABLE_BLOCKIDS)
+                .map_err(|e| BlockProcError::Custom(format!("Block IDs table error: {}", e)))?;
+            blockids_table
+                .insert(id.to_byte_array(), blockid)
+                .map_err(|e| BlockProcError::Custom(format!("Block ID storage error: {}", e)))?;
+
+            // Store block height information
+            // For simplicity, we use the block ID value as the height
+            let height = blockid.as_u32();
+
+            // TODO: need to think about whether to delete redundancy or distinguish id and height
+            let mut heights_table = db
+                .open_table(TABLE_HEIGHTS)
+                .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
+            heights_table
+                .insert(height, blockid)
+                .map_err(|e| BlockProcError::Custom(format!("Heights storage error: {}", e)))?;
+
+            // Track UTXOs spent in this block
+            let mut block_spends = Vec::new();
+
+            // Process transactions in the block
             for tx in block.transactions {
                 let txid = tx.txid();
                 txno.inc_assign();
 
-                let mut table = db
+                // Store transaction ID to transaction number mapping
+                let mut txids_table = db
                     .open_table(TABLE_TXIDS)
                     .map_err(BlockProcError::TxidTable)?;
-                table
+                txids_table
                     .insert(txid.to_byte_array(), txno)
                     .map_err(BlockProcError::TxidStorage)?;
 
-                // TODO: Add remaining transaction information to other database tables
+                // Associate transaction with block ID
+                let mut tx_blocks_table = db
+                    .open_table(TABLE_TX_BLOCKS)
+                    .map_err(|e| BlockProcError::Custom(format!("Tx-blocks table error: {}", e)))?;
+                tx_blocks_table.insert(txno, blockid).map_err(|e| {
+                    BlockProcError::Custom(format!("Tx-blocks storage error: {}", e))
+                })?;
 
-                let mut table = db
+                // Process transaction inputs
+                for (vin_idx, input) in tx.inputs.iter().enumerate() {
+                    if !input.prev_output.is_coinbase() {
+                        let prev_txid = input.prev_output.txid;
+                        let prev_vout = input.prev_output.vout;
+
+                        // Look up previous transaction number
+                        if let Some(prev_txno) = txids_table
+                            .get(prev_txid.to_byte_array())
+                            .map_err(BlockProcError::TxidLookup)?
+                            .map(|v| v.value())
+                        {
+                            // Mark UTXO as spent
+                            let mut utxos_table = db.open_table(TABLE_UTXOS).map_err(|e| {
+                                BlockProcError::Custom(format!("UTXOs table error: {}", e))
+                            })?;
+                            utxos_table
+                                .remove(&(prev_txno, prev_vout.into_u32()))
+                                .map_err(|e| {
+                                    BlockProcError::Custom(format!("UTXOs removal error: {}", e))
+                                })?;
+
+                            // Record UTXO spent in this block
+                            block_spends.push((prev_txno, prev_vout.into_u32()));
+
+                            // Record input-output mapping
+                            let mut inputs_table = db.open_table(TABLE_INPUTS).map_err(|e| {
+                                BlockProcError::Custom(format!("Inputs table error: {}", e))
+                            })?;
+                            inputs_table
+                                .insert((txno, vin_idx as u32), (prev_txno, prev_vout.into_u32()))
+                                .map_err(|e| {
+                                    BlockProcError::Custom(format!("Inputs storage error: {}", e))
+                                })?;
+
+                            // Update spending relationships
+                            let mut outs_table = db.open_table(TABLE_OUTS).map_err(|e| {
+                                BlockProcError::Custom(format!("Outs table error: {}", e))
+                            })?;
+                            let mut spending_txs = outs_table
+                                .get(prev_txno)
+                                .map_err(|e| {
+                                    BlockProcError::Custom(format!("Outs lookup error: {}", e))
+                                })?
+                                .map(|v| v.value().to_vec())
+                                .unwrap_or_default();
+                            spending_txs.push(txno);
+                            outs_table.insert(prev_txno, spending_txs).map_err(|e| {
+                                BlockProcError::Custom(format!("Outs update error: {}", e))
+                            })?;
+                        }
+                    }
+                }
+
+                // Process transaction outputs
+                for (vout_idx, output) in tx.outputs.iter().enumerate() {
+                    // Add new UTXO
+                    let mut utxos_table = db
+                        .open_table(TABLE_UTXOS)
+                        .map_err(|e| BlockProcError::Custom(format!("UTXOs table error: {}", e)))?;
+                    utxos_table
+                        .insert((txno, vout_idx as u32), ())
+                        .map_err(|e| {
+                            BlockProcError::Custom(format!("UTXOs storage error: {}", e))
+                        })?;
+
+                    // Index script pubkey
+                    let script = &output.script_pubkey;
+                    if !script.is_empty() {
+                        let mut spks_table = db.open_table(TABLE_SPKS).map_err(|e| {
+                            BlockProcError::Custom(format!("SPKs table error: {}", e))
+                        })?;
+                        let mut txnos = spks_table
+                            .get(script.as_slice())
+                            .map_err(|e| {
+                                BlockProcError::Custom(format!("SPKs lookup error: {}", e))
+                            })?
+                            .map(|v| v.value().to_vec())
+                            .unwrap_or_default();
+                        txnos.push(txno);
+                        spks_table.insert(script.as_slice(), txnos).map_err(|e| {
+                            BlockProcError::Custom(format!("SPKs update error: {}", e))
+                        })?;
+                    }
+                }
+
+                // Store complete transaction
+                let mut txes_table = db
                     .open_table(TABLE_TXES)
                     .map_err(BlockProcError::TxesTable)?;
-                table
+                txes_table
                     .insert(txno, DbTx::from(tx))
                     .map_err(BlockProcError::TxesStorage)?;
 
@@ -109,14 +253,52 @@ impl BlockProcessor {
                 count += 1;
             }
 
+            // Store UTXOs spent in this block
+            let mut block_spends_table = db
+                .open_table(TABLE_BLOCK_SPENDS)
+                .map_err(|e| BlockProcError::Custom(format!("Block spends table error: {}", e)))?;
+            block_spends_table
+                .insert(blockid, block_spends)
+                .map_err(|e| {
+                    BlockProcError::Custom(format!("Block spends storage error: {}", e))
+                })?;
+
+            // Update chain state
+            // Simplified approach - just append block to chain
+            let mut chain_table = db
+                .open_table(TABLE_CHAIN)
+                .map_err(|e| BlockProcError::Custom(format!("Chain table error: {}", e)))?;
+
+            // Get current chain
+            let current_chain = chain_table
+                .get(REC_CHAIN)
+                .map_err(|e| BlockProcError::Custom(format!("Chain lookup error: {}", e)))?
+                .map(|v| v.value().to_vec())
+                .unwrap_or_default();
+
+            // Append to main chain
+            let mut new_chain = current_chain;
+            new_chain.push(blockid);
+            chain_table
+                .insert(REC_CHAIN, new_chain)
+                .map_err(|e| BlockProcError::Custom(format!("Chain update error: {}", e)))?;
+
+            // Update global counters
             let mut main = db
                 .open_table(TABLE_MAIN)
                 .map_err(BlockProcError::MainTable)?;
+
+            // Update transaction counter
             main.insert(REC_TXNO, txno.to_byte_array().as_slice())
                 .map_err(BlockProcError::TxNoUpdate)?;
 
+            // Update block ID counter
+            main.insert(REC_BLOCKID, &blockid.to_bytes())
+                .map_err(|e| BlockProcError::Custom(format!("Block ID update error: {}", e)))?;
+
             Ok(())
         };
+
         if let Err(e) = process() {
             if let Err(err) = db.abort() {
                 log::warn!(target: NAME, "Unable to abort failed database transaction due to {err}");
@@ -177,4 +359,13 @@ pub enum BlockProcError {
 
     /// Unable to write to transactions table: {0}
     TxesStorage(StorageError),
+
+    /// Error looking up transaction ID: {0}
+    TxidLookup(StorageError),
+
+    /// Unable to find block: {0}
+    BlockLookup(StorageError),
+
+    /// Custom error: {0}
+    Custom(String),
 }

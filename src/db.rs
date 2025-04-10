@@ -25,7 +25,7 @@ use std::cmp::Ordering;
 use std::ops::ControlFlow;
 use std::path::Path;
 
-use amplify::num::u40;
+use amplify::num::{u24, u40};
 use amplify::{ByteArray, FromSliceError};
 use bpwallet::{BlockHeader, ConsensusDecode, ConsensusEncode, Tx};
 use crossbeam_channel::{SendError, Sender};
@@ -39,10 +39,34 @@ use redb::{
 #[display("#{0:010X}")]
 pub struct TxNo(u40);
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Display)]
+#[display("#{0:08X}")]
+pub struct BlockId(u32);
+
 impl TxNo {
     pub fn start() -> Self { TxNo(u40::ONE) }
 
     pub fn inc_assign(&mut self) { self.0 += u40::ONE }
+}
+
+impl BlockId {
+    pub fn start() -> Self { BlockId(0) }
+
+    pub fn inc_assign(&mut self) { self.0 += 1 }
+
+    // Method to access the u32 value
+    pub fn as_u32(&self) -> u32 { self.0 }
+
+    // Method to get bytes representation
+    pub fn to_bytes(&self) -> [u8; 4] { self.0.to_be_bytes() }
+
+    // Method to create BlockId from bytes
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        debug_assert_eq!(bytes.len(), 4);
+        let mut array = [0u8; 4];
+        array.copy_from_slice(bytes);
+        BlockId(u32::from_be_bytes(array))
+    }
 }
 
 impl ByteArray<5> for TxNo {
@@ -134,14 +158,74 @@ impl redb::Value for DbTx {
     fn type_name() -> TypeName { TypeName::new("BpNodeTx") }
 }
 
-pub const TABLE_MAIN: TableDefinition<&'static str, &[u8]> = TableDefinition::new("main");
-pub const TABLE_BLKS: TableDefinition<[u8; 32], DbBlockHeader> = TableDefinition::new("blocks");
-pub const TABLE_TXIDS: TableDefinition<[u8; 32], TxNo> = TableDefinition::new("txids");
-pub const TABLE_TXES: TableDefinition<TxNo, DbTx> = TableDefinition::new("transactions");
-pub const TABLE_OUTS: TableDefinition<TxNo, Vec<TxNo>> = TableDefinition::new("spends");
-pub const TABLE_SPKS: TableDefinition<&[u8], TxNo> = TableDefinition::new("scripts");
+impl redb::Key for BlockId {
+    fn compare(data1: &[u8], data2: &[u8]) -> Ordering { data1.cmp(data2) }
+}
+
+impl redb::Value for BlockId {
+    type SelfType<'a> = Self;
+
+    type AsBytes<'a> = [u8; 4];
+
+    fn fixed_width() -> Option<usize> { Some(4) }
+
+    fn from_bytes<'a>(data: &'a [u8]) -> Self::SelfType<'a>
+    where Self: 'a {
+        BlockId::from_bytes(data)
+    }
+
+    fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>
+    where Self: 'b {
+        value.to_bytes()
+    }
+
+    fn type_name() -> TypeName { TypeName::new("BpNodeBlockId") }
+}
 
 pub const REC_TXNO: &str = "txno";
+pub const REC_BLOCKID: &str = "blockid";
+pub const REC_CHAIN: &str = "chain";
+pub const REC_ORPHANS: &str = "orphans";
+
+// Main metadata table storing global counters and states
+pub const TABLE_MAIN: TableDefinition<&'static str, &[u8]> = TableDefinition::new("main");
+
+// Maps block hash to block header
+pub const TABLE_BLKS: TableDefinition<[u8; 32], DbBlockHeader> = TableDefinition::new("blocks");
+
+// Maps transaction ID to internal transaction number
+pub const TABLE_TXIDS: TableDefinition<[u8; 32], TxNo> = TableDefinition::new("txids");
+
+// Maps block hash to internal block ID
+pub const TABLE_BLOCKIDS: TableDefinition<[u8; 32], BlockId> = TableDefinition::new("blockids");
+
+// Stores complete transaction data
+pub const TABLE_TXES: TableDefinition<TxNo, DbTx> = TableDefinition::new("transactions");
+
+// Maps transaction number to transaction numbers that spend its outputs
+pub const TABLE_OUTS: TableDefinition<TxNo, Vec<TxNo>> = TableDefinition::new("spends");
+
+// Maps script pubkey to a list of transaction numbers containing it
+pub const TABLE_SPKS: TableDefinition<&[u8], Vec<TxNo>> = TableDefinition::new("scripts");
+
+// Tracks unspent transaction outputs
+pub const TABLE_UTXOS: TableDefinition<(TxNo, u32), ()> = TableDefinition::new("utxos");
+
+// Maps block height to block ID
+pub const TABLE_HEIGHTS: TableDefinition<u32, BlockId> = TableDefinition::new("block_heights");
+
+// Maps transaction number to the block ID it belongs to
+pub const TABLE_TX_BLOCKS: TableDefinition<TxNo, BlockId> = TableDefinition::new("tx_blocks");
+
+// Maps transaction input to the output it spends
+pub const TABLE_INPUTS: TableDefinition<(TxNo, u32), (TxNo, u32)> = TableDefinition::new("inputs");
+
+// Tracks the active chain and orphaned blocks
+pub const TABLE_CHAIN: TableDefinition<&'static str, Vec<BlockId>> = TableDefinition::new("chain");
+
+// Records UTXOs spent in each block for reorg handling
+pub const TABLE_BLOCK_SPENDS: TableDefinition<BlockId, Vec<(TxNo, u32)>> =
+    TableDefinition::new("block_spends");
 
 pub struct IndexDb(Database);
 
