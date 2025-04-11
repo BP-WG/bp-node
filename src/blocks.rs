@@ -25,8 +25,8 @@
 
 use std::collections::HashSet;
 
-use bprpc::BloomFilter32;
 use amplify::{ByteArray, Bytes32, FromSliceError, hex};
+use bprpc::BloomFilter32;
 use bpwallet::{Block, BlockHash, Network, Txid};
 use crossbeam_channel::{RecvError, SendError, Sender};
 use microservices::USender;
@@ -344,7 +344,15 @@ impl BlockProcessor {
                     .map_err(BlockProcError::TxesStorage)?;
 
                 // Check if transaction ID is in tracking list and notify if needed
-                if self.tracking.contains(&txid) {
+                let txid_bytes = txid.to_byte_array();
+                let mut should_notify = false;
+                for filter in &self.tracking {
+                    if filter.contains(&txid_bytes) {
+                        should_notify = true;
+                        break;
+                    }
+                }
+                if should_notify {
                     self.broker.send(ImporterMsg::Mined(txid))?;
                 }
 
