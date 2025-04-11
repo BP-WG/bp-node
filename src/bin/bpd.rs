@@ -79,15 +79,109 @@ fn main() -> Status {
                 );
                 exit(3);
             }
-            if let Err(err) = Database::create(&index_path) {
-                eprintln!("unable to create index database.\n{err}");
-                exit(4);
+
+            // Create the database
+            let db = match Database::create(&index_path) {
+                Ok(db) => db,
+                Err(err) => {
+                    eprintln!("unable to create index database.\n{err}");
+                    exit(4);
+                }
+            };
+
+            // Initialize database with network information
+            let network = opts.general.network;
+            match db.begin_write() {
+                Ok(tx) => {
+                    match tx.open_table(bpnode::db::TABLE_MAIN) {
+                        Ok(mut main_table) => {
+                            if let Err(err) = main_table
+                                .insert(bpnode::REC_NETWORK, network.to_string().as_bytes())
+                            {
+                                eprintln!("Failed to write network information to database: {err}");
+                                exit(5);
+                            }
+                        }
+                        Err(err) => {
+                            eprintln!("Failed to open main table in database: {err}");
+                            exit(6);
+                        }
+                    }
+
+                    if let Err(err) = tx.commit() {
+                        eprintln!("Failed to commit initial database transaction: {err}");
+                        exit(7);
+                    }
+                }
+                Err(err) => {
+                    eprintln!("Failed to begin database transaction: {err}");
+                    exit(8);
+                }
             }
-            eprintln!("index database initialized, exiting");
+
+            eprintln!("index database initialized for {} network, exiting", network);
             Status(Ok(()))
         }
         None => {
             let conf = Config::from(opts);
+            let index_path = conf.data_dir.join(PATH_INDEXDB);
+
+            // Check if the database exists
+            if let Ok(true) = fs::exists(&index_path) {
+                // Open the database to check network configuration
+                match Database::open(&index_path) {
+                    Ok(db) => {
+                        // Check stored network matches configured network
+                        if let Ok(tx) = db.begin_read() {
+                            if let Ok(main_table) = tx.open_table(bpnode::db::TABLE_MAIN) {
+                                if let Ok(Some(network_rec)) = main_table.get(bpnode::REC_NETWORK) {
+                                    let stored_network =
+                                        String::from_utf8_lossy(network_rec.value());
+                                    if stored_network != conf.network.to_string() {
+                                        eprintln!("ERROR: Database network mismatch!");
+                                        eprintln!("Configured network: {}", conf.network);
+                                        eprintln!("Database network: {}", stored_network);
+                                        eprintln!(
+                                            "Each BP-Node instance works with a single chain."
+                                        );
+                                        eprintln!(
+                                            "To use a different network, create a separate \
+                                             instance with a different data directory."
+                                        );
+                                        exit(9);
+                                    }
+                                    log::info!(
+                                        "Database network matches configured network: {}",
+                                        stored_network
+                                    );
+                                } else {
+                                    // Network information not found in the database
+                                    eprintln!(
+                                        "ERROR: Database exists but doesn't contain network \
+                                         information."
+                                    );
+                                    eprintln!(
+                                        "Please reinitialize the database with 'bpd init' command."
+                                    );
+                                    exit(10);
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "Warning: Could not open database to check network configuration: {}",
+                            err
+                        );
+                    }
+                }
+            } else {
+                eprintln!(
+                    "ERROR: Database not found! Please initialize with 'bpd init' command first."
+                );
+                exit(11);
+            }
+
             Status(Broker::start(conf).and_then(|runtime| runtime.run()))
         }
     }

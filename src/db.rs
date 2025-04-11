@@ -221,13 +221,14 @@ pub const TABLE_TX_BLOCKS: TableDefinition<TxNo, BlockId> = TableDefinition::new
 // Maps transaction input to the output it spends
 pub const TABLE_INPUTS: TableDefinition<(TxNo, u32), (TxNo, u32)> = TableDefinition::new("inputs");
 
-// Tracks the active chain and orphaned blocks
-pub const TABLE_CHAIN: TableDefinition<&'static str, Vec<BlockId>> = TableDefinition::new("chain");
-
 // Records UTXOs spent in each block for reorg handling
 pub const TABLE_BLOCK_SPENDS: TableDefinition<BlockId, Vec<(TxNo, u32)>> =
     TableDefinition::new("block_spends");
 
+// Each BP-Node instance is designed to work with a single blockchain network.
+// If multiple networks need to be indexed, separate instances should be used
+// with different data directories. The network information is stored in the
+// MAIN table under the REC_NETWORK key.
 pub struct IndexDb(Database);
 
 impl IndexDb {

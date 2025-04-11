@@ -25,9 +25,9 @@
 
 use std::collections::HashSet;
 
-use amplify::{ByteArray, Bytes32, FromSliceError, hex};
+use amplify::{ByteArray, FromSliceError};
 use bprpc::BloomFilter32;
-use bpwallet::{Block, BlockHash, Network, Txid};
+use bpwallet::{Block, BlockHash};
 use crossbeam_channel::{RecvError, SendError, Sender};
 use microservices::USender;
 use redb::{CommitError, ReadableTable, StorageError, TableError};
@@ -35,26 +35,14 @@ use redb::{CommitError, ReadableTable, StorageError, TableError};
 use crate::ImporterMsg;
 use crate::db::{
     BlockId, DbBlockHeader, DbMsg, DbTx, REC_BLOCKID, REC_CHAIN, REC_ORPHANS, REC_TXNO, TABLE_BLKS,
-    TABLE_BLOCK_SPENDS, TABLE_BLOCKIDS, TABLE_CHAIN, TABLE_HEIGHTS, TABLE_INPUTS, TABLE_MAIN,
-    TABLE_OUTS, TABLE_SPKS, TABLE_TX_BLOCKS, TABLE_TXES, TABLE_TXIDS, TABLE_UTXOS, TxNo,
+    TABLE_BLOCK_SPENDS, TABLE_BLOCKIDS, TABLE_HEIGHTS, TABLE_INPUTS, TABLE_MAIN, TABLE_OUTS,
+    TABLE_SPKS, TABLE_TX_BLOCKS, TABLE_TXES, TABLE_TXIDS, TABLE_UTXOS, TxNo,
 };
 
 const NAME: &str = "blockproc";
 
 // Network information record in main table
 pub const REC_NETWORK: &str = "network";
-
-// Genesis block hashes for different networks
-const GENESIS_HASH_MAINNET: &str =
-    "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f";
-const GENESIS_HASH_TESTNET3: &str =
-    "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943";
-const GENESIS_HASH_TESTNET4: &str =
-    "00000000da84f2bafbbc53dee25a72ae507ff4914b867c565be350b0da8bf043";
-const GENESIS_HASH_SIGNET: &str =
-    "00000008819873e925422c1ff0f99f7cc9bbb232af63a077a480a3633bee1ef6";
-const GENESIS_HASH_REGTEST: &str =
-    "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206";
 
 pub struct BlockProcessor {
     db: USender<DbMsg>,
@@ -73,19 +61,6 @@ impl BlockProcessor {
         self.tracking.retain(|filter| !filters.contains(filter));
     }
 
-    // Helper function to determine network from block hash
-    fn detect_network_from_genesis(blockhash: &BlockHash) -> Option<Network> {
-        let hash_str = blockhash.to_string();
-        match hash_str.as_str() {
-            GENESIS_HASH_MAINNET => Some(Network::Mainnet),
-            GENESIS_HASH_TESTNET3 => Some(Network::Testnet3),
-            GENESIS_HASH_TESTNET4 => Some(Network::Testnet4),
-            GENESIS_HASH_SIGNET => Some(Network::Signet),
-            GENESIS_HASH_REGTEST => Some(Network::Regtest),
-            _ => None,
-        }
-    }
-
     // Helper function to calculate block height
     fn calculate_block_height(
         &self,
@@ -99,9 +74,10 @@ impl BlockProcessor {
             return Ok(0);
         }
 
-        // For simplicity in this implementation, we'll use block ID as fallback
-        // When proper reorg handling is implemented this should be revisited
-        // The proper height calculation would include blockchain state analysis
+        // Since each BP-Node instance works with a single chain,
+        // for simplicity we use block ID as a height fallback.
+        // In a multi-chain system, we would need more sophisticated height calculation.
+        // When proper reorg handling is implemented this should be revisited.
 
         // For now, if this is genesis block (blockid == 0), return 0
         // otherwise, simply use blockid as height which will be roughly equivalent
@@ -145,25 +121,6 @@ impl BlockProcessor {
                 None => BlockId::start(),
             }
         };
-
-        // Check for genesis block if this is block ID 0
-        if blockid.as_u32() == 0 {
-            // For genesis block, detect and store network information
-            let network = Self::detect_network_from_genesis(&id)
-                .ok_or_else(|| BlockProcError::Custom("Unknown genesis block hash".to_string()))?;
-
-            let mut main = db
-                .open_table(TABLE_MAIN)
-                .map_err(BlockProcError::MainTable)?;
-
-            // Store network information
-            main.insert(REC_NETWORK, network.to_string().as_bytes())
-                .map_err(|e| {
-                    BlockProcError::Custom(format!("Failed to store network info: {}", e))
-                })?;
-
-            log::info!(target: NAME, "Initialized with genesis block for network: {}", network);
-        }
 
         let mut count = 0;
         let process = || -> Result<(), BlockProcError> {
@@ -217,6 +174,12 @@ impl BlockProcessor {
                     );
 
                     // TODO: Implement full reorg handling
+                    // In a single-chain BP-Node instance, reorgs are detected when a different
+                    // block is encountered at the same height. The proper handling would include:
+                    // 1. Finding the common ancestor block
+                    // 2. Rolling back transactions in the old chain branch
+                    // 3. Applying transactions from the new chain branch
+                    // 4. Updating UTXO set accordingly
                     // For now, we'll just overwrite the existing entry
                 }
             }
@@ -347,7 +310,7 @@ impl BlockProcessor {
                 let txid_bytes = txid.to_byte_array();
                 let mut should_notify = false;
                 for filter in &self.tracking {
-                    if filter.contains(&txid_bytes) {
+                    if filter.contains(txid_bytes) {
                         should_notify = true;
                         break;
                     }
@@ -369,26 +332,6 @@ impl BlockProcessor {
                     BlockProcError::Custom(format!("Block spends storage error: {}", e))
                 })?;
 
-            // Update chain state
-            // Simplified approach - just append block to chain
-            let mut chain_table = db
-                .open_table(TABLE_CHAIN)
-                .map_err(|e| BlockProcError::Custom(format!("Chain table error: {}", e)))?;
-
-            // Get current chain
-            let current_chain = chain_table
-                .get(REC_CHAIN)
-                .map_err(|e| BlockProcError::Custom(format!("Chain lookup error: {}", e)))?
-                .map(|v| v.value().to_vec())
-                .unwrap_or_default();
-
-            // Append to main chain
-            let mut new_chain = current_chain;
-            new_chain.push(blockid);
-            chain_table
-                .insert(REC_CHAIN, new_chain)
-                .map_err(|e| BlockProcError::Custom(format!("Chain update error: {}", e)))?;
-
             // Update global counters
             let mut main = db
                 .open_table(TABLE_MAIN)
@@ -401,6 +344,15 @@ impl BlockProcessor {
             // Update block ID counter
             main.insert(REC_BLOCKID, &blockid.to_bytes().as_slice())
                 .map_err(|e| BlockProcError::Custom(format!("Block ID update error: {}", e)))?;
+
+            // Log successful block processing
+            log::debug!(
+                target: NAME,
+                "Successfully processed block {} at height {} with {} transactions",
+                id,
+                height,
+                count
+            );
 
             Ok(())
         };

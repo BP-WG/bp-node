@@ -126,22 +126,10 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ImporterCmd> for BlockI
     fn on_command(&mut self, cmd: ImporterCmd) {
         match cmd {
             ImporterCmd::TrackTxid(filters) => {
-                self.processor.track(
-                    filters
-                        .into_iter()
-                        .map(|a| a.to_byte_array())
-                        .map(Txid::from)
-                        .collect(),
-                );
+                self.processor.track(filters);
             }
             ImporterCmd::Untrack(filters) => {
-                self.processor.untrack(
-                    filters
-                        .into_iter()
-                        .map(|a| a.to_byte_array())
-                        .map(Txid::from)
-                        .collect(),
-                );
+                self.processor.untrack(filters);
             }
         }
     }
