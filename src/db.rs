@@ -25,7 +25,7 @@ use std::cmp::Ordering;
 use std::ops::ControlFlow;
 use std::path::Path;
 
-use amplify::num::{u24, u40};
+use amplify::num::u40;
 use amplify::{ByteArray, FromSliceError};
 use bpwallet::{BlockHeader, ConsensusDecode, ConsensusEncode, Tx};
 use crossbeam_channel::{SendError, Sender};
@@ -44,12 +44,13 @@ pub struct TxNo(u40);
 pub struct BlockId(u32);
 
 impl TxNo {
-    pub fn start() -> Self { TxNo(u40::ONE) }
+    pub fn start() -> Self { TxNo(u40::ZERO) }
 
     pub fn inc_assign(&mut self) { self.0 += u40::ONE }
 }
 
 impl BlockId {
+    // 0 corresponds to the genesis block, and the height is aligned with other indexers
     pub fn start() -> Self { BlockId(0) }
 
     pub fn inc_assign(&mut self) { self.0 += 1 }
