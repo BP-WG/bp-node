@@ -34,7 +34,9 @@ mod response;
 mod data;
 mod connectivity;
 mod provider;
+mod bloom;
 
+pub use bloom::{BloomFilter, BloomFilter32};
 pub use connectivity::{RemoteAddr, Session};
 pub use data::{AgentInfo, ClientInfo, Failure, FailureCode, Status, Version};
 pub use provider::{ExporterPub, FiltersMsg, ImporterReply};

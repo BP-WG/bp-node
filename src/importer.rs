@@ -27,8 +27,7 @@ use std::error::Error;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::str::FromStr;
 
-use amplify::Bytes32;
-use bprpc::{ClientInfo, ExporterPub, Failure, ImporterReply, RemoteAddr, Session};
+use bprpc::{BloomFilter32, ClientInfo, ExporterPub, Failure, ImporterReply, RemoteAddr, Session};
 use bpwallet::{Network, Txid};
 use crossbeam_channel::Sender;
 use microservices::USender;
@@ -48,10 +47,10 @@ const NAME: &str = "importer";
 #[derive(Debug, Display)]
 pub enum ImporterCmd {
     #[display("TRACK")]
-    TrackTxid(Vec<Bytes32>),
+    TrackTxid(Vec<BloomFilter32>),
 
     #[display("UNTRACK")]
-    Untrack(Vec<Bytes32>),
+    Untrack(Vec<BloomFilter32>),
 }
 
 #[derive(Debug, Display)]

@@ -26,9 +26,9 @@ use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use amplify::IoError;
 use amplify::confinement::TinyOrdSet;
-use amplify::{Bytes32, IoError};
-use bprpc::Response;
+use bprpc::{BloomFilter32, Response};
 use crossbeam_channel::{Receiver, select};
 use microservices::UThread;
 use netservices::{NetAccept, service};
@@ -52,7 +52,7 @@ pub enum BrokerRpcMsg {
 
 #[derive(Debug)]
 pub enum TrackReq {
-    TrackTxids(TinyOrdSet<Bytes32>),
+    TrackTxids(TinyOrdSet<BloomFilter32>),
 }
 
 pub struct Broker {
@@ -62,7 +62,7 @@ pub struct Broker {
     rpc_rx: Receiver<BrokerRpcMsg>,
     blocks_rx: Receiver<ImporterMsg>,
 
-    tracking: HashMap<SocketAddr, HashSet<Bytes32>>,
+    tracking: HashMap<SocketAddr, HashSet<BloomFilter32>>,
 }
 
 impl Broker {

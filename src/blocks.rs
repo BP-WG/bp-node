@@ -25,7 +25,8 @@
 
 use std::collections::HashSet;
 
-use amplify::{ByteArray, Bytes32, FromSliceError};
+use amplify::{ByteArray, FromSliceError};
+use bprpc::BloomFilter32;
 use bpwallet::{Block, BlockHash};
 use crossbeam_channel::{RecvError, SendError, Sender};
 use microservices::USender;
@@ -41,7 +42,7 @@ const NAME: &str = "blockproc";
 pub struct BlockProcessor {
     db: USender<DbMsg>,
     broker: Sender<ImporterMsg>,
-    tracking: HashSet<Bytes32>,
+    tracking: HashSet<BloomFilter32>,
 }
 
 impl BlockProcessor {
@@ -49,9 +50,9 @@ impl BlockProcessor {
         Self { db, tracking: none!(), broker }
     }
 
-    pub fn track(&mut self, filters: Vec<Bytes32>) { self.tracking.extend(filters); }
+    pub fn track(&mut self, filters: Vec<BloomFilter32>) { self.tracking.extend(filters); }
 
-    pub fn untrack(&mut self, filters: Vec<Bytes32>) {
+    pub fn untrack(&mut self, filters: Vec<BloomFilter32>) {
         self.tracking.retain(|filter| !filters.contains(filter));
     }
 

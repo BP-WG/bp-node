@@ -23,14 +23,13 @@
 
 use std::io::{Read, Write};
 
-use amplify::Bytes32;
 use amplify::confinement::{TinyBlob, TinyOrdSet, U24 as U24MAX};
 use netservices::Frame;
 use strict_encoding::{
     DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
 };
 
-use crate::BP_RPC_LIB;
+use crate::{BP_RPC_LIB, BloomFilter32};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
 #[display(UPPERCASE)]
@@ -48,7 +47,7 @@ pub enum Request {
     /// Subscribe to all txid mining status updates matching the provided set of Bloom filters.
     #[display("TRACK_TXIDS")]
     #[strict_type(tag = 0x04)]
-    TrackTxids(TinyOrdSet<Bytes32>),
+    TrackTxids(TinyOrdSet<BloomFilter32>),
 }
 
 impl Frame for Request {

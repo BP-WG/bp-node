@@ -23,7 +23,6 @@
 
 use std::io::{Read, Write};
 
-use amplify::Bytes32;
 use amplify::confinement::{TinyOrdMap, U24 as U24MAX};
 use bpstd::{Block, BlockHash};
 use netservices::Frame;
@@ -32,7 +31,7 @@ use strict_encoding::{
     StrictWriter,
 };
 
-use crate::{AgentInfo, BP_RPC_LIB, Failure};
+use crate::{AgentInfo, BP_RPC_LIB, BloomFilter32, Failure};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
@@ -112,7 +111,7 @@ pub struct FiltersMsg {
     pub height: u32,
     pub timestamp: u32,
     pub block_hash: BlockHash,
-    pub bloom_filters: TinyOrdMap<(u32, u32), Bytes32>,
+    pub bloom_filters: TinyOrdMap<(u32, u32), BloomFilter32>,
 }
 
 impl StrictDumb for FiltersMsg {
