@@ -28,7 +28,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use amplify::{ByteArray, FromSliceError};
 use bprpc::BloomFilter32;
-use bpwallet::{Block, BlockHash, ConsensusDecode, ConsensusEncode};
+use bpwallet::{Block, BlockHash};
 use crossbeam_channel::{RecvError, SendError, Sender};
 use microservices::USender;
 use redb::{CommitError, ReadableTable, ReadableTableMetadata, StorageError, TableError};
@@ -488,9 +488,8 @@ impl BlockProcessor {
                 // Successful processing
                 db.commit()?;
 
-                // After successful processing, check if we have any orphans that depend on this
-                // block
-                self.process_orphans(id)?;
+                // IMPORTANT: No longer calling process_orphans here to avoid recursion
+                // This is now handled by process_block_and_orphans
 
                 // Final log message
                 log::debug!(
@@ -503,6 +502,287 @@ impl BlockProcessor {
                 Ok(count)
             }
         }
+    }
+
+    /// Process a block and all its dependent orphans in an iterative manner to avoid stack
+    /// overflow.
+    ///
+    /// This method should be used instead of directly calling `process_block` when you want to
+    /// ensure that orphan blocks dependent on the processed block are also handled.
+    ///
+    /// # Example
+    /// ```no_run
+    /// let processor = BlockProcessor::new(db, broker);
+    /// // Process a block and its dependent orphans
+    /// processor.process_block_and_orphans(block_hash, block)?;
+    /// ```
+    pub fn process_block_and_orphans(
+        &mut self,
+        id: BlockHash,
+        block: Block,
+    ) -> Result<usize, BlockProcError> {
+        // Create a queue to store blocks that need to be processed
+        // Store (block_hash, block, parent_hash) tuples
+        let mut pending_blocks = std::collections::VecDeque::new();
+        pending_blocks.push_back((id, block, None));
+
+        let mut total_processed = 0;
+
+        // Process blocks in a loop rather than recursive calls
+        while let Some((current_id, current_block, parent_hash)) = pending_blocks.pop_front() {
+            // Process the current block
+            match self.process_block(current_id, current_block) {
+                Ok(count) => {
+                    total_processed += count;
+
+                    // If this was an orphan block (has a parent_hash), remove it from the orphan
+                    // pool
+                    if let Some(parent) = parent_hash {
+                        // Only remove this specific orphan after successful processing
+                        if let Err(e) = self.remove_processed_orphans(parent, &[current_id]) {
+                            log::warn!(
+                                target: NAME,
+                                "Failed to remove processed orphan {}: {}",
+                                current_id,
+                                e
+                            );
+                        } else {
+                            log::info!(
+                                target: NAME,
+                                "Successfully removed processed orphan {} from pool",
+                                current_id
+                            );
+                        }
+                    }
+
+                    // Find orphans that depend on this block
+                    if let Ok(orphans) = self.find_dependent_orphans(current_id) {
+                        // Skip if no orphans found
+                        if !orphans.is_empty() {
+                            // Add them to the queue for processing
+                            for (orphan_id, orphan_block) in orphans {
+                                log::info!(
+                                    target: NAME,
+                                    "Adding orphan block {} to processing queue",
+                                    orphan_id
+                                );
+
+                                // Add to the queue for processing
+                                // Include the parent hash so we can remove it from orphan pool
+                                // after processing
+                                pending_blocks.push_back((
+                                    orphan_id,
+                                    orphan_block,
+                                    Some(current_id),
+                                ));
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    // For orphan blocks, we just continue with the next block
+                    if let BlockProcError::OrphanBlock(_) = e {
+                        log::debug!(
+                            target: NAME,
+                            "Orphan block {} will be processed later when its parent is available",
+                            current_id
+                        );
+                        continue;
+                    }
+
+                    // For other errors, log and return the error
+                    log::error!(
+                        target: NAME,
+                        "Error processing block {}: {}",
+                        current_id,
+                        e
+                    );
+                    return Err(e);
+                }
+            }
+        }
+
+        Ok(total_processed)
+    }
+
+    // Helper method to find orphans that depend on a specific block
+    fn find_dependent_orphans(
+        &self,
+        parent_id: BlockHash,
+    ) -> Result<Vec<(BlockHash, Block)>, BlockProcError> {
+        // First check if we have any orphans that depend on this block
+        let (tx, rx) = crossbeam_channel::bounded(1);
+        self.db.send(DbMsg::Read(tx))?;
+        let db = rx.recv()?;
+
+        // Check orphan parents table
+        let orphan_parents_table = db
+            .open_table(TABLE_ORPHAN_PARENTS)
+            .map_err(|e| BlockProcError::Custom(format!("Orphan parents table error: {}", e)))?;
+
+        let parent_hash = parent_id.to_byte_array();
+        let orphans = orphan_parents_table
+            .get(parent_hash)
+            .map_err(|e| BlockProcError::Custom(format!("Orphan parents lookup error: {}", e)))?;
+
+        // If no orphans depend on this block, return empty list
+        if orphans.is_none() {
+            return Ok(Vec::new());
+        }
+
+        // Get list of orphan block hashes
+        let orphan_hashes = orphans.unwrap().value();
+
+        // Get orphans data
+        let orphans_table = db
+            .open_table(TABLE_ORPHANS)
+            .map_err(|e| BlockProcError::Custom(format!("Orphans table error: {}", e)))?;
+
+        let mut dependent_orphans = Vec::with_capacity(orphan_hashes.len());
+
+        for orphan_hash in &orphan_hashes {
+            // Get the orphan block data
+            if let Some(orphan_block_data) = orphans_table
+                .get(orphan_hash)
+                .map_err(|e| BlockProcError::Custom(format!("Orphan lookup error: {}", e)))?
+            {
+                let (block_data, _timestamp) = orphan_block_data.value();
+
+                // Extract the Block object and create a BlockHash
+                let block = Block::from(block_data);
+                let block_hash = BlockHash::from_byte_array(*orphan_hash);
+                debug_assert_eq!(block.block_hash(), block_hash);
+
+                dependent_orphans.push((block_hash, block));
+
+                log::info!(
+                    target: NAME,
+                    "Found orphan block {} with parent {}",
+                    block_hash,
+                    parent_id
+                );
+            }
+        }
+
+        // We don't remove orphans here - they'll be removed after successful processing
+        if !dependent_orphans.is_empty() {
+            log::info!(
+                target: NAME,
+                "Found {} orphan blocks dependent on block {}",
+                dependent_orphans.len(),
+                parent_id
+            );
+        }
+
+        Ok(dependent_orphans)
+    }
+
+    // Modified to remove orphans after they've been processed
+    fn remove_processed_orphans(
+        &mut self,
+        parent_id: BlockHash,
+        processed: &[BlockHash],
+    ) -> Result<(), BlockProcError> {
+        if processed.is_empty() {
+            return Ok(());
+        }
+
+        let (tx, rx) = crossbeam_channel::bounded(1);
+        self.db.send(DbMsg::Write(tx))?;
+        let write_db = rx.recv()?;
+
+        let remove_orphans = || -> Result<(), BlockProcError> {
+            // Remove from orphan parents table
+            let mut orphan_parents_table =
+                write_db.open_table(TABLE_ORPHAN_PARENTS).map_err(|e| {
+                    BlockProcError::Custom(format!("Orphan parents table error: {}", e))
+                })?;
+
+            // Get the current list of orphans for this parent
+            let parent_hash = parent_id.to_byte_array();
+
+            // Get orphan list and immediately convert to Vec to drop the borrow
+            let orphan_hashes = {
+                let orphans = orphan_parents_table.get(parent_hash).map_err(|e| {
+                    BlockProcError::Custom(format!("Orphan parents lookup error: {}", e))
+                })?;
+
+                if let Some(orphans_record) = orphans {
+                    orphans_record.value().to_vec()
+                } else {
+                    // No orphans found for this parent, nothing to do
+                    return Ok(());
+                }
+            };
+
+            // Filter out processed orphans
+            let remaining_orphans: Vec<[u8; 32]> = orphan_hashes
+                .into_iter()
+                .filter(|h| !processed.iter().any(|p| p.to_byte_array() == *h))
+                .collect();
+
+            // Update or remove the entry
+            if remaining_orphans.is_empty() {
+                orphan_parents_table.remove(parent_hash).map_err(|e| {
+                    BlockProcError::Custom(format!("Orphan parents removal error: {}", e))
+                })?;
+
+                log::debug!(
+                    target: NAME,
+                    "Removed all orphans for parent block {}",
+                    parent_id
+                );
+            } else {
+                orphan_parents_table
+                    .insert(parent_hash, remaining_orphans)
+                    .map_err(|e| BlockProcError::Custom(format!("Parent update error: {}", e)))?;
+
+                log::debug!(
+                    target: NAME,
+                    "Updated orphan list for parent block {}",
+                    parent_id
+                );
+            }
+
+            // Remove from orphans table
+            let mut orphans_table = write_db
+                .open_table(TABLE_ORPHANS)
+                .map_err(|e| BlockProcError::Custom(format!("Orphans table error: {}", e)))?;
+
+            for orphan_hash in processed {
+                orphans_table
+                    .remove(orphan_hash.to_byte_array())
+                    .map_err(|e| BlockProcError::Custom(format!("Orphan removal error: {}", e)))?;
+
+                log::debug!(
+                    target: NAME,
+                    "Removed orphan block {} from orphans table",
+                    orphan_hash
+                );
+            }
+
+            Ok(())
+        };
+
+        if let Err(e) = remove_orphans() {
+            if let Err(err) = write_db.abort() {
+                log::warn!(
+                    target: NAME,
+                    "Unable to abort failed orphan cleanup transaction due to {err}"
+                );
+            }
+            return Err(e);
+        }
+
+        write_db.commit()?;
+
+        log::info!(
+            target: NAME,
+            "Successfully removed {} processed orphan blocks",
+            processed.len()
+        );
+
+        Ok(())
     }
 
     // Save an orphan block for later processing
@@ -598,121 +878,6 @@ impl BlockProcessor {
         Ok(0)
     }
 
-    // Process orphan blocks that depend on a given block
-    fn process_orphans(&mut self, parent_id: BlockHash) -> Result<(), BlockProcError> {
-        // First check if we have any orphans that depend on this block
-        let (tx, rx) = crossbeam_channel::bounded(1);
-        self.db.send(DbMsg::Read(tx))?;
-        let db = rx.recv()?;
-
-        // Check orphan parents table
-        let orphan_parents_table = db
-            .open_table(TABLE_ORPHAN_PARENTS)
-            .map_err(|e| BlockProcError::Custom(format!("Orphan parents table error: {}", e)))?;
-
-        let parent_hash = parent_id.to_byte_array();
-        let orphans = orphan_parents_table
-            .get(parent_hash)
-            .map_err(|e| BlockProcError::Custom(format!("Orphan parents lookup error: {}", e)))?;
-
-        // If no orphans depend on this block, we're done
-        if orphans.is_none() {
-            return Ok(());
-        }
-
-        // Get list of orphan block hashes
-        let orphan_hashes = orphans.unwrap().value().to_vec();
-
-        // Process each orphan block
-        let orphans_table = db
-            .open_table(TABLE_ORPHANS)
-            .map_err(|e| BlockProcError::Custom(format!("Orphans table error: {}", e)))?;
-
-        let mut processed_orphans = Vec::with_capacity(orphan_hashes.len());
-
-        for orphan_hash in &orphan_hashes {
-            // Get the orphan block data
-            if let Some(orphan_block_data) = orphans_table
-                .get(orphan_hash)
-                .map_err(|e| BlockProcError::Custom(format!("Orphan lookup error: {}", e)))?
-            {
-                let (_block_data, _timestamp) = orphan_block_data.value();
-
-                // TODO: Implement
-                todo!();
-                // Track that we processed this orphan
-                processed_orphans.push(orphan_hash.clone());
-            }
-        }
-
-        // Remove processed orphans from the database
-        if !processed_orphans.is_empty() {
-            let (tx, rx) = crossbeam_channel::bounded(1);
-            self.db.send(DbMsg::Write(tx))?;
-            let write_db = rx.recv()?;
-
-            let remove_processed = || -> Result<(), BlockProcError> {
-                // Remove from orphan parents table
-                let mut orphan_parents_table =
-                    write_db.open_table(TABLE_ORPHAN_PARENTS).map_err(|e| {
-                        BlockProcError::Custom(format!("Orphan parents table error: {}", e))
-                    })?;
-
-                // Remove the whole entry if all orphans for this parent were processed
-                if orphan_hashes.len() == processed_orphans.len() {
-                    orphan_parents_table.remove(parent_hash).map_err(|e| {
-                        BlockProcError::Custom(format!("Orphan parents removal error: {}", e))
-                    })?;
-                } else {
-                    // Otherwise, update the list to remove the processed orphans
-                    let remaining_orphans: Vec<[u8; 32]> = orphan_hashes
-                        .into_iter()
-                        .filter(|h| !processed_orphans.contains(&h))
-                        .collect();
-
-                    orphan_parents_table
-                        .insert(parent_hash, remaining_orphans)
-                        .map_err(|e| {
-                            BlockProcError::Custom(format!("Parent update error: {}", e))
-                        })?;
-                }
-
-                // Remove from orphans table
-                let mut orphans_table = write_db
-                    .open_table(TABLE_ORPHANS)
-                    .map_err(|e| BlockProcError::Custom(format!("Orphans table error: {}", e)))?;
-
-                for orphan_hash in &processed_orphans {
-                    orphans_table.remove(*orphan_hash).map_err(|e| {
-                        BlockProcError::Custom(format!("Orphan removal error: {}", e))
-                    })?;
-                }
-
-                Ok(())
-            };
-
-            if let Err(e) = remove_processed() {
-                if let Err(err) = write_db.abort() {
-                    log::warn!(
-                        target: NAME,
-                        "Unable to abort failed orphan cleanup transaction due to {err}"
-                    );
-                };
-                return Err(e);
-            }
-
-            write_db.commit()?;
-
-            log::info!(
-                target: NAME,
-                "Cleaned up {} processed orphan blocks",
-                processed_orphans.len()
-            );
-        }
-
-        Ok(())
-    }
-
     // Count total number of orphan blocks
     fn count_orphans(&self) -> Result<usize, BlockProcError> {
         let (tx, rx) = crossbeam_channel::bounded(1);
@@ -723,51 +888,56 @@ impl BlockProcessor {
             .open_table(TABLE_ORPHANS)
             .map_err(|e| BlockProcError::Custom(format!("Orphans table error: {}", e)))?;
 
-        let count = orphans_table
+        let count: usize = orphans_table
             .len()
-            .map_err(|e| BlockProcError::Custom(format!("Orphans table length error: {}", e)))?;
+            .map_err(|e| BlockProcError::Custom(format!("Failed to count orphans: {}", e)))?
+            as usize;
 
-        Ok(count as usize)
+        Ok(count)
     }
 
-    // Remove expired orphan blocks
+    // Remove orphan blocks that have been in the pool for too long
     fn clean_expired_orphans(&self) -> Result<(), BlockProcError> {
+        log::debug!(target: NAME, "Checking for expired orphan blocks...");
+
+        let (tx, rx) = crossbeam_channel::bounded(1);
+        self.db.send(DbMsg::Read(tx))?;
+        let db = rx.recv()?;
+
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or(Duration::from_secs(0))
             .as_secs();
 
-        let expiry_seconds = ORPHAN_EXPIRY_HOURS * 3600;
+        // Calculate expiry threshold
+        let expiry_secs = ORPHAN_EXPIRY_HOURS * 3600;
+        let expiry_threshold = now.saturating_sub(expiry_secs);
 
-        // First read to find expired orphans
-        let (read_tx, read_rx) = crossbeam_channel::bounded(1);
-        self.db.send(DbMsg::Read(read_tx))?;
-        let read_db = read_rx.recv()?;
-
-        let orphans_table = read_db
+        // Find expired orphans
+        let orphans_table = db
             .open_table(TABLE_ORPHANS)
             .map_err(|e| BlockProcError::Custom(format!("Orphans table error: {}", e)))?;
 
         let mut expired_orphans = Vec::new();
 
+        // Scan all orphans
         let orphans_iter = orphans_table.iter().map_err(|e| {
             BlockProcError::Custom(format!("Failed to iterate orphans table: {}", e))
         })?;
 
-        for entry in orphans_iter {
-            let (hash, data) = entry.map_err(|e| {
+        for orphan_entry in orphans_iter {
+            let (orphan_hash, data) = orphan_entry.map_err(|e| {
                 BlockProcError::Custom(format!("Failed to read orphan entry: {}", e))
             })?;
 
             let (_block_data, timestamp) = data.value();
 
             // Check if orphan has expired
-            if now - timestamp > expiry_seconds {
-                expired_orphans.push(hash.value());
+            if timestamp < expiry_threshold {
+                expired_orphans.push(orphan_hash.value().clone());
             }
         }
 
-        // If we have expired orphans, remove them
         if !expired_orphans.is_empty() {
             log::info!(
                 target: NAME,
