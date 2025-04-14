@@ -27,7 +27,7 @@ use std::path::Path;
 
 use amplify::num::u40;
 use amplify::{ByteArray, FromSliceError};
-use bpwallet::{BlockHeader, ConsensusDecode, ConsensusEncode, Tx};
+use bpwallet::{Block, BlockHeader, ConsensusDecode, ConsensusEncode, Tx};
 use crossbeam_channel::{SendError, Sender};
 use microservices::UService;
 use redb::{
@@ -94,6 +94,9 @@ impl ByteArray<5> for TxNo {
 pub struct DbBlockHeader(#[from] BlockHeader);
 
 #[derive(Wrapper, Clone, Eq, PartialEq, Debug, From)]
+pub struct DbBlock(#[from] Block);
+
+#[derive(Wrapper, Clone, Eq, PartialEq, Debug, From)]
 pub struct DbTx(#[from] Tx);
 
 impl redb::Key for TxNo {
@@ -138,6 +141,25 @@ impl redb::Value for DbBlockHeader {
     }
 
     fn type_name() -> TypeName { TypeName::new("BpNodeBlockHeader") }
+}
+
+impl redb::Value for DbBlock {
+    type SelfType<'a> = Self;
+    type AsBytes<'a> = Vec<u8>;
+
+    fn fixed_width() -> Option<usize> { None }
+
+    fn from_bytes<'a>(data: &'a [u8]) -> Self::SelfType<'a>
+    where Self: 'a {
+        Self(unsafe { Block::consensus_deserialize(data).unwrap_unchecked() })
+    }
+
+    fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>
+    where Self: 'b {
+        value.0.consensus_serialize()
+    }
+
+    fn type_name() -> TypeName { TypeName::new("BpNodeBlock") }
 }
 
 impl redb::Value for DbTx {
@@ -192,7 +214,7 @@ pub const REC_ORPHANS: &str = "orphans";
 pub const TABLE_MAIN: TableDefinition<&'static str, &[u8]> = TableDefinition::new("main");
 
 // Maps block hash to block header
-pub const TABLE_BLKS: TableDefinition<[u8; 32], DbBlockHeader> = TableDefinition::new("blocks");
+pub const TABLE_BLKS: TableDefinition<BlockId, DbBlockHeader> = TableDefinition::new("blocks");
 
 // Maps transaction ID to internal transaction number
 pub const TABLE_TXIDS: TableDefinition<[u8; 32], TxNo> = TableDefinition::new("txids");
@@ -215,8 +237,15 @@ pub const TABLE_UTXOS: TableDefinition<(TxNo, u32), ()> = TableDefinition::new("
 // Maps block height to block ID
 pub const TABLE_HEIGHTS: TableDefinition<u32, BlockId> = TableDefinition::new("block_heights");
 
+// Maps block ID to block height (reverse of TABLE_HEIGHTS)
+pub const TABLE_BLOCK_HEIGHTS: TableDefinition<BlockId, u32> =
+    TableDefinition::new("blockid_height");
+
 // Maps transaction number to the block ID it belongs to
 pub const TABLE_TX_BLOCKS: TableDefinition<TxNo, BlockId> = TableDefinition::new("tx_blocks");
+
+// Maps block ID to all transaction numbers it contains
+pub const TABLE_BLOCK_TXS: TableDefinition<BlockId, Vec<TxNo>> = TableDefinition::new("block_txs");
 
 // Maps transaction input to the output it spends
 pub const TABLE_INPUTS: TableDefinition<(TxNo, u32), (TxNo, u32)> = TableDefinition::new("inputs");
@@ -224,6 +253,16 @@ pub const TABLE_INPUTS: TableDefinition<(TxNo, u32), (TxNo, u32)> = TableDefinit
 // Records UTXOs spent in each block for reorg handling
 pub const TABLE_BLOCK_SPENDS: TableDefinition<BlockId, Vec<(TxNo, u32)>> =
     TableDefinition::new("block_spends");
+
+// Stores orphan blocks (blocks whose parent block is not yet processed)
+// Maps block hash to serialized block data
+pub const TABLE_ORPHANS: TableDefinition<[u8; 32], (DbBlock, u64)> =
+    TableDefinition::new("orphans");
+
+// Maps orphan block's parent hash to orphan block hash
+// This allows quick lookup of orphan blocks when their parent is processed
+pub const TABLE_ORPHAN_PARENTS: TableDefinition<[u8; 32], Vec<[u8; 32]>> =
+    TableDefinition::new("orphan_parents");
 
 // Each BP-Node instance is designed to work with a single blockchain network.
 // If multiple networks need to be indexed, separate instances should be used
