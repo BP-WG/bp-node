@@ -38,9 +38,10 @@ mod blocks;
 pub mod db;
 mod importer;
 
-pub use blocks::{BlockProcError, BlockProcessor, REC_NETWORK};
+pub use blocks::{BlockProcError, BlockProcessor};
 pub use broker::{Broker, BrokerError, BrokerRpcMsg, PATH_INDEXDB, TrackReq};
 pub use config::Config;
+pub use db::REC_NETWORK;
 pub use importer::{BlockImporter, ImporterCmd, ImporterMsg};
 pub use rpc::{RpcCmd, RpcController};
 //pub use query::{QueryWorker, QueryReq, QueryResp};

@@ -41,7 +41,10 @@ pub struct TxNo(u40);
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Display)]
 #[display("#{0:08X}")]
-pub struct BlockId(u32);
+pub struct Id(u32);
+
+pub type BlockId = Id;
+pub type ForkId = Id;
 
 impl TxNo {
     pub fn start() -> Self { TxNo(u40::ZERO) }
@@ -49,9 +52,8 @@ impl TxNo {
     pub fn inc_assign(&mut self) { self.0 += u40::ONE }
 }
 
-impl BlockId {
-    // 0 corresponds to the genesis block, and the height is aligned with other indexers
-    pub fn start() -> Self { BlockId(0) }
+impl Id {
+    pub fn start() -> Self { Id(0) }
 
     pub fn inc_assign(&mut self) { self.0 += 1 }
 
@@ -61,12 +63,12 @@ impl BlockId {
     // Method to get bytes representation
     pub fn to_bytes(&self) -> [u8; 4] { self.0.to_be_bytes() }
 
-    // Method to create BlockId from bytes
+    // Method to create Id from bytes
     pub fn from_bytes(bytes: &[u8]) -> Self {
         debug_assert_eq!(bytes.len(), 4);
         let mut array = [0u8; 4];
         array.copy_from_slice(bytes);
-        BlockId(u32::from_be_bytes(array))
+        Id(u32::from_be_bytes(array))
     }
 }
 
@@ -181,11 +183,11 @@ impl redb::Value for DbTx {
     fn type_name() -> TypeName { TypeName::new("BpNodeTx") }
 }
 
-impl redb::Key for BlockId {
+impl redb::Key for Id {
     fn compare(data1: &[u8], data2: &[u8]) -> Ordering { data1.cmp(data2) }
 }
 
-impl redb::Value for BlockId {
+impl redb::Value for Id {
     type SelfType<'a> = Self;
 
     type AsBytes<'a> = [u8; 4];
@@ -194,7 +196,7 @@ impl redb::Value for BlockId {
 
     fn from_bytes<'a>(data: &'a [u8]) -> Self::SelfType<'a>
     where Self: 'a {
-        BlockId::from_bytes(data)
+        Id::from_bytes(data)
     }
 
     fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>
@@ -209,6 +211,10 @@ pub const REC_TXNO: &str = "txno";
 pub const REC_BLOCKID: &str = "blockid";
 pub const REC_CHAIN: &str = "chain";
 pub const REC_ORPHANS: &str = "orphans";
+// Network information record in main table
+pub const REC_NETWORK: &str = "network";
+// Constants for fork management
+pub const REC_FORK_ID: &str = "forkid";
 
 // Main metadata table storing global counters and states
 pub const TABLE_MAIN: TableDefinition<&'static str, &[u8]> = TableDefinition::new("main");
@@ -250,19 +256,28 @@ pub const TABLE_BLOCK_TXS: TableDefinition<BlockId, Vec<TxNo>> = TableDefinition
 // Maps transaction input to the output it spends
 pub const TABLE_INPUTS: TableDefinition<(TxNo, u32), (TxNo, u32)> = TableDefinition::new("inputs");
 
-// Records UTXOs spent in each block for reorg handling
+// Records all UTXOs spent in each block for potential rollback
 pub const TABLE_BLOCK_SPENDS: TableDefinition<BlockId, Vec<(TxNo, u32)>> =
     TableDefinition::new("block_spends");
 
-// Stores orphan blocks (blocks whose parent block is not yet processed)
-// Maps block hash to serialized block data
+// Stores orphan blocks (blocks received without their parent blocks)
+// Maps block hash to (block data, timestamp)
+// Note: Orphan blocks are not assigned BlockId values because:
+// 1. They are in a temporary state and may never become part of the main chain
+// 2. Many orphans may eventually be discarded when their ancestry is resolved
+// 3. BlockId resources are preserved for blocks that are (or may become) part of the chain
 pub const TABLE_ORPHANS: TableDefinition<[u8; 32], (DbBlock, u64)> =
     TableDefinition::new("orphans");
 
-// Maps orphan block's parent hash to orphan block hash
-// This allows quick lookup of orphan blocks when their parent is processed
+// Maps parent block hash to list of orphan blocks that depend on it
 pub const TABLE_ORPHAN_PARENTS: TableDefinition<[u8; 32], Vec<[u8; 32]>> =
     TableDefinition::new("orphan_parents");
+
+// Tracks blockchain forks - maps fork ID to (fork_start_height, tip_block_id, current_height)
+pub const TABLE_FORKS: TableDefinition<ForkId, (u32, BlockId, u32)> = TableDefinition::new("forks");
+
+// Maps fork tip hash to fork ID for quick lookup
+pub const TABLE_FORK_TIPS: TableDefinition<[u8; 32], ForkId> = TableDefinition::new("fork_tips");
 
 // Each BP-Node instance is designed to work with a single blockchain network.
 // If multiple networks need to be indexed, separate instances should be used

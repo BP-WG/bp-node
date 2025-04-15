@@ -31,20 +31,20 @@ use bprpc::BloomFilter32;
 use bpwallet::{Block, BlockHash};
 use crossbeam_channel::{RecvError, SendError, Sender};
 use microservices::USender;
-use redb::{CommitError, ReadableTable, ReadableTableMetadata, StorageError, TableError};
+use redb::{
+    CommitError, ReadableTable, ReadableTableMetadata, StorageError, TableError, WriteTransaction,
+};
 
 use crate::ImporterMsg;
 use crate::db::{
-    BlockId, DbBlock, DbBlockHeader, DbMsg, DbTx, REC_BLOCKID, REC_TXNO, TABLE_BLKS,
-    TABLE_BLOCK_HEIGHTS, TABLE_BLOCK_SPENDS, TABLE_BLOCK_TXS, TABLE_BLOCKIDS, TABLE_HEIGHTS,
-    TABLE_INPUTS, TABLE_MAIN, TABLE_ORPHAN_PARENTS, TABLE_ORPHANS, TABLE_OUTS, TABLE_SPKS,
-    TABLE_TX_BLOCKS, TABLE_TXES, TABLE_TXIDS, TABLE_UTXOS, TxNo,
+    BlockId, DbBlock, DbBlockHeader, DbMsg, DbTx, ForkId, REC_BLOCKID, REC_FORK_ID, REC_TXNO,
+    TABLE_BLKS, TABLE_BLOCK_HEIGHTS, TABLE_BLOCK_SPENDS, TABLE_BLOCK_TXS, TABLE_BLOCKIDS,
+    TABLE_FORK_TIPS, TABLE_FORKS, TABLE_HEIGHTS, TABLE_INPUTS, TABLE_MAIN, TABLE_ORPHAN_PARENTS,
+    TABLE_ORPHANS, TABLE_OUTS, TABLE_SPKS, TABLE_TX_BLOCKS, TABLE_TXES, TABLE_TXIDS, TABLE_UTXOS,
+    TxNo,
 };
 
 const NAME: &str = "blockproc";
-
-// Network information record in main table
-pub const REC_NETWORK: &str = "network";
 
 // Constants for orphan block management
 const MAX_ORPHAN_BLOCKS: usize = 100;
@@ -110,41 +110,46 @@ impl BlockProcessor {
             .open_table(TABLE_BLOCK_HEIGHTS)
             .map_err(|e| BlockProcError::Custom(format!("Block heights table error: {}", e)))?;
 
-        if let Some(prev_height_record) = block_heights_table
+        let height = block_heights_table
             .get(prev_blockid)
             .map_err(|e| BlockProcError::Custom(format!("Block height lookup error: {}", e)))?
-        {
-            let prev_height = prev_height_record.value();
-            return Ok(prev_height + 1);
-        }
+            .map(|v| {
+                let prev_height = v.value();
+                prev_height + 1
+            })
+            .ok_or_else(|| {
+                BlockProcError::Custom(format!(
+                    "Database inconsistency: Previous block with ID {} found in blockids table \
+                     but not in any height table",
+                    prev_blockid
+                ))
+            })?;
 
-        // If not found in the direct mapping table, check the height -> blockid table
+        // Store block height information
         let heights_table = db
             .open_table(TABLE_HEIGHTS)
             .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
 
-        // Scan the heights table to find the previous block ID
-        let heights_iter = heights_table
-            .iter()
-            .map_err(|e| BlockProcError::Custom(format!("Heights table iterator error: {}", e)))?;
+        // Check if we already have a block at this height
+        if let Some(existing_blockid) = heights_table
+            .get(height)
+            .map_err(|e| BlockProcError::Custom(format!("Heights lookup error: {}", e)))?
+            .map(|v| v.value())
+        {
+            log::warn!(
+                target: NAME,
+                "Detected potential chain fork at height {}: existing block ID {}",
+                height,
+                existing_blockid,
+            );
 
-        for height_entry in heights_iter {
-            let (height, block_id) = height_entry
-                .map_err(|e| BlockProcError::Custom(format!("Heights entry error: {}", e)))?;
-
-            if block_id.value() == prev_blockid {
-                // Previous block's height + 1 is the current block's height
-                return Ok(height.value() + 1);
-            }
+            return Err(BlockProcError::PotentialFork(
+                block.block_hash(),
+                height,
+                existing_blockid,
+            ));
         }
-
-        // If we couldn't find the previous block in either height table,
-        // this is an error condition as the database is in an inconsistent state
-        Err(BlockProcError::Custom(format!(
-            "Database inconsistency: Previous block with ID {} found in blockids table but not in \
-             any height table",
-            prev_blockid
-        )))
+        Ok(height)
     }
 
     pub fn process_block(&mut self, id: BlockHash, block: Block) -> Result<usize, BlockProcError> {
@@ -170,37 +175,13 @@ impl BlockProcessor {
             TxNo::from_slice(rec.value()).map_err(BlockProcError::TxNoInvalid)?
         };
 
-        // Get or create the next block ID
-        let mut blockid = {
-            let main = db
-                .open_table(TABLE_MAIN)
-                .map_err(BlockProcError::MainTable)?;
-            match main
-                .get(REC_BLOCKID)
-                .map_err(|e| BlockProcError::Custom(format!("Block ID lookup error: {}", e)))?
-            {
-                Some(rec) => {
-                    // Parse bytes into BlockId using from_bytes method
-                    BlockId::from_bytes(rec.value())
-                }
-                None => BlockId::start(),
-            }
-        };
-
         let mut count = 0;
         let process = || -> Result<(), BlockProcError> {
             // Calculate the block height based on previous block
-            // This function will also detect orphan blocks
-            let height = match self.calculate_block_height(&block) {
-                Ok(h) => h,
-                Err(BlockProcError::OrphanBlock(_)) => {
-                    // If we detect an orphan block, abort this transaction and save the orphan
-                    return Err(BlockProcError::OrphanBlock(parent_hash));
-                }
-                Err(e) => return Err(e),
-            };
+            // This function will also detect orphan blocks and potential forks
+            let height = self.calculate_block_height(&block)?;
 
-            blockid.inc_assign();
+            let blockid = self.get_next_block_id(&db)?;
 
             // Store block header
             let mut table = db
@@ -226,45 +207,9 @@ impl BlockProcessor {
                 blockid
             );
 
-            // Store block height information
             let mut heights_table = db
                 .open_table(TABLE_HEIGHTS)
-                .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
-
-            // Check if we already have a block at this height
-            if let Some(existing_blockid) = heights_table
-                .get(height)
-                .map_err(|e| BlockProcError::Custom(format!("Heights lookup error: {}", e)))?
-                .map(|v| v.value())
-            {
-                // If different block at this height, we have a potential reorg
-                if existing_blockid != blockid {
-                    log::warn!(
-                        target: NAME,
-                        "Detected potential chain reorganization at height {}: replacing block ID {} with {}",
-                        height,
-                        existing_blockid,
-                        blockid
-                    );
-
-                    // TODO: Implement full reorg handling
-                    // In a single-chain BP-Node instance, reorgs are detected when a different
-                    // block is encountered at the same height. The proper handling would include:
-                    // 1. Finding the common ancestor block
-                    // 2. Rolling back transactions in the old chain branch
-                    // 3. Applying transactions from the new chain branch
-                    // 4. Updating UTXO set accordingly
-
-                    // When implementing reorg, make sure to update both height tables:
-                    // - TABLE_HEIGHTS: height -> blockid mapping
-                    // - TABLE_BLOCK_HEIGHTS: blockid -> height mapping
-
-                    // For now, we'll just overwrite the existing entry
-                    // This simple approach doesn't handle the full reorg properly
-                    // but ensures the database doesn't get into an inconsistent state
-                }
-            }
-
+                .map_err(BlockProcError::HeightsTable)?;
             heights_table
                 .insert(height, blockid)
                 .map_err(|e| BlockProcError::Custom(format!("Heights storage error: {}", e)))?;
@@ -444,10 +389,6 @@ impl BlockProcessor {
             main.insert(REC_TXNO, txno.to_byte_array().as_slice())
                 .map_err(BlockProcError::TxNoUpdate)?;
 
-            // Update block ID counter
-            main.insert(REC_BLOCKID, &blockid.to_bytes().as_slice())
-                .map_err(|e| BlockProcError::Custom(format!("Block ID update error: {}", e)))?;
-
             // Log successful block processing
             log::debug!(
                 target: NAME,
@@ -461,6 +402,18 @@ impl BlockProcessor {
         };
 
         match process() {
+            Ok(()) => {
+                db.commit()?;
+
+                log::debug!(
+                    target: NAME,
+                    "Successfully processed block {} with {} transactions",
+                    id,
+                    count
+                );
+
+                Ok(count)
+            }
             Err(BlockProcError::OrphanBlock(_)) => {
                 // Handle orphan block case
                 if let Err(err) = db.abort() {
@@ -477,29 +430,30 @@ impl BlockProcessor {
 
                 return self.save_orphan_block(id, block_clone);
             }
+            Err(BlockProcError::PotentialFork(new_block_hash, height, existing_blockid)) => {
+                // Handle potential fork case
+                if let Err(err) = db.abort() {
+                    log::warn!(target: NAME, "Unable to abort failed database transaction due to {err}");
+                };
+
+                // Record this as a potential fork for later verification
+                // Store the new block but don't update the height tables yet
+                // We'll only perform a reorganization if this fork becomes the longest chain
+                // TODO: store the new block in the database
+                self.process_potential_fork(id, &block_clone, height, existing_blockid)?;
+
+                return Err(BlockProcError::PotentialFork(
+                    new_block_hash,
+                    height,
+                    existing_blockid,
+                ));
+            }
             Err(e) => {
                 // Handle other errors
                 if let Err(err) = db.abort() {
                     log::warn!(target: NAME, "Unable to abort failed database transaction due to {err}");
                 };
                 return Err(e);
-            }
-            Ok(()) => {
-                // Successful processing
-                db.commit()?;
-
-                // IMPORTANT: No longer calling process_orphans here to avoid recursion
-                // This is now handled by process_block_and_orphans
-
-                // Final log message
-                log::debug!(
-                    target: NAME,
-                    "Successfully processed block {} with {} transactions",
-                    id,
-                    count
-                );
-
-                Ok(count)
             }
         }
     }
@@ -1048,6 +1002,929 @@ impl BlockProcessor {
 
         Ok(())
     }
+
+    /// Process a block that might create a fork in the blockchain.
+    /// This method records fork information and checks if we need to perform a chain
+    /// reorganization.
+    fn process_potential_fork(
+        &mut self,
+        block_hash: BlockHash,
+        block: &Block,
+        height: u32,
+        existing_blockid: BlockId,
+    ) -> Result<(), BlockProcError> {
+        let (tx, rx) = crossbeam_channel::bounded(1);
+        self.db.send(DbMsg::Write(tx))?;
+        let db = rx.recv()?;
+
+        let new_blockid = self.get_next_block_id(&db)?;
+        // First, check if this block is extending an existing fork
+        let fork_id = if let Some(parent_fork_id) =
+            self.find_fork_by_block_hash(&db, block.header.prev_block_hash)?
+        {
+            // This block extends an existing fork
+            log::info!(
+                target: NAME,
+                "Block {} at height {} extends existing fork {}",
+                block_hash,
+                height,
+                parent_fork_id
+            );
+
+            // Update the fork with this new block
+            self.update_fork(&db, parent_fork_id, height, new_blockid, block_hash)?;
+
+            parent_fork_id
+        } else {
+            // This block might start a new fork
+            // First check if its parent is in the main chain
+            if self.is_block_in_main_chain(&db, block.header.prev_block_hash)? {
+                // Create a new fork
+                let new_fork_id = match self.record_fork(
+                    &db,
+                    height,
+                    existing_blockid,
+                    new_blockid,
+                    block_hash,
+                )? {
+                    Some(id) => id,
+                    None => {
+                        // This shouldn't happen, but handle it gracefully
+                        log::warn!(
+                            target: NAME,
+                            "Failed to create new fork for block {} at height {}",
+                            block_hash,
+                            height
+                        );
+                        return Ok(());
+                    }
+                };
+
+                new_fork_id
+            } else {
+                // Parent is not in main chain and not in a known fork
+                // This could be an orphan or invalid block
+                log::warn!(
+                    target: NAME,
+                    "Block {} at height {} is disconnected: parent {} not found in main chain or forks",
+                    block_hash,
+                    height,
+                    block.header.prev_block_hash
+                );
+                return Ok(());
+            }
+        };
+
+        // Check if this fork is now longer than the main chain
+        self.check_fork_length(&db, fork_id)?;
+
+        db.commit()?;
+
+        Ok(())
+    }
+
+    /// Check if a fork is longer than the main chain and perform reorganization if needed
+    fn check_fork_length(
+        &mut self,
+        db: &WriteTransaction,
+        fork_id: ForkId,
+    ) -> Result<(), BlockProcError> {
+        // Get fork information
+        let forks_table = db
+            .open_table(TABLE_FORKS)
+            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
+
+        let fork_info = match forks_table
+            .get(fork_id)
+            .map_err(|e| BlockProcError::Custom(format!("Fork lookup error: {}", e)))?
+        {
+            Some(record) => record.value(),
+            None => {
+                return Err(BlockProcError::Custom(format!(
+                    "Fork {} not found in database",
+                    fork_id
+                )));
+            }
+        };
+
+        let (_fork_start_height, _fork_tip_id, fork_height) = fork_info;
+
+        // Get main chain height
+        let main_chain_height = self.get_main_chain_height(db)?;
+
+        // If fork is longer than main chain, perform reorganization
+        if fork_height > main_chain_height {
+            log::info!(
+                target: NAME,
+                "Fork {} is longer than main chain ({} > {}), initiating chain reorganization",
+                fork_id,
+                fork_height,
+                main_chain_height
+            );
+
+            // Perform chain reorganization
+            self.perform_chain_reorganization(db, fork_id)?;
+        } else {
+            log::debug!(
+                target: NAME,
+                "Fork {} is not longer than main chain ({} <= {}), no reorganization needed",
+                fork_id,
+                fork_height,
+                main_chain_height
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Perform a chain reorganization to adopt a fork as the new main chain
+    fn perform_chain_reorganization(
+        &mut self,
+        db: &WriteTransaction,
+        fork_id: ForkId,
+    ) -> Result<(), BlockProcError> {
+        // Get fork information
+        let forks_table = db
+            .open_table(TABLE_FORKS)
+            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
+
+        let fork_info = match forks_table
+            .get(fork_id)
+            .map_err(|e| BlockProcError::Custom(format!("Fork lookup error: {}", e)))?
+        {
+            Some(record) => record.value(),
+            None => {
+                return Err(BlockProcError::Custom(format!(
+                    "Fork {} not found in database",
+                    fork_id
+                )));
+            }
+        };
+
+        let (fork_start_height, fork_tip_id, fork_height) = fork_info;
+
+        log::info!(
+            target: NAME,
+            "Starting chain reorganization: Fork {} from height {} to {} with tip block {}",
+            fork_id,
+            fork_start_height,
+            fork_height,
+            fork_tip_id
+        );
+
+        // 1. Find the common ancestor (could be the fork_start_height - 1)
+        let common_ancestor_height = fork_start_height;
+
+        // 2. Get blocks to rollback from main chain
+        let main_chain_height = self.get_main_chain_height(db)?;
+        let blocks_to_rollback =
+            self.get_blocks_to_rollback(db, common_ancestor_height, main_chain_height)?;
+
+        // 3. Get blocks to apply from fork chain
+        let blocks_to_apply =
+            self.get_blocks_to_apply(db, fork_id, common_ancestor_height, fork_height)?;
+
+        log::info!(
+            target: NAME,
+            "Chain reorganization: rolling back {} blocks and applying {} blocks",
+            blocks_to_rollback.len(),
+            blocks_to_apply.len()
+        );
+
+        // 4. Roll back blocks from main chain
+        self.rollback_blocks(db, &blocks_to_rollback)?;
+
+        // 5. Apply blocks from fork chain
+        self.apply_blocks(db, &blocks_to_apply)?;
+
+        // 6. Update fork status
+        self.cleanup_after_reorg(db, fork_id)?;
+
+        log::info!(
+            target: NAME,
+            "Chain reorganization complete: new chain height is {}",
+            fork_height
+        );
+
+        Ok(())
+    }
+
+    /// Records a potential fork in the blockchain.
+    /// This happens when we discover two different blocks at the same height.
+    fn record_fork(
+        &self,
+        db: &WriteTransaction,
+        height: u32,
+        existing_blockid: BlockId,
+        new_blockid: BlockId,
+        new_block_hash: BlockHash,
+    ) -> Result<Option<ForkId>, BlockProcError> {
+        // Check if this block is already part of a known fork
+        if let Some(fork_id) = self.find_fork_by_block_hash(db, new_block_hash)? {
+            log::debug!(
+                target: NAME,
+                "Block {} at height {} is already part of fork {}",
+                new_block_hash,
+                height,
+                fork_id
+            );
+            return Ok(None);
+        }
+
+        // Generate a new fork ID
+        let fork_id = self.get_next_fork_id(db)?;
+
+        // Record the fork in the forks table
+        let mut forks_table = db
+            .open_table(TABLE_FORKS)
+            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
+
+        // A fork starts at the current height
+        forks_table
+            .insert(fork_id, (height, new_blockid, height))
+            .map_err(|e| BlockProcError::Custom(format!("Fork insertion error: {}", e)))?;
+
+        // Map the fork tip hash to the fork ID
+        let mut fork_tips_table = db
+            .open_table(TABLE_FORK_TIPS)
+            .map_err(|e| BlockProcError::Custom(format!("Fork tips table error: {}", e)))?;
+
+        fork_tips_table
+            .insert(new_block_hash.to_byte_array(), fork_id)
+            .map_err(|e| BlockProcError::Custom(format!("Fork tip mapping error: {}", e)))?;
+
+        log::info!(
+            target: NAME,
+            "Created new fork {} at height {}: Main chain block {} vs Fork block {}",
+            fork_id,
+            height,
+            existing_blockid,
+            new_blockid
+        );
+
+        Ok(Some(fork_id))
+    }
+
+    /// Gets the next available block ID and increments the counter
+    fn get_next_block_id(&self, db: &WriteTransaction) -> Result<BlockId, BlockProcError> {
+        let mut main = db
+            .open_table(TABLE_MAIN)
+            .map_err(BlockProcError::MainTable)?;
+        let mut block_id = match main
+            .get(REC_BLOCKID)
+            .map_err(|e| BlockProcError::Custom(format!("Block ID lookup error: {}", e)))?
+        {
+            Some(rec) => BlockId::from_bytes(rec.value()),
+            None => BlockId::start(),
+        };
+
+        block_id.inc_assign();
+        main.insert(REC_BLOCKID, block_id.to_bytes().as_slice())
+            .map_err(|e| BlockProcError::Custom(format!("Block ID update error: {}", e)))?;
+
+        Ok(block_id)
+    }
+
+    /// Gets the next available fork ID and increments the counter
+    fn get_next_fork_id(&self, db: &WriteTransaction) -> Result<ForkId, BlockProcError> {
+        let mut main = db
+            .open_table(TABLE_MAIN)
+            .map_err(BlockProcError::MainTable)?;
+
+        let mut fork_id = {
+            match main
+                .get(REC_FORK_ID)
+                .map_err(|e| BlockProcError::Custom(format!("Fork ID lookup error: {}", e)))?
+            {
+                Some(rec) => ForkId::from_bytes(rec.value()),
+                None => ForkId::start(),
+            }
+        };
+        fork_id.inc_assign();
+        main.insert(REC_FORK_ID, fork_id.to_bytes().as_slice())
+            .map_err(|e| BlockProcError::Custom(format!("Fork ID update error: {}", e)))?;
+
+        Ok(fork_id)
+    }
+
+    /// Find fork ID by block hash
+    fn find_fork_by_block_hash(
+        &self,
+        db: &WriteTransaction,
+        block_hash: BlockHash,
+    ) -> Result<Option<ForkId>, BlockProcError> {
+        let fork_tips_table = db
+            .open_table(TABLE_FORK_TIPS)
+            .map_err(|e| BlockProcError::Custom(format!("Fork tips table error: {}", e)))?;
+
+        if let Some(fork_id_record) = fork_tips_table
+            .get(block_hash.to_byte_array())
+            .map_err(|e| BlockProcError::Custom(format!("Fork tip lookup error: {}", e)))?
+        {
+            return Ok(Some(fork_id_record.value()));
+        }
+
+        Ok(None)
+    }
+
+    /// Update fork information with a new block
+    fn update_fork(
+        &self,
+        db: &WriteTransaction,
+        fork_id: ForkId,
+        new_height: u32,
+        new_block_id: BlockId,
+        new_block_hash: BlockHash,
+    ) -> Result<(), BlockProcError> {
+        // Update the fork record
+        let mut forks_table = db
+            .open_table(TABLE_FORKS)
+            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
+
+        // Get current fork info
+        let fork_info = match forks_table
+            .get(fork_id)
+            .map_err(|e| BlockProcError::Custom(format!("Fork lookup error: {}", e)))?
+        {
+            Some(record) => record.value(),
+            None => {
+                return Err(BlockProcError::Custom(format!(
+                    "Fork {} not found in database",
+                    fork_id
+                )));
+            }
+        };
+
+        let (start_height, _old_tip_id, _old_height) = fork_info;
+
+        // Update fork with new tip and height
+        forks_table
+            .insert(fork_id, (start_height, new_block_id, new_height))
+            .map_err(|e| BlockProcError::Custom(format!("Fork update error: {}", e)))?;
+
+        // Update the fork tip mapping
+        let mut fork_tips_table = db
+            .open_table(TABLE_FORK_TIPS)
+            .map_err(|e| BlockProcError::Custom(format!("Fork tips table error: {}", e)))?;
+
+        // Remove old tip mapping if it exists (need to look it up first)
+        if let Some(old_tip_hash) = self.find_fork_tip_hash(db, fork_id)? {
+            fork_tips_table
+                .remove(old_tip_hash.to_byte_array())
+                .map_err(|e| BlockProcError::Custom(format!("Fork tip removal error: {}", e)))?;
+        }
+
+        // Add new tip mapping
+        fork_tips_table
+            .insert(new_block_hash.to_byte_array(), fork_id)
+            .map_err(|e| BlockProcError::Custom(format!("Fork tip mapping error: {}", e)))?;
+
+        log::debug!(
+            target: NAME,
+            "Updated fork {}: new height {}, new tip {}",
+            fork_id,
+            new_height,
+            new_block_id
+        );
+
+        Ok(())
+    }
+
+    /// Find the hash of a fork's tip block
+    fn find_fork_tip_hash(
+        &self,
+        db: &WriteTransaction,
+        fork_id: ForkId,
+    ) -> Result<Option<BlockHash>, BlockProcError> {
+        // Get fork info
+        let forks_table = db
+            .open_table(TABLE_FORKS)
+            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
+
+        if let Some(fork_record) = forks_table
+            .get(fork_id)
+            .map_err(|e| BlockProcError::Custom(format!("Fork lookup error: {}", e)))?
+        {
+            let (_start_height, tip_id, _height) = fork_record.value();
+
+            // Find the block hash for this block ID
+            // This requires iterating through the blockids table
+            let blockids_table = db
+                .open_table(TABLE_BLOCKIDS)
+                .map_err(|e| BlockProcError::Custom(format!("Block IDs table error: {}", e)))?;
+
+            let iter = blockids_table
+                .iter()
+                .map_err(|e| BlockProcError::Custom(format!("Block IDs iterator error: {}", e)))?;
+
+            for entry in iter {
+                let (hash, id) = entry
+                    .map_err(|e| BlockProcError::Custom(format!("Block ID entry error: {}", e)))?;
+
+                if id.value() == tip_id {
+                    // Found the block hash
+                    let mut hash_array = [0u8; 32];
+                    hash_array.copy_from_slice(hash.value().as_slice());
+                    return Ok(Some(BlockHash::from_byte_array(hash_array)));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Get the current height of the main chain
+    fn get_main_chain_height(&self, db: &WriteTransaction) -> Result<u32, BlockProcError> {
+        // Find the maximum height in the heights table
+        let heights_table = db
+            .open_table(TABLE_HEIGHTS)
+            .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
+
+        let mut max_height = 0;
+        let iter = heights_table
+            .iter()
+            .map_err(|e| BlockProcError::Custom(format!("Heights iterator error: {}", e)))?;
+
+        for entry in iter {
+            let (height, _) =
+                entry.map_err(|e| BlockProcError::Custom(format!("Heights entry error: {}", e)))?;
+
+            let h = height.value();
+            if h > max_height {
+                max_height = h;
+            }
+        }
+
+        Ok(max_height)
+    }
+
+    /// Check if a block with the given hash is in the main chain
+    fn is_block_in_main_chain(
+        &self,
+        db: &WriteTransaction,
+        block_hash: BlockHash,
+    ) -> Result<bool, BlockProcError> {
+        // Look up the block ID
+        let blockids_table = db
+            .open_table(TABLE_BLOCKIDS)
+            .map_err(|e| BlockProcError::Custom(format!("Block IDs table error: {}", e)))?;
+
+        let block_id = match blockids_table
+            .get(block_hash.to_byte_array())
+            .map_err(|e| BlockProcError::Custom(format!("Block ID lookup error: {}", e)))?
+        {
+            Some(id_record) => id_record.value(),
+            None => return Ok(false), // Block not found
+        };
+
+        // Check if this block ID has a height entry
+        let block_heights_table = db
+            .open_table(TABLE_BLOCK_HEIGHTS)
+            .map_err(|e| BlockProcError::Custom(format!("Block heights table error: {}", e)))?;
+
+        if block_heights_table
+            .get(block_id)
+            .map_err(|e| BlockProcError::Custom(format!("Block height lookup error: {}", e)))?
+            .is_some()
+        {
+            return Ok(true); // Block has a height, so it's in the main chain
+        }
+
+        Ok(false)
+    }
+
+    /// Get blocks that need to be rolled back from the main chain
+    /// Returns a list of (height, block_id) pairs, from highest to lowest height
+    fn get_blocks_to_rollback(
+        &self,
+        db: &WriteTransaction,
+        start_height: u32,
+        end_height: u32,
+    ) -> Result<Vec<(u32, BlockId)>, BlockProcError> {
+        let mut blocks_to_rollback = Vec::new();
+
+        // We need to roll back from highest to lowest height
+        for height in (start_height..=end_height).rev() {
+            let heights_table = db
+                .open_table(TABLE_HEIGHTS)
+                .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
+
+            if let Some(block_id_record) = heights_table
+                .get(height)
+                .map_err(|e| BlockProcError::Custom(format!("Heights lookup error: {}", e)))?
+            {
+                blocks_to_rollback.push((height, block_id_record.value()));
+            }
+        }
+
+        log::debug!(
+            target: NAME,
+            "Found {} blocks to roll back from heights {} to {}",
+            blocks_to_rollback.len(),
+            start_height,
+            end_height
+        );
+
+        Ok(blocks_to_rollback)
+    }
+
+    /// Get blocks that need to be applied from the fork chain
+    /// Returns a list of (height, block_id) pairs, from lowest to highest height
+    fn get_blocks_to_apply(
+        &self,
+        db: &WriteTransaction,
+        fork_id: ForkId,
+        start_height: u32,
+        end_height: u32,
+    ) -> Result<Vec<(u32, BlockId)>, BlockProcError> {
+        let mut blocks_to_apply = Vec::new();
+
+        // Find the blocks in the fork that need to be applied
+        // This is more complex as fork blocks aren't in the heights table yet
+
+        // Get the tip block ID of the fork
+        let forks_table = db
+            .open_table(TABLE_FORKS)
+            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
+
+        let fork_info = match forks_table
+            .get(fork_id)
+            .map_err(|e| BlockProcError::Custom(format!("Fork lookup error: {}", e)))?
+        {
+            Some(record) => record.value(),
+            None => {
+                return Err(BlockProcError::Custom(format!(
+                    "Fork {} not found in database",
+                    fork_id
+                )));
+            }
+        };
+
+        let (_fork_start_height, fork_tip_id, fork_height) = fork_info;
+
+        // We need to find all blocks from the tip down to the start height
+        // Since they're not yet in the heights table, we need to traverse backwards
+
+        // Start with the tip block
+        let mut current_height = fork_height;
+        let mut current_block_id = fork_tip_id;
+
+        // Collect blocks (from high to low)
+        let mut temp_blocks = Vec::new();
+
+        while current_height >= start_height {
+            temp_blocks.push((current_height, current_block_id));
+
+            if current_height == start_height {
+                break;
+            }
+
+            // Find the parent of this block
+            let blks_table = db
+                .open_table(TABLE_BLKS)
+                .map_err(|e| BlockProcError::Custom(format!("Blocks table error: {}", e)))?;
+
+            let block_header = match blks_table
+                .get(current_block_id)
+                .map_err(|e| BlockProcError::Custom(format!("Block lookup error: {}", e)))?
+            {
+                Some(record) => record.value(),
+                None => {
+                    return Err(BlockProcError::Custom(format!(
+                        "Block with ID {} not found in database",
+                        current_block_id
+                    )));
+                }
+            };
+
+            let prev_hash = block_header.as_ref().prev_block_hash;
+
+            // Find the block ID for this hash
+            let blockids_table = db
+                .open_table(TABLE_BLOCKIDS)
+                .map_err(|e| BlockProcError::Custom(format!("Block IDs table error: {}", e)))?;
+
+            let prev_block_id = match blockids_table
+                .get(prev_hash.to_byte_array())
+                .map_err(|e| BlockProcError::Custom(format!("Block ID lookup error: {}", e)))?
+            {
+                Some(record) => record.value(),
+                None => {
+                    return Err(BlockProcError::Custom(format!(
+                        "Previous block with hash {} not found in database",
+                        prev_hash
+                    )));
+                }
+            };
+
+            current_block_id = prev_block_id;
+            current_height -= 1;
+        }
+
+        // Reverse to get blocks from low to high
+        blocks_to_apply = temp_blocks.into_iter().rev().collect();
+
+        log::debug!(
+            target: NAME,
+            "Found {} blocks to apply from heights {} to {}",
+            blocks_to_apply.len(),
+            start_height,
+            end_height
+        );
+
+        Ok(blocks_to_apply)
+    }
+
+    /// Roll back blocks from the main chain
+    fn rollback_blocks(
+        &self,
+        db: &WriteTransaction,
+        blocks: &[(u32, BlockId)],
+    ) -> Result<(), BlockProcError> {
+        if blocks.is_empty() {
+            return Ok(());
+        }
+
+        // Iterate through blocks to roll back (should be in descending height order)
+        for &(height, block_id) in blocks {
+            log::info!(
+                target: NAME,
+                "Rolling back block at height {}: block ID {}",
+                height,
+                block_id
+            );
+
+            // 1. Restore UTXOs spent in this block
+            let block_spends_table = db
+                .open_table(TABLE_BLOCK_SPENDS)
+                .map_err(|e| BlockProcError::Custom(format!("Block spends table error: {}", e)))?;
+
+            if let Some(spends_record) = block_spends_table
+                .get(block_id)
+                .map_err(|e| BlockProcError::Custom(format!("Block spends lookup error: {}", e)))?
+            {
+                let spends = spends_record.value();
+
+                // Restore each spent UTXO
+                let mut utxos_table = db
+                    .open_table(TABLE_UTXOS)
+                    .map_err(|e| BlockProcError::Custom(format!("UTXOs table error: {}", e)))?;
+
+                for (txno, vout) in spends {
+                    utxos_table.insert((txno, vout), ()).map_err(|e| {
+                        BlockProcError::Custom(format!("UTXO restoration error: {}", e))
+                    })?;
+
+                    log::debug!(
+                        target: NAME,
+                        "Restored UTXO: txno={}, vout={}",
+                        txno,
+                        vout
+                    );
+                }
+            }
+
+            // 2. Find all transactions in this block
+            let block_txs_table = db
+                .open_table(TABLE_BLOCK_TXS)
+                .map_err(|e| BlockProcError::Custom(format!("Block-txs table error: {}", e)))?;
+
+            if let Some(txs_record) = block_txs_table
+                .get(block_id)
+                .map_err(|e| BlockProcError::Custom(format!("Block-txs lookup error: {}", e)))?
+            {
+                let txs = txs_record.value();
+
+                // For each transaction
+                for txno in txs {
+                    // 3. Remove UTXOs created by this transaction
+                    let txes_table = db
+                        .open_table(TABLE_TXES)
+                        .map_err(|e| BlockProcError::Custom(format!("Txes table error: {}", e)))?;
+
+                    if let Some(tx_record) = txes_table
+                        .get(txno)
+                        .map_err(|e| BlockProcError::Custom(format!("Tx lookup error: {}", e)))?
+                    {
+                        let tx = tx_record.value();
+                        let num_outputs = tx.as_ref().outputs.len();
+
+                        let mut utxos_table = db.open_table(TABLE_UTXOS).map_err(|e| {
+                            BlockProcError::Custom(format!("UTXOs table error: {}", e))
+                        })?;
+
+                        for vout in 0..num_outputs {
+                            utxos_table.remove(&(txno, vout as u32)).map_err(|e| {
+                                BlockProcError::Custom(format!("UTXO removal error: {}", e))
+                            })?;
+
+                            log::debug!(
+                                target: NAME,
+                                "Removed UTXO: txno={}, vout={}",
+                                txno,
+                                vout
+                            );
+                        }
+                    }
+                }
+            }
+
+            // 4. Remove this block from the heights tables
+            let mut heights_table = db
+                .open_table(TABLE_HEIGHTS)
+                .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
+
+            heights_table
+                .remove(height)
+                .map_err(|e| BlockProcError::Custom(format!("Heights removal error: {}", e)))?;
+
+            let mut block_heights_table = db
+                .open_table(TABLE_BLOCK_HEIGHTS)
+                .map_err(|e| BlockProcError::Custom(format!("Block heights table error: {}", e)))?;
+
+            block_heights_table.remove(block_id).map_err(|e| {
+                BlockProcError::Custom(format!("Block height removal error: {}", e))
+            })?;
+
+            log::debug!(
+                target: NAME,
+                "Removed block height mapping for height {} and block ID {}",
+                height,
+                block_id
+            );
+        }
+
+        log::info!(
+            target: NAME,
+            "Successfully rolled back {} blocks",
+            blocks.len()
+        );
+
+        Ok(())
+    }
+
+    /// Apply blocks from the fork chain to make it the new main chain
+    fn apply_blocks(
+        &self,
+        db: &WriteTransaction,
+        blocks: &[(u32, BlockId)],
+    ) -> Result<(), BlockProcError> {
+        if blocks.is_empty() {
+            return Ok(());
+        }
+
+        // Iterate through blocks to apply (should be in ascending height order)
+        for &(height, block_id) in blocks {
+            log::info!(
+                target: NAME,
+                "Applying block at height {}: block ID {}",
+                height,
+                block_id
+            );
+
+            // Update the heights tables
+            let mut heights_table = db
+                .open_table(TABLE_HEIGHTS)
+                .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
+
+            heights_table
+                .insert(height, block_id)
+                .map_err(|e| BlockProcError::Custom(format!("Heights storage error: {}", e)))?;
+
+            let mut block_heights_table = db
+                .open_table(TABLE_BLOCK_HEIGHTS)
+                .map_err(|e| BlockProcError::Custom(format!("Block heights table error: {}", e)))?;
+
+            block_heights_table.insert(block_id, height).map_err(|e| {
+                BlockProcError::Custom(format!("Block height storage error: {}", e))
+            })?;
+
+            log::debug!(
+                target: NAME,
+                "Updated block height mapping for height {} and block ID {}",
+                height,
+                block_id
+            );
+        }
+
+        log::info!(
+            target: NAME,
+            "Successfully applied {} blocks",
+            blocks.len()
+        );
+
+        Ok(())
+    }
+
+    /// Clean up fork information after a successful reorganization
+    fn cleanup_after_reorg(
+        &self,
+        db: &WriteTransaction,
+        applied_fork_id: ForkId,
+    ) -> Result<(), BlockProcError> {
+        // Get information about the applied fork
+        let forks_table = db
+            .open_table(TABLE_FORKS)
+            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
+
+        let fork_info = match forks_table
+            .get(applied_fork_id)
+            .map_err(|e| BlockProcError::Custom(format!("Fork lookup error: {}", e)))?
+        {
+            Some(record) => record.value(),
+            None => {
+                // Fork already removed, nothing to do
+                return Ok(());
+            }
+        };
+
+        let (_start_height, _tip_id, fork_height) = fork_info;
+
+        // Remove old forks that are now definitely invalid
+        // Any fork that starts at a height less than the applied fork's height
+        // and has not become the main chain by now should be removed
+
+        let iter = forks_table
+            .iter()
+            .map_err(|e| BlockProcError::Custom(format!("Forks iterator error: {}", e)))?;
+
+        let mut forks_to_remove = Vec::new();
+
+        for entry in iter {
+            let (fork_id, info) =
+                entry.map_err(|e| BlockProcError::Custom(format!("Fork entry error: {}", e)))?;
+
+            let fork_id_value = fork_id.value();
+
+            // Skip the fork that was just applied
+            if fork_id_value == applied_fork_id {
+                continue;
+            }
+
+            let (start_height, _tip_id, current_height) = info.value();
+
+            // If this fork is left behind the main chain, remove it
+            if start_height < fork_height && current_height <= fork_height {
+                forks_to_remove.push(fork_id_value);
+            }
+        }
+
+        // Now remove the outdated forks
+        let mut forks_table = db
+            .open_table(TABLE_FORKS)
+            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
+
+        for fork_id in &forks_to_remove {
+            // Find and remove the tip hash for this fork
+            if let Some(tip_hash) = self.find_fork_tip_hash(db, *fork_id)? {
+                let mut fork_tips_table = db
+                    .open_table(TABLE_FORK_TIPS)
+                    .map_err(|e| BlockProcError::Custom(format!("Fork tips table error: {}", e)))?;
+
+                fork_tips_table
+                    .remove(tip_hash.to_byte_array())
+                    .map_err(|e| {
+                        BlockProcError::Custom(format!("Fork tip removal error: {}", e))
+                    })?;
+            }
+
+            // Remove the fork entry
+            forks_table
+                .remove(*fork_id)
+                .map_err(|e| BlockProcError::Custom(format!("Fork removal error: {}", e)))?;
+
+            log::info!(
+                target: NAME,
+                "Removed obsolete fork {} after reorganization",
+                fork_id
+            );
+        }
+
+        // Finally, remove the applied fork as well
+        // Remove the tip hash mapping
+        if let Some(tip_hash) = self.find_fork_tip_hash(db, applied_fork_id)? {
+            let mut fork_tips_table = db
+                .open_table(TABLE_FORK_TIPS)
+                .map_err(|e| BlockProcError::Custom(format!("Fork tips table error: {}", e)))?;
+
+            fork_tips_table
+                .remove(tip_hash.to_byte_array())
+                .map_err(|e| BlockProcError::Custom(format!("Fork tip removal error: {}", e)))?;
+        }
+
+        // Remove the fork entry
+        forks_table
+            .remove(applied_fork_id)
+            .map_err(|e| BlockProcError::Custom(format!("Fork removal error: {}", e)))?;
+
+        log::info!(
+            target: NAME,
+            "Removed applied fork {} after successful reorganization",
+            applied_fork_id
+        );
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Display, Error, From)]
@@ -1084,6 +1961,9 @@ pub enum BlockProcError {
     /// Unable to open blocks table: {0}
     BlockTable(TableError),
 
+    /// Unable to open heights table: {0}
+    HeightsTable(TableError),
+
     /// Unable to write to blocks table: {0}
     BlockStorage(StorageError),
 
@@ -1107,6 +1987,9 @@ pub enum BlockProcError {
 
     /// Orphan block detected: parent block {0} not found
     OrphanBlock(BlockHash),
+
+    /// Potential fork detected: new block {0} at height {1} conflicts with existing block {2}
+    PotentialFork(BlockHash, u32, BlockId),
 
     /// Custom error: {0}
     Custom(String),
