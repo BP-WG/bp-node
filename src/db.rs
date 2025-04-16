@@ -273,11 +273,19 @@ pub const TABLE_ORPHANS: TableDefinition<[u8; 32], (DbBlock, u64)> =
 pub const TABLE_ORPHAN_PARENTS: TableDefinition<[u8; 32], Vec<[u8; 32]>> =
     TableDefinition::new("orphan_parents");
 
-// Tracks blockchain forks - maps fork ID to (fork_start_height, tip_block_id, current_height)
-pub const TABLE_FORKS: TableDefinition<ForkId, (u32, BlockId, u32)> = TableDefinition::new("forks");
+// Tracks blockchain forks - maps fork ID to (fork_start_height, fork_start_block_id, tip_block_id,
+// current_height)
+pub const TABLE_FORKS: TableDefinition<ForkId, (u32, BlockId, BlockId, u32)> =
+    TableDefinition::new("forks");
 
-// Maps fork tip hash to fork ID for quick lookup
-pub const TABLE_FORK_TIPS: TableDefinition<[u8; 32], ForkId> = TableDefinition::new("fork_tips");
+// Maps fork tip block ID to fork ID for quick lookup
+pub const TABLE_FORK_TIPS: TableDefinition<BlockId, ForkId> = TableDefinition::new("fork_tips");
+
+// Stores complete block data for fork blocks
+// This allows us to access the full block content when performing chain reorganization
+// Fork blocks are stored with their assigned BlockId like main chain blocks
+pub const TABLE_FORK_BLOCKS: TableDefinition<BlockId, DbBlock> =
+    TableDefinition::new("fork_blocks");
 
 // Each BP-Node instance is designed to work with a single blockchain network.
 // If multiple networks need to be indexed, separate instances should be used
