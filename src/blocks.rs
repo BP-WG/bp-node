@@ -190,11 +190,15 @@ impl BlockProcessor {
             let main = db
                 .open_table(TABLE_MAIN)
                 .map_err(BlockProcError::MainTable)?;
-            let rec = main
-                .get(REC_TXNO)
-                .map_err(BlockProcError::TxNoAbsent)?
-                .unwrap();
-            TxNo::from_slice(rec.value()).map_err(BlockProcError::TxNoInvalid)?
+
+            // Get current transaction number or use starting value if not found
+            match main.get(REC_TXNO).map_err(BlockProcError::TxNoAbsent)? {
+                Some(rec) => TxNo::from_slice(rec.value()).map_err(BlockProcError::TxNoInvalid)?,
+                None => {
+                    log::debug!(target: NAME, "No transaction counter found, starting from zero");
+                    TxNo::start()
+                }
+            }
         };
 
         let mut count = 0;
@@ -1811,11 +1815,14 @@ impl BlockProcessor {
             let main = db
                 .open_table(TABLE_MAIN)
                 .map_err(BlockProcError::MainTable)?;
-            let rec = main
-                .get(REC_TXNO)
-                .map_err(BlockProcError::TxNoAbsent)?
-                .unwrap();
-            TxNo::from_slice(rec.value()).map_err(BlockProcError::TxNoInvalid)?
+            // Get current transaction number or use starting value if not found
+            match main.get(REC_TXNO).map_err(BlockProcError::TxNoAbsent)? {
+                Some(rec) => TxNo::from_slice(rec.value()).map_err(BlockProcError::TxNoInvalid)?,
+                None => {
+                    log::debug!(target: NAME, "No transaction counter found, starting from zero");
+                    TxNo::start()
+                }
+            }
         };
 
         // Iterate through blocks to apply (should be in ascending height order)

@@ -39,7 +39,11 @@ use strict_encoding::Ident;
 
 pub const AGENT: &str = "BC_BP";
 
-pub const BLOCK_SEPARATOR: [u8; 4] = [0xF9, 0xBE, 0xB4, 0xD9];
+pub const BITCOIN_BLOCK_SEPARATOR: [u8; 4] = [0xF9, 0xBE, 0xB4, 0xD9];
+pub const TESTNET_BLOCK_SEPARATOR: [u8; 4] = [0x0B, 0x11, 0x09, 0x07];
+pub const TESTNET4_BLOCK_SEPARATOR: [u8; 4] = [0x1c, 0x16, 0x3f, 0x28];
+pub const SIGNET_BLOCK_SEPARATOR: [u8; 4] = [0x0A, 0x03, 0xCF, 0x40];
+pub const REGTEST_BLOCK_SEPARATOR: [u8; 4] = [0xFA, 0xBF, 0xB5, 0xDA];
 
 /// Command-line arguments
 #[derive(Parser)]
@@ -104,6 +108,15 @@ fn read_blocks(client: Client<ExporterPub>, args: Args) {
         exit(1);
     }
 
+    // Select the correct block separator according to the network type
+    let block_separator = match args.network {
+        Network::Mainnet => BITCOIN_BLOCK_SEPARATOR,
+        Network::Testnet3 => TESTNET_BLOCK_SEPARATOR,
+        Network::Testnet4 => TESTNET4_BLOCK_SEPARATOR,
+        Network::Signet => SIGNET_BLOCK_SEPARATOR,
+        Network::Regtest => REGTEST_BLOCK_SEPARATOR,
+    };
+
     let mut file_no: u32 = 0;
     let mut total_blocks: u32 = 0;
     let mut total_tx: u64 = 0;
@@ -138,7 +151,13 @@ fn read_blocks(client: Client<ExporterPub>, args: Args) {
                     exit(4);
                 }
             }
-            if buf != BLOCK_SEPARATOR {
+
+            if buf == [0x00, 0x00, 0x00, 0x00] {
+                log::info!("Reached end of block file");
+                break;
+            }
+
+            if buf != block_separator {
                 log::error!(
                     "Invalid block separator 0x{:02X}{:02X}{:02X}{:02X} before block #{block_no}",
                     buf[0],
