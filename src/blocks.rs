@@ -1157,24 +1157,8 @@ impl BlockProcessor {
         fork_id: ForkId,
     ) -> Result<(), BlockProcError> {
         // Get fork information
-        let forks_table = db
-            .open_table(TABLE_FORKS)
-            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
-
-        let fork_info = match forks_table
-            .get(fork_id)
-            .map_err(|e| BlockProcError::Custom(format!("Fork lookup error: {}", e)))?
-        {
-            Some(record) => record.value(),
-            None => {
-                return Err(BlockProcError::Custom(format!(
-                    "Fork {} not found in database",
-                    fork_id
-                )));
-            }
-        };
-
-        let (_fork_start_height, _fork_start_block_id, _fork_tip_id, fork_height) = fork_info;
+        let (_fork_start_height, _fork_start_block_id, _fork_tip_id, fork_height) =
+            self.get_fork_info(db, fork_id)?;
 
         // Get main chain height
         let main_chain_height = self.get_main_chain_height(db)?;
@@ -1211,24 +1195,8 @@ impl BlockProcessor {
         fork_id: ForkId,
     ) -> Result<(), BlockProcError> {
         // Get fork information
-        let forks_table = db
-            .open_table(TABLE_FORKS)
-            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
-
-        let fork_info = match forks_table
-            .get(fork_id)
-            .map_err(|e| BlockProcError::Custom(format!("Fork lookup error: {}", e)))?
-        {
-            Some(record) => record.value(),
-            None => {
-                return Err(BlockProcError::Custom(format!(
-                    "Fork {} not found in database",
-                    fork_id
-                )));
-            }
-        };
-
-        let (fork_start_height, _fork_start_block_id, fork_tip_id, fork_height) = fork_info;
+        let (fork_start_height, _fork_start_block_id, fork_tip_id, fork_height) =
+            self.get_fork_info(db, fork_id)?;
 
         log::info!(
             target: NAME,
@@ -1417,27 +1385,15 @@ impl BlockProcessor {
         fork_id: ForkId,
         new_block_id: BlockId,
     ) -> Result<(), BlockProcError> {
+        // Get current fork info
+        let (start_height, start_block_id, old_tip_id, current_height) =
+            self.get_fork_info(db, fork_id)?;
+        let new_height = current_height + 1;
+
         // Update the fork record
         let mut forks_table = db
             .open_table(TABLE_FORKS)
             .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
-
-        // Get current fork info
-        let fork_info = match forks_table
-            .get(fork_id)
-            .map_err(|e| BlockProcError::Custom(format!("Fork lookup error: {}", e)))?
-        {
-            Some(record) => record.value(),
-            None => {
-                return Err(BlockProcError::Custom(format!(
-                    "Fork {} not found in database",
-                    fork_id
-                )));
-            }
-        };
-
-        let (start_height, start_block_id, old_tip_id, current_height) = fork_info;
-        let new_height = current_height + 1;
 
         // Update fork with new tip and height
         forks_table
@@ -1578,24 +1534,8 @@ impl BlockProcessor {
         // This is more complex as fork blocks aren't in the heights table yet
 
         // Get the tip block ID of the fork
-        let forks_table = db
-            .open_table(TABLE_FORKS)
-            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
-
-        let fork_info = match forks_table
-            .get(fork_id)
-            .map_err(|e| BlockProcError::Custom(format!("Fork lookup error: {}", e)))?
-        {
-            Some(record) => record.value(),
-            None => {
-                return Err(BlockProcError::Custom(format!(
-                    "Fork {} not found in database",
-                    fork_id
-                )));
-            }
-        };
-
-        let (_fork_start_height, _fork_start_block_id, fork_tip_id, fork_height) = fork_info;
+        let (_fork_start_height, _fork_start_block_id, fork_tip_id, fork_height) =
+            self.get_fork_info(db, fork_id)?;
 
         // We need to find all blocks from the tip down to the start height
         // Since they're not yet in the heights table, we need to traverse backwards
@@ -1867,7 +1807,7 @@ impl BlockProcessor {
 
                 // For fork blocks, txids may already be in the database with assigned txno
                 // Check if this txid already exists
-                let txids_table = db
+                let mut txids_table = db
                     .open_table(TABLE_TXIDS)
                     .map_err(BlockProcError::TxidTable)?;
 
@@ -1890,10 +1830,6 @@ impl BlockProcessor {
 
                 // If this is a new transaction, store its mapping and data
                 if existing_txno.is_none() {
-                    // Store transaction ID to transaction number mapping
-                    let mut txids_table = db
-                        .open_table(TABLE_TXIDS)
-                        .map_err(BlockProcError::TxidTable)?;
                     txids_table
                         .insert(txid.to_byte_array(), tx_txno)
                         .map_err(BlockProcError::TxidStorage)?;
@@ -2079,31 +2015,28 @@ impl BlockProcessor {
         applied_fork_id: ForkId,
     ) -> Result<(), BlockProcError> {
         // Get information about the applied fork
-        let forks_table = db
-            .open_table(TABLE_FORKS)
-            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
-
-        let fork_info = match forks_table
-            .get(applied_fork_id)
-            .map_err(|e| BlockProcError::Custom(format!("Fork lookup error: {}", e)))?
-        {
-            Some(record) => record.value(),
-            None => {
-                // Fork already removed, nothing to do
-                return Ok(());
-            }
-        };
-
-        let (_start_height, _start_block_id, _tip_id, fork_height) = fork_info;
+        let (_start_height, _start_block_id, _tip_id, fork_height) =
+            match self.get_fork_info(db, applied_fork_id) {
+                Ok(info) => info,
+                Err(BlockProcError::Custom(msg)) if msg.contains("not found") => {
+                    // Fork already removed, nothing to do
+                    return Ok(());
+                }
+                Err(e) => return Err(e),
+            };
 
         // Remove old forks that are now definitely invalid
         // Any fork that starts at a height less than the applied fork's height
         // and has not become the main chain by now should be removed
+        let mut forks_table = db
+            .open_table(TABLE_FORKS)
+            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
+
+        let mut forks_to_remove = Vec::new();
+
         let iter = forks_table
             .iter()
             .map_err(|e| BlockProcError::Custom(format!("Forks iterator error: {}", e)))?;
-
-        let mut forks_to_remove = Vec::new();
 
         for entry in iter {
             let (fork_id, info) =
@@ -2125,10 +2058,6 @@ impl BlockProcessor {
         }
 
         // Now remove the outdated forks
-        let mut forks_table = db
-            .open_table(TABLE_FORKS)
-            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
-
         let mut fork_tips_table = db
             .open_table(TABLE_FORK_TIPS)
             .map_err(|e| BlockProcError::Custom(format!("Fork tips table error: {}", e)))?;
@@ -2178,6 +2107,32 @@ impl BlockProcessor {
         );
 
         Ok(())
+    }
+
+    /// Helper method to get fork information, reducing the need to repeatedly open the forks table
+    fn get_fork_info(
+        &self,
+        db: &WriteTransaction,
+        fork_id: ForkId,
+    ) -> Result<(u32, BlockId, BlockId, u32), BlockProcError> {
+        let forks_table = db
+            .open_table(TABLE_FORKS)
+            .map_err(|e| BlockProcError::Custom(format!("Forks table error: {}", e)))?;
+
+        let fork_info = match forks_table
+            .get(fork_id)
+            .map_err(|e| BlockProcError::Custom(format!("Fork lookup error: {}", e)))?
+        {
+            Some(record) => record.value(),
+            None => {
+                return Err(BlockProcError::Custom(format!(
+                    "Fork {} not found in database",
+                    fork_id
+                )));
+            }
+        };
+
+        Ok(fork_info)
     }
 }
 

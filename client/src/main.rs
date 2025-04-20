@@ -56,7 +56,9 @@ fn cb(reply: Response) {
         Response::Failure(failure) => {
             println!("Failure: {failure}");
         }
-        Response::Pong(_noise) => {}
+        Response::Pong(_noise) => {
+            println!("Pong from server");
+        }
         Response::Status(status) => {
             println!("{}", serde_yaml::to_string(&status).unwrap());
         }
