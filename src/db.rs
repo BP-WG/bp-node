@@ -24,15 +24,16 @@
 use std::cmp::Ordering;
 use std::ops::ControlFlow;
 use std::path::Path;
+use std::process::exit;
 
 use amplify::num::u40;
 use amplify::{ByteArray, FromSliceError};
-use bpwallet::{Block, BlockHeader, ConsensusDecode, ConsensusEncode, Tx};
+use bpwallet::{Block, BlockHeader, ConsensusDecode, ConsensusEncode, Network, Tx};
 use crossbeam_channel::{SendError, Sender};
 use microservices::UService;
 use redb::{
-    Database, DatabaseError, ReadTransaction, TableDefinition, TransactionError, TypeName,
-    WriteTransaction,
+    Database, DatabaseError, Key, ReadTransaction, TableDefinition, TransactionError, TypeName,
+    Value, WriteTransaction,
 };
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Display)]
@@ -50,6 +51,8 @@ impl TxNo {
     pub fn start() -> Self { TxNo(u40::ZERO) }
 
     pub fn inc_assign(&mut self) { self.0 += u40::ONE }
+
+    pub fn into_inner(self) -> u40 { self.0 }
 }
 
 impl Id {
@@ -70,6 +73,8 @@ impl Id {
         array.copy_from_slice(bytes);
         Id(u32::from_be_bytes(array))
     }
+
+    pub fn into_inner(self) -> u32 { self.0 }
 }
 
 impl ByteArray<5> for TxNo {
@@ -341,5 +346,112 @@ impl UService for IndexDb {
         if let Err(e) = self.0.compact() {
             log::error!("Failed to compact database: {e}");
         }
+    }
+}
+
+/// Initialize database tables
+pub fn initialize_db_tables(db: &Database, network: Network) {
+    // It's necessary to open all tables with WriteTransaction to ensure they are created
+    // In ReDB, tables are only created when first opened with a WriteTransaction
+    // If later accessed with ReadTransaction without being created first, errors will occur
+    match db.begin_write() {
+        Ok(tx) => {
+            // Initialize main table with network information
+            initialize_main_table(&tx, network);
+
+            // Initialize all other tables by group
+            create_core_tables(&tx);
+            create_utxo_tables(&tx);
+            create_block_height_tables(&tx);
+            create_transaction_block_tables(&tx);
+            create_orphan_tables(&tx);
+            create_fork_tables(&tx);
+
+            // Commit the transaction
+            if let Err(err) = tx.commit() {
+                eprintln!("Failed to commit initial database transaction: {err}");
+                exit(8);
+            }
+        }
+        Err(err) => {
+            eprintln!("Failed to begin database transaction: {err}");
+            exit(9);
+        }
+    }
+}
+
+/// Initialize the main table with network information
+fn initialize_main_table(tx: &WriteTransaction, network: Network) {
+    match tx.open_table(TABLE_MAIN) {
+        Ok(mut main_table) => {
+            if let Err(err) = main_table.insert(REC_NETWORK, network.to_string().as_bytes()) {
+                eprintln!("Failed to write network information to database: {err}");
+                exit(5);
+            }
+        }
+        Err(err) => {
+            eprintln!("Failed to open main table in database: {err}");
+            exit(6);
+        }
+    }
+}
+
+/// Create core block and transaction tables
+fn create_core_tables(tx: &WriteTransaction) {
+    log::info!("Creating core block and transaction tables...");
+    create_table(tx, TABLE_BLKS, "blocks");
+    create_table(tx, TABLE_TXIDS, "txids");
+    create_table(tx, TABLE_BLOCKIDS, "blockids");
+    create_table(tx, TABLE_TXES, "transactions");
+}
+
+/// Create UTXO and transaction relationship tables
+fn create_utxo_tables(tx: &WriteTransaction) {
+    log::info!("Creating UTXO and transaction relationship tables...");
+    create_table(tx, TABLE_OUTS, "spends");
+    create_table(tx, TABLE_SPKS, "scripts");
+    create_table(tx, TABLE_UTXOS, "utxos");
+}
+
+/// Create block height mapping tables
+fn create_block_height_tables(tx: &WriteTransaction) {
+    log::info!("Creating block height mapping tables...");
+    create_table(tx, TABLE_HEIGHTS, "block_heights");
+    create_table(tx, TABLE_BLOCK_HEIGHTS, "blockid_height");
+}
+
+/// Create transaction-block relationship tables
+fn create_transaction_block_tables(tx: &WriteTransaction) {
+    log::info!("Creating transaction-block relationship tables...");
+    create_table(tx, TABLE_TX_BLOCKS, "tx_blocks");
+    create_table(tx, TABLE_BLOCK_TXS, "block_txs");
+    create_table(tx, TABLE_INPUTS, "inputs");
+    create_table(tx, TABLE_BLOCK_SPENDS, "block_spends");
+}
+
+/// Create orphan blocks tables
+fn create_orphan_tables(tx: &WriteTransaction) {
+    log::info!("Creating orphan blocks tables...");
+    create_table(tx, TABLE_ORPHANS, "orphans");
+    create_table(tx, TABLE_ORPHAN_PARENTS, "orphan_parents");
+}
+
+/// Create fork management tables
+fn create_fork_tables(tx: &WriteTransaction) {
+    log::info!("Creating fork management tables...");
+    create_table(tx, TABLE_FORKS, "forks");
+    create_table(tx, TABLE_FORK_TIPS, "fork_tips");
+    create_table(tx, TABLE_FORK_BLOCKS, "fork_blocks");
+}
+
+/// Generic function to create a table with error handling
+fn create_table<K: Key + 'static, V: Value + 'static>(
+    tx: &WriteTransaction,
+    table_def: TableDefinition<K, V>,
+    table_name: &str,
+) {
+    if let Err(err) = tx.open_table(table_def) {
+        eprintln!("Failed to create {} table: {err}", table_name);
+        exit(7);
     }
 }

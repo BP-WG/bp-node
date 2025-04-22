@@ -161,9 +161,10 @@ impl Broker {
         match msg {
             ImporterMsg::Mined(txid) => {
                 for (remote, filters) in &self.tracking {
-                    // TODO: Check against Bloom filters
-                    if false {
-                        self.rpc.cmd(RpcCmd::Send(*remote, Response::Mined(txid)))?;
+                    for filter in filters {
+                        if filter.contains(txid) {
+                            self.rpc.cmd(RpcCmd::Send(*remote, Response::Mined(txid)))?;
+                        }
                     }
                 }
             }

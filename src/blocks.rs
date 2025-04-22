@@ -174,6 +174,24 @@ impl BlockProcessor {
         Ok(height)
     }
 
+    /// Check if the block hash already exists in the database
+    fn is_block_exists(
+        &self,
+        db: &WriteTransaction,
+        block_hash: &BlockHash,
+    ) -> Result<bool, BlockProcError> {
+        let blockids_table = db
+            .open_table(TABLE_BLOCKIDS)
+            .map_err(|e| BlockProcError::Custom(format!("Block IDs table error: {}", e)))?;
+
+        let exists = blockids_table
+            .get(block_hash.to_byte_array())
+            .map_err(|e| BlockProcError::Custom(format!("Block hash lookup error: {}", e)))?
+            .is_some();
+
+        Ok(exists)
+    }
+
     pub fn process_block(&mut self, id: BlockHash, block: Block) -> Result<usize, BlockProcError> {
         // Store a copy of the parent hash for potential orphan block handling
         let parent_hash = block.header.prev_block_hash;
@@ -185,8 +203,18 @@ impl BlockProcessor {
         self.db.send(DbMsg::Write(tx))?;
         let db = rx.recv()?;
 
+        // Check if the block already exists
+        if self.is_block_exists(&db, &id)? {
+            log::warn!(
+                target: NAME,
+                "Block {} already exists in database, skipping processing",
+                id
+            );
+            return Err(BlockProcError::Custom(format!("Block {} already exists", id)));
+        }
+
         // Get current transaction number
-        let mut txno = {
+        let mut txno_counter = {
             let main = db
                 .open_table(TABLE_MAIN)
                 .map_err(BlockProcError::MainTable)?;
@@ -256,16 +284,29 @@ impl BlockProcessor {
 
             // Process transactions in the block
             for tx in block.transactions {
-                let txid = tx.txid();
-                txno.inc_assign();
-
-                // Add transaction to the list for this block
-                block_txs.push(txno);
-
                 // Store transaction ID to transaction number mapping
                 let mut txids_table = db
                     .open_table(TABLE_TXIDS)
                     .map_err(BlockProcError::TxidTable)?;
+
+                // Get txno from TABLE_TXIDS using txid. If it doesn't exist, use txno-counter,
+                // otherwise use the existing txno. This is mainly to avoid issues after block
+                // reorganization, where the same txid in different blocks could be
+                // assigned different txno values, leading to incorrect processing
+
+                let txid = tx.txid();
+                let txno = txids_table
+                    .get(txid.to_byte_array())
+                    .map_err(BlockProcError::TxidLookup)?
+                    .map(|v| v.value())
+                    .unwrap_or_else(|| {
+                        txno_counter.inc_assign();
+                        txno_counter
+                    });
+
+                // Add transaction to the list for this block
+                block_txs.push(txno);
+
                 txids_table
                     .insert(txid.to_byte_array(), txno)
                     .map_err(BlockProcError::TxidStorage)?;
@@ -412,7 +453,7 @@ impl BlockProcessor {
                 .map_err(BlockProcError::MainTable)?;
 
             // Update transaction counter
-            main.insert(REC_TXNO, txno.to_byte_array().as_slice())
+            main.insert(REC_TXNO, txno_counter.to_byte_array().as_slice())
                 .map_err(BlockProcError::TxNoUpdate)?;
 
             // Log successful block processing
@@ -440,7 +481,7 @@ impl BlockProcessor {
 
                 Ok(count)
             }
-            Err(BlockProcError::OrphanBlock(_)) => {
+            Err(BlockProcError::OrphanBlock(e)) => {
                 // Handle orphan block case
                 if let Err(err) = db.abort() {
                     log::warn!(target: NAME, "Unable to abort failed database transaction due to {err}");
@@ -454,7 +495,8 @@ impl BlockProcessor {
                     id
                 );
 
-                return self.save_orphan_block(id, block_clone);
+                self.save_orphan_block(id, block_clone)?;
+                return Err(BlockProcError::OrphanBlock(e));
             }
             Err(BlockProcError::PotentialFork(new_block_hash, height, existing_blockid)) => {
                 // Handle potential fork case - conflict with existing block at same height
@@ -465,12 +507,14 @@ impl BlockProcessor {
                 // Record this as a potential fork for later verification
                 // Store the new block but don't update the height tables yet
                 // We'll only perform a reorganization if this fork becomes the longest chain
-                self.process_potential_fork(
+                let result = self.process_potential_fork(
                     id,
                     &block_clone,
                     Some(height),
                     Some(existing_blockid),
                 )?;
+
+                debug_assert!(result.is_none());
 
                 return Err(BlockProcError::PotentialFork(
                     new_block_hash,
@@ -491,9 +535,14 @@ impl BlockProcessor {
                     parent_hash
                 );
 
-                self.process_potential_fork(id, &block_clone, None, None)?;
+                // If a chain reorganization occurs, return the number of transactions added
+                if let Some(txs_added) =
+                    self.process_potential_fork(id, &block_clone, None, None)?
+                {
+                    return Ok(txs_added);
+                }
 
-                return Ok(0);
+                return Err(BlockProcError::ForkChainExtension(block_hash, parent_hash));
             }
             Err(e) => {
                 // Handle other errors
@@ -510,13 +559,6 @@ impl BlockProcessor {
     ///
     /// This method should be used instead of directly calling `process_block` when you want to
     /// ensure that orphan blocks dependent on the processed block are also handled.
-    ///
-    /// # Example
-    /// ```no_run
-    /// let processor = BlockProcessor::new(db, broker);
-    /// // Process a block and its dependent orphans
-    /// processor.process_block_and_orphans(block_hash, block)?;
-    /// ```
     pub fn process_block_and_orphans(
         &mut self,
         id: BlockHash,
@@ -1059,7 +1101,7 @@ impl BlockProcessor {
         block: &Block,
         height: Option<u32>,
         existing_blockid: Option<BlockId>,
-    ) -> Result<(), BlockProcError> {
+    ) -> Result<Option<usize>, BlockProcError> {
         let (tx, rx) = crossbeam_channel::bounded(1);
         self.db.send(DbMsg::Write(tx))?;
         let db = rx.recv()?;
@@ -1127,7 +1169,7 @@ impl BlockProcessor {
                     block_hash,
                     block.header.prev_block_hash
                 );
-                return Ok(());
+                return Ok(None);
             }
 
             self.record_fork(
@@ -1143,11 +1185,11 @@ impl BlockProcessor {
         };
 
         // Check if this fork is now longer than the main chain
-        self.check_fork_length(&db, fork_id)?;
+        let txs_added = self.check_fork_length(&db, fork_id)?;
 
         db.commit()?;
 
-        Ok(())
+        Ok(txs_added)
     }
 
     /// Check if a fork is longer than the main chain and perform reorganization if needed
@@ -1155,7 +1197,7 @@ impl BlockProcessor {
         &mut self,
         db: &WriteTransaction,
         fork_id: ForkId,
-    ) -> Result<(), BlockProcError> {
+    ) -> Result<Option<usize>, BlockProcError> {
         // Get fork information
         let (_fork_start_height, _fork_start_block_id, _fork_tip_id, fork_height) =
             self.get_fork_info(db, fork_id)?;
@@ -1174,7 +1216,8 @@ impl BlockProcessor {
             );
 
             // Perform chain reorganization
-            self.perform_chain_reorganization(db, fork_id)?;
+            let txs_added = self.perform_chain_reorganization(db, fork_id)?;
+            return Ok(Some(txs_added));
         } else {
             log::debug!(
                 target: NAME,
@@ -1185,7 +1228,7 @@ impl BlockProcessor {
             );
         }
 
-        Ok(())
+        Ok(None)
     }
 
     /// Perform a chain reorganization to adopt a fork as the new main chain
@@ -1193,7 +1236,7 @@ impl BlockProcessor {
         &mut self,
         db: &WriteTransaction,
         fork_id: ForkId,
-    ) -> Result<(), BlockProcError> {
+    ) -> Result<usize, BlockProcError> {
         // Get fork information
         let (fork_start_height, _fork_start_block_id, fork_tip_id, fork_height) =
             self.get_fork_info(db, fork_id)?;
@@ -1230,7 +1273,7 @@ impl BlockProcessor {
         self.rollback_blocks(db, &blocks_to_rollback)?;
 
         // 5. Apply blocks from fork chain
-        self.apply_blocks(db, &blocks_to_apply)?;
+        let txs_added = self.apply_blocks(db, &blocks_to_apply)?;
 
         // 6. Update fork status
         self.cleanup_after_reorg(db, fork_id)?;
@@ -1241,7 +1284,7 @@ impl BlockProcessor {
             fork_height
         );
 
-        Ok(())
+        Ok(txs_added)
     }
 
     /// Records a potential fork in the blockchain.
@@ -1620,6 +1663,10 @@ impl BlockProcessor {
             return Ok(());
         }
 
+        let mut total_txs_removed = 0;
+        let mut total_utxos_restored = 0;
+        let mut total_utxos_removed = 0;
+
         // Iterate through blocks to roll back (should be in descending height order)
         for &(height, block_id) in blocks {
             log::info!(
@@ -1628,6 +1675,10 @@ impl BlockProcessor {
                 height,
                 block_id
             );
+
+            let mut block_utxos_restored = 0;
+            let mut block_utxos_removed = 0;
+            let mut block_txs_removed = 0;
 
             // 1. Restore UTXOs spent in this block
             let block_spends_table = db
@@ -1639,6 +1690,8 @@ impl BlockProcessor {
                 .map_err(|e| BlockProcError::Custom(format!("Block spends lookup error: {}", e)))?
             {
                 let spends = spends_record.value();
+                block_utxos_restored = spends.len();
+                total_utxos_restored += block_utxos_restored;
 
                 // Restore each spent UTXO
                 let mut utxos_table = db
@@ -1669,6 +1722,8 @@ impl BlockProcessor {
                 .map_err(|e| BlockProcError::Custom(format!("Block-txs lookup error: {}", e)))?
             {
                 let txs = txs_record.value();
+                block_txs_removed = txs.len();
+                total_txs_removed += block_txs_removed;
 
                 // For each transaction
                 for txno in txs {
@@ -1683,6 +1738,8 @@ impl BlockProcessor {
                     {
                         let tx = tx_record.value();
                         let num_outputs = tx.as_ref().outputs.len();
+                        block_utxos_removed += num_outputs;
+                        total_utxos_removed += num_outputs;
 
                         let mut utxos_table = db.open_table(TABLE_UTXOS).map_err(|e| {
                             BlockProcError::Custom(format!("UTXOs table error: {}", e))
@@ -1727,12 +1784,24 @@ impl BlockProcessor {
                 height,
                 block_id
             );
+
+            log::info!(
+                target: NAME,
+                "Block rollback stats for height {}: removed {} transactions, restored {} UTXOs, removed {} UTXOs",
+                height,
+                block_txs_removed,
+                block_utxos_restored,
+                block_utxos_removed
+            );
         }
 
         log::info!(
             target: NAME,
-            "Successfully rolled back {} blocks",
-            blocks.len()
+            "Successfully rolled back {} blocks: removed {} transactions, restored {} UTXOs, removed {} UTXOs",
+            blocks.len(),
+            total_txs_removed,
+            total_utxos_restored,
+            total_utxos_removed
         );
 
         Ok(())
@@ -1745,9 +1814,9 @@ impl BlockProcessor {
         &self,
         db: &WriteTransaction,
         blocks: &[(u32, BlockId)],
-    ) -> Result<(), BlockProcError> {
+    ) -> Result<usize, BlockProcError> {
         if blocks.is_empty() {
-            return Ok(());
+            return Ok(0);
         }
 
         // Get current transaction number - we'll need this for processing new transactions
@@ -1764,6 +1833,10 @@ impl BlockProcessor {
                 }
             }
         };
+
+        let mut total_txs_added = 0;
+        let mut total_utxos_added = 0;
+        let mut total_utxos_spent = 0;
 
         // Iterate through blocks to apply (should be in ascending height order)
         for &(height, block_id) in blocks {
@@ -1794,6 +1867,10 @@ impl BlockProcessor {
                 block.transactions.len(),
                 block_id
             );
+
+            let mut block_txs_added: usize = 0;
+            let mut block_utxos_added: usize = 0;
+            let mut block_utxos_spent: usize = 0;
 
             // Track UTXOs spent in this block
             let mut block_spends = Vec::new();
@@ -1841,6 +1918,8 @@ impl BlockProcessor {
                     txes_table
                         .insert(tx_txno, DbTx::from(tx.clone()))
                         .map_err(BlockProcError::TxesStorage)?;
+
+                    block_txs_added += 1;
                 }
 
                 // Associate transaction with block ID (update even if transaction existed)
@@ -1872,6 +1951,8 @@ impl BlockProcessor {
                                 .map_err(|e| {
                                     BlockProcError::Custom(format!("UTXOs removal error: {}", e))
                                 })?;
+
+                            block_utxos_spent += 1;
 
                             // Record UTXO spent in this block
                             block_spends.push((prev_txno, prev_vout.into_u32()));
@@ -1923,6 +2004,8 @@ impl BlockProcessor {
                         .map_err(|e| {
                             BlockProcError::Custom(format!("UTXOs storage error: {}", e))
                         })?;
+
+                    block_utxos_added += 1;
 
                     // Index script pubkey
                     let script = &output.script_pubkey;
@@ -1990,6 +2073,19 @@ impl BlockProcessor {
                 height,
                 block_id
             );
+
+            total_txs_added += block_txs_added;
+            total_utxos_added += block_utxos_added;
+            total_utxos_spent += block_utxos_spent;
+
+            log::info!(
+                target: NAME,
+                "Block apply stats for height {}: added {} transactions, added {} UTXOs, spent {} UTXOs",
+                height,
+                block_txs_added,
+                block_utxos_added,
+                block_utxos_spent
+            );
         }
 
         // Update the global transaction counter
@@ -2001,11 +2097,14 @@ impl BlockProcessor {
 
         log::info!(
             target: NAME,
-            "Successfully applied {} blocks with all transactions",
-            blocks.len()
+            "Successfully applied {} blocks: added {} transactions, added {} UTXOs, spent {} UTXOs",
+            blocks.len(),
+            total_txs_added,
+            total_utxos_added,
+            total_utxos_spent
         );
 
-        Ok(())
+        Ok(total_txs_added)
     }
 
     /// Clean up fork information after a successful reorganization

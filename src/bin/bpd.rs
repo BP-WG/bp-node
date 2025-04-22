@@ -31,11 +31,11 @@ use std::path::Path;
 use std::process::{ExitCode, Termination, exit};
 
 pub use bpnode;
-use bpnode::{Broker, BrokerError, Config, PATH_INDEXDB};
+use bpnode::{Broker, BrokerError, Config, PATH_INDEXDB, initialize_db_tables};
 use bpwallet::Network;
 use clap::Parser;
 use loglevel::LogLevel;
-use redb::{Database, Key, TableDefinition, Value, WriteTransaction};
+use redb::Database;
 
 use crate::opts::{Command, Opts};
 
@@ -44,11 +44,6 @@ const EXIT_PATH_ACCESS_ERROR: i32 = 1;
 const EXIT_DB_EXISTS_ERROR: i32 = 2;
 const EXIT_DIR_CREATE_ERROR: i32 = 3;
 const EXIT_DB_CREATE_ERROR: i32 = 4;
-const EXIT_DB_WRITE_ERROR: i32 = 5;
-const EXIT_TABLE_OPEN_ERROR: i32 = 6;
-const EXIT_TABLE_CREATE_ERROR: i32 = 7;
-const EXIT_COMMIT_ERROR: i32 = 8;
-const EXIT_TRANSACTION_ERROR: i32 = 9;
 const EXIT_NETWORK_MISMATCH: i32 = 10;
 const EXIT_NO_NETWORK_INFO: i32 = 11;
 const EXIT_DB_NOT_FOUND: i32 = 12;
@@ -157,114 +152,6 @@ fn check_db_path(index_path: &Path, should_exist: bool) -> Result<(), Status> {
         }
     }
     Ok(())
-}
-
-/// Initialize database tables
-fn initialize_db_tables(db: &Database, network: Network) {
-    // It's necessary to open all tables with WriteTransaction to ensure they are created
-    // In ReDB, tables are only created when first opened with a WriteTransaction
-    // If later accessed with ReadTransaction without being created first, errors will occur
-    match db.begin_write() {
-        Ok(tx) => {
-            // Initialize main table with network information
-            initialize_main_table(&tx, network);
-
-            // Initialize all other tables by group
-            create_core_tables(&tx);
-            create_utxo_tables(&tx);
-            create_block_height_tables(&tx);
-            create_transaction_block_tables(&tx);
-            create_orphan_tables(&tx);
-            create_fork_tables(&tx);
-
-            // Commit the transaction
-            if let Err(err) = tx.commit() {
-                eprintln!("Failed to commit initial database transaction: {err}");
-                exit(EXIT_COMMIT_ERROR);
-            }
-        }
-        Err(err) => {
-            eprintln!("Failed to begin database transaction: {err}");
-            exit(EXIT_TRANSACTION_ERROR);
-        }
-    }
-}
-
-/// Initialize the main table with network information
-fn initialize_main_table(tx: &WriteTransaction, network: Network) {
-    match tx.open_table(bpnode::db::TABLE_MAIN) {
-        Ok(mut main_table) => {
-            if let Err(err) = main_table.insert(bpnode::REC_NETWORK, network.to_string().as_bytes())
-            {
-                eprintln!("Failed to write network information to database: {err}");
-                exit(EXIT_DB_WRITE_ERROR);
-            }
-        }
-        Err(err) => {
-            eprintln!("Failed to open main table in database: {err}");
-            exit(EXIT_TABLE_OPEN_ERROR);
-        }
-    }
-}
-
-/// Create core block and transaction tables
-fn create_core_tables(tx: &WriteTransaction) {
-    log::info!("Creating core block and transaction tables...");
-    create_table(tx, bpnode::db::TABLE_BLKS, "blocks");
-    create_table(tx, bpnode::db::TABLE_TXIDS, "txids");
-    create_table(tx, bpnode::db::TABLE_BLOCKIDS, "blockids");
-    create_table(tx, bpnode::db::TABLE_TXES, "transactions");
-}
-
-/// Create UTXO and transaction relationship tables
-fn create_utxo_tables(tx: &WriteTransaction) {
-    log::info!("Creating UTXO and transaction relationship tables...");
-    create_table(tx, bpnode::db::TABLE_OUTS, "spends");
-    create_table(tx, bpnode::db::TABLE_SPKS, "scripts");
-    create_table(tx, bpnode::db::TABLE_UTXOS, "utxos");
-}
-
-/// Create block height mapping tables
-fn create_block_height_tables(tx: &WriteTransaction) {
-    log::info!("Creating block height mapping tables...");
-    create_table(tx, bpnode::db::TABLE_HEIGHTS, "block_heights");
-    create_table(tx, bpnode::db::TABLE_BLOCK_HEIGHTS, "blockid_height");
-}
-
-/// Create transaction-block relationship tables
-fn create_transaction_block_tables(tx: &WriteTransaction) {
-    log::info!("Creating transaction-block relationship tables...");
-    create_table(tx, bpnode::db::TABLE_TX_BLOCKS, "tx_blocks");
-    create_table(tx, bpnode::db::TABLE_BLOCK_TXS, "block_txs");
-    create_table(tx, bpnode::db::TABLE_INPUTS, "inputs");
-    create_table(tx, bpnode::db::TABLE_BLOCK_SPENDS, "block_spends");
-}
-
-/// Create orphan blocks tables
-fn create_orphan_tables(tx: &WriteTransaction) {
-    log::info!("Creating orphan blocks tables...");
-    create_table(tx, bpnode::db::TABLE_ORPHANS, "orphans");
-    create_table(tx, bpnode::db::TABLE_ORPHAN_PARENTS, "orphan_parents");
-}
-
-/// Create fork management tables
-fn create_fork_tables(tx: &WriteTransaction) {
-    log::info!("Creating fork management tables...");
-    create_table(tx, bpnode::db::TABLE_FORKS, "forks");
-    create_table(tx, bpnode::db::TABLE_FORK_TIPS, "fork_tips");
-    create_table(tx, bpnode::db::TABLE_FORK_BLOCKS, "fork_blocks");
-}
-
-/// Generic function to create a table with error handling
-fn create_table<K: Key + 'static, V: Value + 'static>(
-    tx: &WriteTransaction,
-    table_def: TableDefinition<K, V>,
-    table_name: &str,
-) {
-    if let Err(err) = tx.open_table(table_def) {
-        eprintln!("Failed to create {} table: {err}", table_name);
-        exit(EXIT_TABLE_CREATE_ERROR);
-    }
 }
 
 /// Verify that database network configuration matches the configured network
