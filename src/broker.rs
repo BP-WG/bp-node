@@ -72,7 +72,7 @@ impl Broker {
         const TIMEOUT: Option<Duration> = Some(Duration::from_secs(60 * 10));
 
         log::info!("Starting database managing thread...");
-        let indexdb = IndexDb::new(&conf.data_dir.join(PATH_INDEXDB))?;
+        let indexdb = IndexDb::new(conf.data_dir.join(PATH_INDEXDB))?;
         let db = UThread::new(indexdb, TIMEOUT);
 
         log::info!("Starting block importer thread...");
@@ -81,7 +81,7 @@ impl Broker {
         let listen = conf.import.iter().map(|addr| {
             NetAccept::bind(addr).unwrap_or_else(|err| panic!("unable to bind to {addr}: {err}"))
         });
-        let importer = service::Runtime::new(conf.import[0].clone(), controller, listen)
+        let importer = service::Runtime::new(conf.import[0], controller, listen)
             .map_err(|err| BrokerError::Import(err.into()))?;
 
         log::info!("Starting RPC server thread...");
@@ -90,7 +90,7 @@ impl Broker {
         let listen = conf.rpc.iter().map(|addr| {
             NetAccept::bind(addr).unwrap_or_else(|err| panic!("unable to bind to {addr}: {err}"))
         });
-        let rpc = service::Runtime::new(conf.rpc[0].clone(), controller, listen)
+        let rpc = service::Runtime::new(conf.rpc[0], controller, listen)
             .map_err(|err| BrokerError::Rpc(err.into()))?;
 
         log::info!("Launch completed successfully");

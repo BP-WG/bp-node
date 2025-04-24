@@ -110,7 +110,7 @@ impl ServiceController<RemoteAddr, Session, TcpListener, RpcCmd> for RpcControll
         let client = self.clients.remove(&remote).unwrap_or_else(|| {
             panic!("Client at {remote} got disconnected but not found in providers list");
         });
-        log::warn!(target: NAME, "Client at {remote} got disconnected due to {reason} ({})", client.agent.map(|a| a.to_string()).unwrap_or(none!()));
+        log::warn!(target: NAME, "Client at {remote} got disconnected due to {reason} ({})", client.agent.map(|a| a.to_string()).unwrap_or_default());
         self.broker
             .send(BrokerRpcMsg::UntrackAll(remote))
             .expect("Unable to communicate to broker");

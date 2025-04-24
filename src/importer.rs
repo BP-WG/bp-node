@@ -120,7 +120,7 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ImporterCmd> for BlockI
         let client = self.providers.remove(&addr).unwrap_or_else(|| {
             panic!("Block provider at {addr} got disconnected but not found in providers list");
         });
-        log::warn!(target: NAME, "Block provider at {addr} got disconnected due to {reason} ({})", client.agent.map(|a| a.to_string()).unwrap_or(none!()));
+        log::warn!(target: NAME, "Block provider at {addr} got disconnected due to {reason} ({})", client.agent.map(|a| a.to_string()).unwrap_or_default());
     }
 
     fn on_command(&mut self, cmd: ImporterCmd) {

@@ -497,7 +497,7 @@ impl BlockProcessor {
                 );
 
                 self.save_orphan_block(id, block_clone)?;
-                return Err(BlockProcError::OrphanBlock(e));
+                Err(BlockProcError::OrphanBlock(e))
             }
             Err(BlockProcError::PotentialFork(new_block_hash, height, existing_blockid)) => {
                 // Handle potential fork case - conflict with existing block at same height
@@ -517,11 +517,7 @@ impl BlockProcessor {
 
                 debug_assert!(result.is_none());
 
-                return Err(BlockProcError::PotentialFork(
-                    new_block_hash,
-                    height,
-                    existing_blockid,
-                ));
+                Err(BlockProcError::PotentialFork(new_block_hash, height, existing_blockid))
             }
             Err(BlockProcError::ForkChainExtension(block_hash, parent_hash)) => {
                 // Handle fork chain extension case - parent block is part of a fork
@@ -543,14 +539,14 @@ impl BlockProcessor {
                     return Ok(txs_added);
                 }
 
-                return Err(BlockProcError::ForkChainExtension(block_hash, parent_hash));
+                Err(BlockProcError::ForkChainExtension(block_hash, parent_hash))
             }
             Err(e) => {
                 // Handle other errors
                 if let Err(err) = db.abort() {
                     log::warn!(target: NAME, "Unable to abort failed database transaction due to {err}");
                 };
-                return Err(e);
+                Err(e)
             }
         }
     }
@@ -978,7 +974,7 @@ impl BlockProcessor {
 
             // Check if orphan has expired
             if timestamp < expiry_threshold {
-                expired_orphans.push(orphan_hash.value().clone());
+                expired_orphans.push(orphan_hash.value());
             }
         }
 
@@ -1024,8 +1020,7 @@ impl BlockProcessor {
                         })?;
 
                         // Store parent data for later processing
-                        parents_to_scan
-                            .push((parent_hash.value().clone(), orphans.value().to_vec()));
+                        parents_to_scan.push((parent_hash.value(), orphans.value().to_vec()));
                     }
 
                     // Now process parents without borrowing the table
