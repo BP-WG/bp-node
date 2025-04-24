@@ -64,7 +64,7 @@ impl ConnectionDelegate<RemoteAddr, Session> for Delegate {
         TcpStream::connect(remote).unwrap_or_else(|err| {
             #[cfg(feature = "log")]
             log::error!("Unable to connect BP Node {remote} due to {err}");
-            eprintln!("Unable to connect BP Node {remote}");
+            eprintln!("Unable to connect BP Node {remote} due to {err}");
             exit(1);
         })
     }
@@ -74,9 +74,9 @@ impl ConnectionDelegate<RemoteAddr, Session> for Delegate {
         log::info!("connection to the server is established");
     }
 
-    fn on_disconnect(&mut self, err: Error, _attempt: usize) -> OnDisconnect {
+    fn on_disconnect(&mut self, _err: Error, _attempt: usize) -> OnDisconnect {
         #[cfg(feature = "log")]
-        log::error!("disconnected due to {err}");
+        log::error!("disconnected due to {_err}");
         OnDisconnect::Terminate
     }
 
