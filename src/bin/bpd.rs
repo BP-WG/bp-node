@@ -124,9 +124,7 @@ fn run_node(opts: Opts) -> Status {
     }
 
     // Verify network configuration
-    if let Err(err) = verify_network_configuration(&index_path, &conf.network) {
-        return err;
-    }
+    verify_network_configuration(&index_path, &conf.network);
 
     // Start the broker service
     Status(Broker::start(conf).and_then(|runtime| runtime.run()))
@@ -155,45 +153,41 @@ fn check_db_path(index_path: &Path, should_exist: bool) -> Result<(), Status> {
 }
 
 /// Verify that database network configuration matches the configured network
-fn verify_network_configuration(
-    index_path: &Path,
-    configured_network: &Network,
-) -> Result<(), Status> {
-    match Database::open(index_path) {
-        Ok(db) => {
-            if let Ok(tx) = db.begin_read() {
-                if let Ok(main_table) = tx.open_table(bpnode::db::TABLE_MAIN) {
-                    if let Ok(Some(network_rec)) = main_table.get(bpnode::REC_NETWORK) {
-                        let stored_network = String::from_utf8_lossy(network_rec.value());
-                        if stored_network != configured_network.to_string() {
-                            eprintln!("ERROR: Database network mismatch!");
-                            eprintln!("Configured network: {}", configured_network);
-                            eprintln!("Database network: {}", stored_network);
-                            eprintln!("Each BP-Node instance works with a single chain.");
-                            eprintln!(
-                                "To use a different network, create a separate instance with a \
-                                 different data directory."
-                            );
-                            exit(EXIT_NETWORK_MISMATCH);
-                        }
-                        log::info!(
-                            "Database network matches configured network: {}",
-                            stored_network
-                        );
-                    } else {
-                        // Network information not found in the database
-                        eprintln!(
-                            "ERROR: Database exists but doesn't contain network information."
-                        );
-                        eprintln!("Please reinitialize the database with 'bpd init' command.");
-                        exit(EXIT_NO_NETWORK_INFO);
-                    }
-                }
-            }
-        }
-        Err(err) => {
-            eprintln!("Warning: Could not open database to check network configuration: {}", err);
-        }
+fn verify_network_configuration(index_path: &Path, configured_network: &Network) {
+    let Ok(db) = Database::open(index_path)
+        .inspect_err(|err| eprintln!("Error: could not open the database due to {err}"))
+    else {
+        exit(EXIT_DB_OPEN_ERROR)
+    };
+    let Ok(tx) = db
+        .begin_read()
+        .inspect_err(|err| eprintln!("Error: could not access the database due to {err}"))
+    else {
+        exit(EXIT_DB_OPEN_ERROR)
+    };
+    let Ok(main_table) = tx
+        .open_table(bpnode::db::TABLE_MAIN)
+        .inspect_err(|err| eprintln!("Error: could not open the main table due to {err}"))
+    else {
+        exit(EXIT_DB_OPEN_ERROR)
+    };
+    let Ok(Some(network_rec)) = main_table.get(bpnode::REC_NETWORK) else {
+        // Network information isn't found in the database
+        eprintln!("ERROR: Database exists but doesn't contain network information.");
+        eprintln!("Please reinitialize the database with `bpd init` command.");
+        exit(EXIT_NO_NETWORK_INFO);
+    };
+    let stored_network = String::from_utf8_lossy(network_rec.value());
+    if stored_network != configured_network.to_string() {
+        eprintln!("ERROR: Database network mismatch!");
+        eprintln!("Configured network: {}", configured_network);
+        eprintln!("Database network: {}", stored_network);
+        eprintln!("Each BP-Node instance works with a single chain.");
+        eprintln!(
+            "To use a different network, create a separate instance with a different data \
+             directory."
+        );
+        exit(EXIT_NETWORK_MISMATCH);
     }
-    Ok(())
+    log::info!("Database network matches configured network: {}", stored_network);
 }
