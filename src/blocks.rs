@@ -46,6 +46,7 @@ use crate::db::{
 
 const NAME: &str = "blockproc";
 
+// TODO: Make this configuration options
 // Constants for orphan block management
 const MAX_ORPHAN_BLOCKS: usize = 100;
 // Orphan blocks expire after 24 hours
