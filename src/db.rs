@@ -36,6 +36,11 @@ use redb::{
     Value, WriteTransaction,
 };
 
+// see also constants in `bin/bpd.rs`
+const EXIT_DB_INIT_MAIN_TABLE: i32 = 6;
+const EXIT_DB_INIT_TABLE: i32 = 7;
+const EXIT_DB_INIT_ERROR: i32 = 8;
+
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Display)]
 #[display("#{0:010X}")]
 pub struct TxNo(u40);
@@ -370,12 +375,12 @@ pub fn initialize_db_tables(db: &Database, network: Network) {
             // Commit the transaction
             if let Err(err) = tx.commit() {
                 eprintln!("Failed to commit initial database transaction: {err}");
-                exit(8);
+                exit(EXIT_DB_INIT_ERROR);
             }
         }
         Err(err) => {
             eprintln!("Failed to begin database transaction: {err}");
-            exit(9);
+            exit(EXIT_DB_INIT_ERROR);
         }
     }
 }
@@ -386,12 +391,12 @@ fn initialize_main_table(tx: &WriteTransaction, network: Network) {
         Ok(mut main_table) => {
             if let Err(err) = main_table.insert(REC_NETWORK, network.to_string().as_bytes()) {
                 eprintln!("Failed to write network information to database: {err}");
-                exit(5);
+                exit(EXIT_DB_INIT_MAIN_TABLE);
             }
         }
         Err(err) => {
             eprintln!("Failed to open main table in database: {err}");
-            exit(6);
+            exit(EXIT_DB_INIT_MAIN_TABLE);
         }
     }
 }
@@ -452,6 +457,6 @@ fn create_table<K: Key + 'static, V: Value + 'static>(
 ) {
     if let Err(err) = tx.open_table(table_def) {
         eprintln!("Failed to create {} table: {err}", table_name);
-        exit(7);
+        exit(EXIT_DB_INIT_TABLE);
     }
 }

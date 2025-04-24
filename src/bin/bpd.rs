@@ -39,11 +39,13 @@ use redb::Database;
 
 use crate::opts::{Command, Opts};
 
-/// Exit status codes for different error conditions
+// Exit status codes for different error conditions
+// see also constants in `db.rs`
 const EXIT_PATH_ACCESS_ERROR: i32 = 1;
 const EXIT_DB_EXISTS_ERROR: i32 = 2;
 const EXIT_DIR_CREATE_ERROR: i32 = 3;
 const EXIT_DB_CREATE_ERROR: i32 = 4;
+const EXIT_DB_OPEN_ERROR: i32 = 5;
 const EXIT_NETWORK_MISMATCH: i32 = 10;
 const EXIT_NO_NETWORK_INFO: i32 = 11;
 const EXIT_DB_NOT_FOUND: i32 = 12;
