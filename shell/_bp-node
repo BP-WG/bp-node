@@ -23,8 +23,8 @@ _bp-node() {
 '*--listen=[Address(es) to listen for client RPC connections]:LISTEN:_default' \
 '*-b+[Address(es) to listen for block provider connections]:BLOCKS:_default' \
 '*--blocks=[Address(es) to listen for block provider connections]:BLOCKS:_default' \
-'*-v[Set verbosity level]' \
-'*--verbose[Set verbosity level]' \
+'*-v[Set a verbosity level]' \
+'*--verbose[Set a verbosity level]' \
 '--no-network-prefix[Do not add network prefix to the \`--data-dir\`]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -45,8 +45,8 @@ _arguments "${_arguments_options[@]}" : \
 '--data-dir=[Data directory path]:DATA_DIR:_files -/' \
 '-n+[Network to use]:NETWORK:_default' \
 '--network=[Network to use]:NETWORK:_default' \
-'*-v[Set verbosity level]' \
-'*--verbose[Set verbosity level]' \
+'*-v[Set a verbosity level]' \
+'*--verbose[Set a verbosity level]' \
 '--no-network-prefix[Do not add network prefix to the \`--data-dir\`]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
