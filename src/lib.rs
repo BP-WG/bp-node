@@ -21,6 +21,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! BP-Node: Bitcoin blockchain indexer
+//!
+//! Each BP-Node instance is designed to work with a single blockchain network.
+//! If multiple networks need to be indexed (mainnet, testnet, etc.), separate
+//! instances should be used with different data directories.
+
 #[macro_use]
 extern crate amplify;
 
@@ -35,6 +41,7 @@ mod importer;
 pub use blocks::{BlockProcError, BlockProcessor};
 pub use broker::{Broker, BrokerError, BrokerRpcMsg, PATH_INDEXDB, TrackReq};
 pub use config::Config;
+pub use db::{REC_NETWORK, initialize_db_tables};
 pub use importer::{BlockImporter, ImporterCmd, ImporterMsg};
 pub use rpc::{RpcCmd, RpcController};
 //pub use query::{QueryWorker, QueryReq, QueryResp};

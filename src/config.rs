@@ -35,9 +35,15 @@ pub struct Config {
     /// Data location
     pub data_dir: PathBuf,
 
+    /// Bitcoin network type (mainnet, testnet, etc.)
+    ///
+    /// Each BP-Node instance is designed to work with a single network type.
+    /// To work with multiple networks, create separate instances with different data directories.
     pub network: Network,
 
+    /// Addresses to listen for RPC connections
     pub rpc: Vec<SocketAddr>,
 
+    /// Addresses to listen for block import connections
     pub import: Vec<SocketAddr>,
 }

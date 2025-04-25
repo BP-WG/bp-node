@@ -57,22 +57,27 @@ impl ConnectionDelegate<RemoteAddr, Session> for BlockExporter {
 
     fn connect(&mut self, remote: &RemoteAddr) -> Session {
         TcpStream::connect(remote).unwrap_or_else(|err| {
+            #[cfg(feature = "log")]
             log::error!(target: NAME, "Unable to connect BP Node {remote} due to {err}");
+            #[cfg(feature = "log")]
             log::warn!(target: NAME, "Stopping RPC import thread");
             exit(1);
         })
     }
 
     fn on_established(&mut self, remote: SocketAddr, _attempt: usize) {
+        #[cfg(feature = "log")]
         log::info!(target: NAME, "Connected to BP Node {remote}, sending `hello(...)`");
     }
 
     fn on_disconnect(&mut self, err: std::io::Error, _attempt: usize) -> OnDisconnect {
+        #[cfg(feature = "log")]
         log::error!(target: NAME, "BP Node got disconnected due to {err}");
         exit(1)
     }
 
     fn on_io_error(&mut self, err: reactor::Error<ImpossibleResource, NetTransport<Session>>) {
+        #[cfg(feature = "log")]
         log::error!(target: NAME, "I/O error in communicating with BP Node: {err}");
         self.disconnect();
     }
@@ -85,14 +90,17 @@ impl ClientDelegate<RemoteAddr, Session> for BlockExporter {
         match msg {
             ImporterReply::Filters(filters) => {
                 if self.filters_received {
+                    #[cfg(feature = "log")]
                     log::warn!(target: NAME, "Received duplicate filters");
                 } else {
+                    #[cfg(feature = "log")]
                     log::info!(target: NAME, "Received filters");
                 }
                 self.filters = filters;
                 self.filters_received = true;
             }
             ImporterReply::Error(failure) => {
+                #[cfg(feature = "log")]
                 log::error!(target: NAME, "Received error from BP Node: {failure}");
                 self.disconnect();
             }
@@ -100,6 +108,7 @@ impl ClientDelegate<RemoteAddr, Session> for BlockExporter {
     }
 
     fn on_reply_unparsable(&mut self, err: <Self::Reply as Frame>::Error) {
+        #[cfg(feature = "log")]
         log::error!("Invalid message from BP Node: {err}");
     }
 }

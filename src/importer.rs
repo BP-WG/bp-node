@@ -120,7 +120,7 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ImporterCmd> for BlockI
         let client = self.providers.remove(&addr).unwrap_or_else(|| {
             panic!("Block provider at {addr} got disconnected but not found in providers list");
         });
-        log::warn!(target: NAME, "Block provider at {addr} got disconnected due to {reason} ({})", client.agent.map(|a| a.to_string()).unwrap_or(none!()));
+        log::warn!(target: NAME, "Block provider at {addr} got disconnected due to {reason} ({})", client.agent.map(|a| a.to_string()).unwrap_or_default());
     }
 
     fn on_command(&mut self, cmd: ImporterCmd) {
@@ -155,7 +155,7 @@ impl ServiceController<RemoteAddr, Session, TcpListener, ImporterCmd> for BlockI
             ExporterPub::Block(block) => {
                 let block_id = block.header.block_hash();
                 log::debug!("Received block {block_id} from {remote}");
-                match self.processor.process_block(block_id, block) {
+                match self.processor.process_block_and_orphans(block_id, block) {
                     Err(err) => {
                         log::error!(target: NAME, "{err}");
                         log::warn!(target: NAME, "Block {block_id} got dropped due to database connectivity issue");
