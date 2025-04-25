@@ -1671,6 +1671,9 @@ impl BlockProcessor {
         let mut total_txs_removed = 0;
         let mut total_utxos_restored = 0;
         let mut total_utxos_removed = 0;
+        let mut total_spk_entries_cleaned = 0;
+        let mut total_inputs_cleaned = 0;
+        let mut total_outs_refs_cleaned = 0;
 
         let block_spends_table = db
             .open_table(TABLE_BLOCK_SPENDS)
@@ -1696,6 +1699,26 @@ impl BlockProcessor {
             .open_table(TABLE_BLOCK_HEIGHTS)
             .map_err(|e| BlockProcError::Custom(format!("Block heights table error: {}", e)))?;
 
+        // Open the SPKs table for script pubkey cleanup during rollback
+        let mut spks_table = db
+            .open_table(TABLE_SPKS)
+            .map_err(|e| BlockProcError::Custom(format!("SPKs table error: {}", e)))?;
+
+        // Open the inputs table to clean up input references
+        let mut inputs_table = db
+            .open_table(TABLE_INPUTS)
+            .map_err(|e| BlockProcError::Custom(format!("Inputs table error: {}", e)))?;
+
+        // Open the outs table to clean up spending relationships
+        let mut outs_table = db
+            .open_table(TABLE_OUTS)
+            .map_err(|e| BlockProcError::Custom(format!("Outs table error: {}", e)))?;
+
+        // Open tx_blocks table to clean up transaction-block associations
+        let mut tx_blocks_table = db
+            .open_table(TABLE_TX_BLOCKS)
+            .map_err(|e| BlockProcError::Custom(format!("TX-Blocks table error: {}", e)))?;
+
         // Iterate through blocks to roll back (should be in descending height order)
         for &(height, block_id) in blocks {
             log::info!(
@@ -1708,6 +1731,9 @@ impl BlockProcessor {
             let mut block_utxos_restored = 0;
             let mut block_utxos_removed = 0;
             let mut block_txs_removed = 0;
+            let mut block_spk_entries_cleaned = 0;
+            let mut block_inputs_cleaned = 0;
+            let mut block_outs_refs_cleaned = 0;
 
             // 1. Restore UTXOs spent in this block
             if let Some(spends_record) = block_spends_table
@@ -1750,12 +1776,17 @@ impl BlockProcessor {
                         .map_err(|e| BlockProcError::Custom(format!("Tx lookup error: {}", e)))?
                     {
                         let tx = tx_record.value();
-                        let num_outputs = tx.as_ref().outputs.len();
+                        let outputs = tx.as_ref().outputs.as_slice();
+                        let num_outputs = outputs.len();
                         block_utxos_removed += num_outputs;
                         total_utxos_removed += num_outputs;
 
-                        for vout in 0..num_outputs {
-                            utxos_table.remove(&(txno, vout as u32)).map_err(|e| {
+                        // Get the number of inputs for this transaction
+                        let inputs_count = tx.as_ref().inputs.len();
+
+                        for (vout_idx, output) in outputs.iter().enumerate() {
+                            // Remove UTXOs
+                            utxos_table.remove(&(txno, vout_idx as u32)).map_err(|e| {
                                 BlockProcError::Custom(format!("UTXO removal error: {}", e))
                             })?;
 
@@ -1763,14 +1794,101 @@ impl BlockProcessor {
                                 target: NAME,
                                 "Removed UTXO: txno={}, vout={}",
                                 txno,
-                                vout
+                                vout_idx
+                            );
+
+                            // 4. Clean up script pubkey index for this transaction output
+                            let script = &output.script_pubkey;
+                            if !script.is_empty() {
+                                let txnos = spks_table
+                                    .get(script.as_slice())
+                                    .map_err(|e| {
+                                        BlockProcError::Custom(format!("SPKs lookup error: {}", e))
+                                    })?
+                                    .map(|t| t.value().to_vec());
+
+                                if let Some(mut txnos) = txnos {
+                                    // Remove this transaction from the list
+                                    if let Some(pos) = txnos.iter().position(|&t| t == txno) {
+                                        txnos.remove(pos);
+                                        block_spk_entries_cleaned += 1;
+
+                                        // If the list is not empty, update it; otherwise, remove
+                                        // the entry
+                                        if !txnos.is_empty() {
+                                            spks_table.insert(script.as_slice(), txnos).map_err(
+                                                |e| {
+                                                    BlockProcError::Custom(format!(
+                                                        "SPKs update error: {}",
+                                                        e
+                                                    ))
+                                                },
+                                            )?;
+                                        } else {
+                                            spks_table.remove(script.as_slice()).map_err(|e| {
+                                                BlockProcError::Custom(format!(
+                                                    "SPKs removal error: {}",
+                                                    e
+                                                ))
+                                            })?;
+                                        }
+
+                                        log::debug!(
+                                            target: NAME,
+                                            "Cleaned up SPK index for txno={}, vout={}",
+                                            txno,
+                                            vout_idx
+                                        );
+                                    }
+                                }
+                            }
+                        }
+
+                        // 5. Clean up inputs table for this transaction
+                        for input_idx in 0..inputs_count {
+                            if inputs_table
+                                .remove(&(txno, input_idx as u32))
+                                .map_err(|e| {
+                                    BlockProcError::Custom(format!("Inputs removal error: {}", e))
+                                })?
+                                .is_some()
+                            {
+                                block_inputs_cleaned += 1;
+                                log::debug!(
+                                    target: NAME,
+                                    "Removed input reference: txno={}, input_idx={}",
+                                    txno,
+                                    input_idx
+                                );
+                            }
+                        }
+                        total_inputs_cleaned += block_inputs_cleaned;
+
+                        // 6. Clean up this transaction from spending relationships
+                        if outs_table
+                            .remove(txno)
+                            .map_err(|e| {
+                                BlockProcError::Custom(format!("Outs lookup error: {}", e))
+                            })?
+                            .is_some()
+                        {
+                            block_outs_refs_cleaned += 1;
+                            log::debug!(
+                                target: NAME,
+                                "Removed spending relationship for txno={}",
+                                txno
                             );
                         }
                     }
+
+                    // 7. Remove transaction-block association
+                    tx_blocks_table.remove(txno).map_err(|e| {
+                        BlockProcError::Custom(format!("TX-Blocks removal error: {}", e))
+                    })?;
                 }
             }
 
-            // 4. Remove this block from the heights tables
+            // 8. Remove this block from the heights tables
             heights_table
                 .remove(height)
                 .map_err(|e| BlockProcError::Custom(format!("Heights removal error: {}", e)))?;
@@ -1786,23 +1904,32 @@ impl BlockProcessor {
                 block_id
             );
 
+            total_spk_entries_cleaned += block_spk_entries_cleaned;
+            total_outs_refs_cleaned += block_outs_refs_cleaned;
+
             log::info!(
                 target: NAME,
-                "Block rollback stats for height {}: removed {} transactions, restored {} UTXOs, removed {} UTXOs",
+                "Block rollback stats for height {}: removed {} transactions, restored {} UTXOs, removed {} UTXOs, cleaned {} SPK entries, {} input refs, {} output refs",
                 height,
                 block_txs_removed,
                 block_utxos_restored,
-                block_utxos_removed
+                block_utxos_removed,
+                block_spk_entries_cleaned,
+                block_inputs_cleaned,
+                block_outs_refs_cleaned
             );
         }
 
         log::info!(
             target: NAME,
-            "Successfully rolled back {} blocks: removed {} transactions, restored {} UTXOs, removed {} UTXOs",
+            "Successfully rolled back {} blocks: removed {} transactions, restored {} UTXOs, removed {} UTXOs, cleaned {} SPK entries, {} input refs, {} output refs",
             blocks.len(),
             total_txs_removed,
             total_utxos_restored,
-            total_utxos_removed
+            total_utxos_removed,
+            total_spk_entries_cleaned,
+            total_inputs_cleaned,
+            total_outs_refs_cleaned
         );
 
         Ok(())
