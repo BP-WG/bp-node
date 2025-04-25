@@ -294,7 +294,6 @@ impl BlockProcessor {
                 // otherwise use the existing txno. This is mainly to avoid issues after block
                 // reorganization, where the same txid in different blocks could be
                 // assigned different txno values, leading to incorrect processing
-
                 let txid = tx.txid();
                 let txno = txids_table
                     .get(txid.to_byte_array())

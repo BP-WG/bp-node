@@ -53,7 +53,7 @@ pub type BlockId = Id;
 pub type ForkId = Id;
 
 impl TxNo {
-    pub fn start() -> Self { TxNo(u40::ZERO) }
+    pub fn start() -> Self { TxNo(u40::ONE) }
 
     pub fn inc_assign(&mut self) { self.0 += u40::ONE }
 
