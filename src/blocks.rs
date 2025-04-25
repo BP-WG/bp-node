@@ -238,18 +238,66 @@ impl BlockProcessor {
 
             let blockid = self.get_next_block_id(&db)?;
 
-            // Store block header
-            let mut table = db
+            // Open tables needed in the loop to avoid repeated opening/closing which affects
+            // performance
+            let mut blocks_table = db
                 .open_table(TABLE_BLKS)
                 .map_err(BlockProcError::BlockTable)?;
-            table
+
+            let mut blockids_table = db
+                .open_table(TABLE_BLOCKIDS)
+                .map_err(|e| BlockProcError::Custom(format!("Block IDs table error: {}", e)))?;
+
+            let mut heights_table = db
+                .open_table(TABLE_HEIGHTS)
+                .map_err(BlockProcError::HeightsTable)?;
+
+            let mut block_heights_table = db
+                .open_table(TABLE_BLOCK_HEIGHTS)
+                .map_err(|e| BlockProcError::Custom(format!("Block heights table error: {}", e)))?;
+
+            let mut txids_table = db
+                .open_table(TABLE_TXIDS)
+                .map_err(BlockProcError::TxidTable)?;
+
+            let mut tx_blocks_table = db
+                .open_table(TABLE_TX_BLOCKS)
+                .map_err(|e| BlockProcError::Custom(format!("Tx-blocks table error: {}", e)))?;
+
+            let mut utxos_table = db
+                .open_table(TABLE_UTXOS)
+                .map_err(|e| BlockProcError::Custom(format!("UTXOs table error: {}", e)))?;
+
+            let mut inputs_table = db
+                .open_table(TABLE_INPUTS)
+                .map_err(|e| BlockProcError::Custom(format!("Inputs table error: {}", e)))?;
+
+            let mut outs_table = db
+                .open_table(TABLE_OUTS)
+                .map_err(|e| BlockProcError::Custom(format!("Outs table error: {}", e)))?;
+
+            let mut spks_table = db
+                .open_table(TABLE_SPKS)
+                .map_err(|e| BlockProcError::Custom(format!("SPKs table error: {}", e)))?;
+
+            let mut txes_table = db
+                .open_table(TABLE_TXES)
+                .map_err(BlockProcError::TxesTable)?;
+
+            let mut block_txs_table = db
+                .open_table(TABLE_BLOCK_TXS)
+                .map_err(|e| BlockProcError::Custom(format!("Block-txs table error: {}", e)))?;
+
+            let mut block_spends_table = db
+                .open_table(TABLE_BLOCK_SPENDS)
+                .map_err(|e| BlockProcError::Custom(format!("Block spends table error: {}", e)))?;
+
+            // Store block header
+            blocks_table
                 .insert(blockid, DbBlockHeader::from(block.header))
                 .map_err(BlockProcError::BlockStorage)?;
 
             // Map block hash to block ID
-            let mut blockids_table = db
-                .open_table(TABLE_BLOCKIDS)
-                .map_err(|e| BlockProcError::Custom(format!("Block IDs table error: {}", e)))?;
             blockids_table
                 .insert(id.to_byte_array(), blockid)
                 .map_err(|e| BlockProcError::Custom(format!("Block ID storage error: {}", e)))?;
@@ -262,17 +310,11 @@ impl BlockProcessor {
                 blockid
             );
 
-            let mut heights_table = db
-                .open_table(TABLE_HEIGHTS)
-                .map_err(BlockProcError::HeightsTable)?;
             heights_table
                 .insert(height, blockid)
                 .map_err(|e| BlockProcError::Custom(format!("Heights storage error: {}", e)))?;
 
             // Also update the reverse mapping (blockid -> height)
-            let mut block_heights_table = db
-                .open_table(TABLE_BLOCK_HEIGHTS)
-                .map_err(|e| BlockProcError::Custom(format!("Block heights table error: {}", e)))?;
             block_heights_table.insert(blockid, height).map_err(|e| {
                 BlockProcError::Custom(format!("Block height storage error: {}", e))
             })?;
@@ -285,11 +327,6 @@ impl BlockProcessor {
 
             // Process transactions in the block
             for tx in block.transactions {
-                // Store transaction ID to transaction number mapping
-                let mut txids_table = db
-                    .open_table(TABLE_TXIDS)
-                    .map_err(BlockProcError::TxidTable)?;
-
                 // Get txno from TABLE_TXIDS using txid. If it doesn't exist, use txno-counter,
                 // otherwise use the existing txno. This is mainly to avoid issues after block
                 // reorganization, where the same txid in different blocks could be
@@ -312,9 +349,6 @@ impl BlockProcessor {
                     .map_err(BlockProcError::TxidStorage)?;
 
                 // Associate transaction with block ID
-                let mut tx_blocks_table = db
-                    .open_table(TABLE_TX_BLOCKS)
-                    .map_err(|e| BlockProcError::Custom(format!("Tx-blocks table error: {}", e)))?;
                 tx_blocks_table.insert(txno, blockid).map_err(|e| {
                     BlockProcError::Custom(format!("Tx-blocks storage error: {}", e))
                 })?;
@@ -332,9 +366,6 @@ impl BlockProcessor {
                             .map(|v| v.value())
                         {
                             // Mark UTXO as spent
-                            let mut utxos_table = db.open_table(TABLE_UTXOS).map_err(|e| {
-                                BlockProcError::Custom(format!("UTXOs table error: {}", e))
-                            })?;
                             utxos_table
                                 .remove(&(prev_txno, prev_vout.into_u32()))
                                 .map_err(|e| {
@@ -345,9 +376,6 @@ impl BlockProcessor {
                             block_spends.push((prev_txno, prev_vout.into_u32()));
 
                             // Record input-output mapping
-                            let mut inputs_table = db.open_table(TABLE_INPUTS).map_err(|e| {
-                                BlockProcError::Custom(format!("Inputs table error: {}", e))
-                            })?;
                             inputs_table
                                 .insert((txno, vin_idx as u32), (prev_txno, prev_vout.into_u32()))
                                 .map_err(|e| {
@@ -355,9 +383,6 @@ impl BlockProcessor {
                                 })?;
 
                             // Update spending relationships
-                            let mut outs_table = db.open_table(TABLE_OUTS).map_err(|e| {
-                                BlockProcError::Custom(format!("Outs table error: {}", e))
-                            })?;
                             let mut spending_txs = outs_table
                                 .get(prev_txno)
                                 .map_err(|e| {
@@ -376,9 +401,6 @@ impl BlockProcessor {
                 // Process transaction outputs
                 for (vout_idx, output) in tx.outputs.iter().enumerate() {
                     // Add new UTXO
-                    let mut utxos_table = db
-                        .open_table(TABLE_UTXOS)
-                        .map_err(|e| BlockProcError::Custom(format!("UTXOs table error: {}", e)))?;
                     utxos_table
                         .insert((txno, vout_idx as u32), ())
                         .map_err(|e| {
@@ -388,9 +410,6 @@ impl BlockProcessor {
                     // Index script pubkey
                     let script = &output.script_pubkey;
                     if !script.is_empty() {
-                        let mut spks_table = db.open_table(TABLE_SPKS).map_err(|e| {
-                            BlockProcError::Custom(format!("SPKs table error: {}", e))
-                        })?;
                         let mut txnos = spks_table
                             .get(script.as_slice())
                             .map_err(|e| {
@@ -406,9 +425,6 @@ impl BlockProcessor {
                 }
 
                 // Store complete transaction
-                let mut txes_table = db
-                    .open_table(TABLE_TXES)
-                    .map_err(BlockProcError::TxesTable)?;
                 txes_table
                     .insert(txno, DbTx::from(tx))
                     .map_err(BlockProcError::TxesStorage)?;
@@ -430,17 +446,11 @@ impl BlockProcessor {
             }
 
             // Store all transaction numbers in this block
-            let mut block_txs_table = db
-                .open_table(TABLE_BLOCK_TXS)
-                .map_err(|e| BlockProcError::Custom(format!("Block-txs table error: {}", e)))?;
             block_txs_table
                 .insert(blockid, block_txs)
                 .map_err(|e| BlockProcError::Custom(format!("Block-txs storage error: {}", e)))?;
 
             // Store UTXOs spent in this block
-            let mut block_spends_table = db
-                .open_table(TABLE_BLOCK_SPENDS)
-                .map_err(|e| BlockProcError::Custom(format!("Block spends table error: {}", e)))?;
             block_spends_table
                 .insert(blockid, block_spends)
                 .map_err(|e| {
@@ -1534,12 +1544,12 @@ impl BlockProcessor {
     ) -> Result<Vec<(u32, BlockId)>, BlockProcError> {
         let mut blocks_to_rollback = Vec::new();
 
+        let heights_table = db
+            .open_table(TABLE_HEIGHTS)
+            .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
+
         // We need to roll back from highest to lowest height
         for height in (start_height..=end_height).rev() {
-            let heights_table = db
-                .open_table(TABLE_HEIGHTS)
-                .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
-
             if let Some(block_id_record) = heights_table
                 .get(height)
                 .map_err(|e| BlockProcError::Custom(format!("Heights lookup error: {}", e)))?
@@ -1585,6 +1595,14 @@ impl BlockProcessor {
         // Collect blocks (from high to low)
         let mut temp_blocks = Vec::new();
 
+        let blks_table = db
+            .open_table(TABLE_BLKS)
+            .map_err(|e| BlockProcError::Custom(format!("Blocks table error: {}", e)))?;
+
+        let blockids_table = db
+            .open_table(TABLE_BLOCKIDS)
+            .map_err(|e| BlockProcError::Custom(format!("Block IDs table error: {}", e)))?;
+
         while current_height >= start_height {
             temp_blocks.push((current_height, current_block_id));
 
@@ -1593,10 +1611,6 @@ impl BlockProcessor {
             }
 
             // Find the parent of this block
-            let blks_table = db
-                .open_table(TABLE_BLKS)
-                .map_err(|e| BlockProcError::Custom(format!("Blocks table error: {}", e)))?;
-
             let block_header = match blks_table
                 .get(current_block_id)
                 .map_err(|e| BlockProcError::Custom(format!("Block lookup error: {}", e)))?
@@ -1613,10 +1627,6 @@ impl BlockProcessor {
             let prev_hash = block_header.as_ref().prev_block_hash;
 
             // Find the block ID for this hash
-            let blockids_table = db
-                .open_table(TABLE_BLOCKIDS)
-                .map_err(|e| BlockProcError::Custom(format!("Block IDs table error: {}", e)))?;
-
             let prev_block_id = match blockids_table
                 .get(prev_hash.to_byte_array())
                 .map_err(|e| BlockProcError::Custom(format!("Block ID lookup error: {}", e)))?
@@ -1662,6 +1672,30 @@ impl BlockProcessor {
         let mut total_utxos_restored = 0;
         let mut total_utxos_removed = 0;
 
+        let block_spends_table = db
+            .open_table(TABLE_BLOCK_SPENDS)
+            .map_err(|e| BlockProcError::Custom(format!("Block spends table error: {}", e)))?;
+
+        let mut utxos_table = db
+            .open_table(TABLE_UTXOS)
+            .map_err(|e| BlockProcError::Custom(format!("UTXOs table error: {}", e)))?;
+
+        let block_txs_table = db
+            .open_table(TABLE_BLOCK_TXS)
+            .map_err(|e| BlockProcError::Custom(format!("Block-txs table error: {}", e)))?;
+
+        let txes_table = db
+            .open_table(TABLE_TXES)
+            .map_err(|e| BlockProcError::Custom(format!("Txes table error: {}", e)))?;
+
+        let mut heights_table = db
+            .open_table(TABLE_HEIGHTS)
+            .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
+
+        let mut block_heights_table = db
+            .open_table(TABLE_BLOCK_HEIGHTS)
+            .map_err(|e| BlockProcError::Custom(format!("Block heights table error: {}", e)))?;
+
         // Iterate through blocks to roll back (should be in descending height order)
         for &(height, block_id) in blocks {
             log::info!(
@@ -1676,10 +1710,6 @@ impl BlockProcessor {
             let mut block_txs_removed = 0;
 
             // 1. Restore UTXOs spent in this block
-            let block_spends_table = db
-                .open_table(TABLE_BLOCK_SPENDS)
-                .map_err(|e| BlockProcError::Custom(format!("Block spends table error: {}", e)))?;
-
             if let Some(spends_record) = block_spends_table
                 .get(block_id)
                 .map_err(|e| BlockProcError::Custom(format!("Block spends lookup error: {}", e)))?
@@ -1689,10 +1719,6 @@ impl BlockProcessor {
                 total_utxos_restored += block_utxos_restored;
 
                 // Restore each spent UTXO
-                let mut utxos_table = db
-                    .open_table(TABLE_UTXOS)
-                    .map_err(|e| BlockProcError::Custom(format!("UTXOs table error: {}", e)))?;
-
                 for (txno, vout) in spends {
                     utxos_table.insert((txno, vout), ()).map_err(|e| {
                         BlockProcError::Custom(format!("UTXO restoration error: {}", e))
@@ -1708,10 +1734,6 @@ impl BlockProcessor {
             }
 
             // 2. Find all transactions in this block
-            let block_txs_table = db
-                .open_table(TABLE_BLOCK_TXS)
-                .map_err(|e| BlockProcError::Custom(format!("Block-txs table error: {}", e)))?;
-
             if let Some(txs_record) = block_txs_table
                 .get(block_id)
                 .map_err(|e| BlockProcError::Custom(format!("Block-txs lookup error: {}", e)))?
@@ -1723,10 +1745,6 @@ impl BlockProcessor {
                 // For each transaction
                 for txno in txs {
                     // 3. Remove UTXOs created by this transaction
-                    let txes_table = db
-                        .open_table(TABLE_TXES)
-                        .map_err(|e| BlockProcError::Custom(format!("Txes table error: {}", e)))?;
-
                     if let Some(tx_record) = txes_table
                         .get(txno)
                         .map_err(|e| BlockProcError::Custom(format!("Tx lookup error: {}", e)))?
@@ -1735,10 +1753,6 @@ impl BlockProcessor {
                         let num_outputs = tx.as_ref().outputs.len();
                         block_utxos_removed += num_outputs;
                         total_utxos_removed += num_outputs;
-
-                        let mut utxos_table = db.open_table(TABLE_UTXOS).map_err(|e| {
-                            BlockProcError::Custom(format!("UTXOs table error: {}", e))
-                        })?;
 
                         for vout in 0..num_outputs {
                             utxos_table.remove(&(txno, vout as u32)).map_err(|e| {
@@ -1757,17 +1771,9 @@ impl BlockProcessor {
             }
 
             // 4. Remove this block from the heights tables
-            let mut heights_table = db
-                .open_table(TABLE_HEIGHTS)
-                .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
-
             heights_table
                 .remove(height)
                 .map_err(|e| BlockProcError::Custom(format!("Heights removal error: {}", e)))?;
-
-            let mut block_heights_table = db
-                .open_table(TABLE_BLOCK_HEIGHTS)
-                .map_err(|e| BlockProcError::Custom(format!("Block heights table error: {}", e)))?;
 
             block_heights_table.remove(block_id).map_err(|e| {
                 BlockProcError::Custom(format!("Block height removal error: {}", e))
@@ -1833,6 +1839,54 @@ impl BlockProcessor {
         let mut total_utxos_added = 0;
         let mut total_utxos_spent = 0;
 
+        let fork_blocks_table = db
+            .open_table(TABLE_FORK_BLOCKS)
+            .map_err(|e| BlockProcError::Custom(format!("Fork blocks table error: {}", e)))?;
+
+        let mut txids_table = db
+            .open_table(TABLE_TXIDS)
+            .map_err(BlockProcError::TxidTable)?;
+
+        let mut txes_table = db
+            .open_table(TABLE_TXES)
+            .map_err(BlockProcError::TxesTable)?;
+
+        let mut tx_blocks_table = db
+            .open_table(TABLE_TX_BLOCKS)
+            .map_err(|e| BlockProcError::Custom(format!("Tx-blocks table error: {}", e)))?;
+
+        let mut utxos_table = db
+            .open_table(TABLE_UTXOS)
+            .map_err(|e| BlockProcError::Custom(format!("UTXOs table error: {}", e)))?;
+
+        let mut inputs_table = db
+            .open_table(TABLE_INPUTS)
+            .map_err(|e| BlockProcError::Custom(format!("Inputs table error: {}", e)))?;
+
+        let mut outs_table = db
+            .open_table(TABLE_OUTS)
+            .map_err(|e| BlockProcError::Custom(format!("Outs table error: {}", e)))?;
+
+        let mut spks_table = db
+            .open_table(TABLE_SPKS)
+            .map_err(|e| BlockProcError::Custom(format!("SPKs table error: {}", e)))?;
+
+        let mut block_txs_table = db
+            .open_table(TABLE_BLOCK_TXS)
+            .map_err(|e| BlockProcError::Custom(format!("Block-txs table error: {}", e)))?;
+
+        let mut block_spends_table = db
+            .open_table(TABLE_BLOCK_SPENDS)
+            .map_err(|e| BlockProcError::Custom(format!("Block spends table error: {}", e)))?;
+
+        let mut heights_table = db
+            .open_table(TABLE_HEIGHTS)
+            .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
+
+        let mut block_heights_table = db
+            .open_table(TABLE_BLOCK_HEIGHTS)
+            .map_err(|e| BlockProcError::Custom(format!("Block heights table error: {}", e)))?;
+
         // Iterate through blocks to apply (should be in ascending height order)
         for &(height, block_id) in blocks {
             log::info!(
@@ -1843,10 +1897,6 @@ impl BlockProcessor {
             );
 
             // Get the complete block data from fork blocks table
-            let fork_blocks_table = db
-                .open_table(TABLE_FORK_BLOCKS)
-                .map_err(|e| BlockProcError::Custom(format!("Fork blocks table error: {}", e)))?;
-
             let block_data = fork_blocks_table
                 .get(block_id)
                 .map_err(|e| BlockProcError::Custom(format!("Fork block lookup error: {}", e)))?
@@ -1879,10 +1929,6 @@ impl BlockProcessor {
 
                 // For fork blocks, txids may already be in the database with assigned txno
                 // Check if this txid already exists
-                let mut txids_table = db
-                    .open_table(TABLE_TXIDS)
-                    .map_err(BlockProcError::TxidTable)?;
-
                 let existing_txno = txids_table
                     .get(txid.to_byte_array())
                     .map_err(BlockProcError::TxidLookup)?
@@ -1907,9 +1953,6 @@ impl BlockProcessor {
                         .map_err(BlockProcError::TxidStorage)?;
 
                     // Store the transaction data
-                    let mut txes_table = db
-                        .open_table(TABLE_TXES)
-                        .map_err(BlockProcError::TxesTable)?;
                     txes_table
                         .insert(tx_txno, DbTx::from(tx.clone()))
                         .map_err(BlockProcError::TxesStorage)?;
@@ -1918,9 +1961,6 @@ impl BlockProcessor {
                 }
 
                 // Associate transaction with block ID (update even if transaction existed)
-                let mut tx_blocks_table = db
-                    .open_table(TABLE_TX_BLOCKS)
-                    .map_err(|e| BlockProcError::Custom(format!("Tx-blocks table error: {}", e)))?;
                 tx_blocks_table.insert(tx_txno, block_id).map_err(|e| {
                     BlockProcError::Custom(format!("Tx-blocks storage error: {}", e))
                 })?;
@@ -1938,9 +1978,6 @@ impl BlockProcessor {
                             .map(|v| v.value())
                         {
                             // Mark UTXO as spent
-                            let mut utxos_table = db.open_table(TABLE_UTXOS).map_err(|e| {
-                                BlockProcError::Custom(format!("UTXOs table error: {}", e))
-                            })?;
                             utxos_table
                                 .remove(&(prev_txno, prev_vout.into_u32()))
                                 .map_err(|e| {
@@ -1953,9 +1990,6 @@ impl BlockProcessor {
                             block_spends.push((prev_txno, prev_vout.into_u32()));
 
                             // Record input-output mapping
-                            let mut inputs_table = db.open_table(TABLE_INPUTS).map_err(|e| {
-                                BlockProcError::Custom(format!("Inputs table error: {}", e))
-                            })?;
                             inputs_table
                                 .insert(
                                     (tx_txno, vin_idx as u32),
@@ -1966,9 +2000,6 @@ impl BlockProcessor {
                                 })?;
 
                             // Update spending relationships
-                            let mut outs_table = db.open_table(TABLE_OUTS).map_err(|e| {
-                                BlockProcError::Custom(format!("Outs table error: {}", e))
-                            })?;
                             let mut spending_txs = outs_table
                                 .get(prev_txno)
                                 .map_err(|e| {
@@ -1991,9 +2022,6 @@ impl BlockProcessor {
                 // Process transaction outputs
                 for (vout_idx, output) in tx.outputs.iter().enumerate() {
                     // Add new UTXO
-                    let mut utxos_table = db
-                        .open_table(TABLE_UTXOS)
-                        .map_err(|e| BlockProcError::Custom(format!("UTXOs table error: {}", e)))?;
                     utxos_table
                         .insert((tx_txno, vout_idx as u32), ())
                         .map_err(|e| {
@@ -2005,9 +2033,6 @@ impl BlockProcessor {
                     // Index script pubkey
                     let script = &output.script_pubkey;
                     if !script.is_empty() {
-                        let mut spks_table = db.open_table(TABLE_SPKS).map_err(|e| {
-                            BlockProcError::Custom(format!("SPKs table error: {}", e))
-                        })?;
                         let mut txnos = spks_table
                             .get(script.as_slice())
                             .map_err(|e| {
@@ -2028,17 +2053,11 @@ impl BlockProcessor {
             }
 
             // Store all transaction numbers in this block
-            let mut block_txs_table = db
-                .open_table(TABLE_BLOCK_TXS)
-                .map_err(|e| BlockProcError::Custom(format!("Block-txs table error: {}", e)))?;
             block_txs_table
                 .insert(block_id, block_txs)
                 .map_err(|e| BlockProcError::Custom(format!("Block-txs storage error: {}", e)))?;
 
             // Store UTXOs spent in this block
-            let mut block_spends_table = db
-                .open_table(TABLE_BLOCK_SPENDS)
-                .map_err(|e| BlockProcError::Custom(format!("Block spends table error: {}", e)))?;
             block_spends_table
                 .insert(block_id, block_spends)
                 .map_err(|e| {
@@ -2046,17 +2065,9 @@ impl BlockProcessor {
                 })?;
 
             // Update the heights tables
-            let mut heights_table = db
-                .open_table(TABLE_HEIGHTS)
-                .map_err(|e| BlockProcError::Custom(format!("Heights table error: {}", e)))?;
-
             heights_table
                 .insert(height, block_id)
                 .map_err(|e| BlockProcError::Custom(format!("Heights storage error: {}", e)))?;
-
-            let mut block_heights_table = db
-                .open_table(TABLE_BLOCK_HEIGHTS)
-                .map_err(|e| BlockProcError::Custom(format!("Block heights table error: {}", e)))?;
 
             block_heights_table.insert(block_id, height).map_err(|e| {
                 BlockProcError::Custom(format!("Block height storage error: {}", e))
