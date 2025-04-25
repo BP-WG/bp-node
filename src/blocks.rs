@@ -52,6 +52,271 @@ const MAX_ORPHAN_BLOCKS: usize = 100;
 // Orphan blocks expire after 24 hours
 const ORPHAN_EXPIRY_HOURS: u64 = 24;
 
+/// Table context for transaction processing
+///
+/// This structure holds references to all database tables needed for transaction processing.
+/// It helps avoid repeated opening of the same tables and provides a unified interface for
+/// transaction processing logic that can be shared between different block processing functions.
+struct TxTablesContext<'a> {
+    /// Maps transaction IDs to transaction numbers
+    txids_table: redb::Table<'a, [u8; 32], TxNo>,
+
+    /// Maps transaction numbers to block IDs
+    tx_blocks_table: redb::Table<'a, TxNo, BlockId>,
+
+    /// Tracks unspent transaction outputs (UTXOs)
+    utxos_table: redb::Table<'a, (TxNo, u32), ()>,
+
+    /// Maps transaction inputs to the outputs they spend
+    inputs_table: redb::Table<'a, (TxNo, u32), (TxNo, u32)>,
+
+    /// Maps transaction numbers to transactions that spend their outputs
+    outs_table: redb::Table<'a, TxNo, Vec<TxNo>>,
+
+    /// Maps script public keys to transactions containing them
+    spks_table: redb::Table<'a, &'static [u8], Vec<TxNo>>,
+
+    /// Stores complete transaction data
+    txes_table: redb::Table<'a, TxNo, DbTx>,
+
+    /// Maps block IDs to transactions they contain
+    block_txs_table: redb::Table<'a, BlockId, Vec<TxNo>>,
+
+    /// Records UTXOs spent in each block (for rollback purposes)
+    block_spends_table: redb::Table<'a, BlockId, Vec<(TxNo, u32)>>,
+}
+
+impl<'a> TxTablesContext<'a> {
+    /// Creates a new transaction tables context from a database transaction
+    fn new(db: &'a WriteTransaction) -> Result<Self, BlockProcError> {
+        Ok(Self {
+            txids_table: db
+                .open_table(TABLE_TXIDS)
+                .map_err(BlockProcError::TxidTable)?,
+
+            tx_blocks_table: db
+                .open_table(TABLE_TX_BLOCKS)
+                .map_err(|e| BlockProcError::Custom(format!("Tx-blocks table error: {}", e)))?,
+
+            utxos_table: db
+                .open_table(TABLE_UTXOS)
+                .map_err(|e| BlockProcError::Custom(format!("UTXOs table error: {}", e)))?,
+
+            inputs_table: db
+                .open_table(TABLE_INPUTS)
+                .map_err(|e| BlockProcError::Custom(format!("Inputs table error: {}", e)))?,
+
+            outs_table: db
+                .open_table(TABLE_OUTS)
+                .map_err(|e| BlockProcError::Custom(format!("Outs table error: {}", e)))?,
+
+            spks_table: db
+                .open_table(TABLE_SPKS)
+                .map_err(|e| BlockProcError::Custom(format!("SPKs table error: {}", e)))?,
+
+            txes_table: db
+                .open_table(TABLE_TXES)
+                .map_err(BlockProcError::TxesTable)?,
+
+            block_txs_table: db
+                .open_table(TABLE_BLOCK_TXS)
+                .map_err(|e| BlockProcError::Custom(format!("Block-txs table error: {}", e)))?,
+
+            block_spends_table: db
+                .open_table(TABLE_BLOCK_SPENDS)
+                .map_err(|e| BlockProcError::Custom(format!("Block spends table error: {}", e)))?,
+        })
+    }
+
+    /// Process a single transaction, handling all database operations
+    ///
+    /// This method abstracts the common logic for processing transactions in both
+    /// normal block processing and during chain reorganization.
+    ///
+    /// # Parameters
+    /// * `tx` - The transaction to process
+    /// * `block_id` - ID of the block containing the transaction
+    /// * `txno_counter` - Current transaction number counter (will be incremented if needed)
+    /// * `block_txs` - Vector to collect transaction IDs for this block
+    /// * `block_spends` - Vector to collect UTXOs spent in this block
+    ///
+    /// # Returns
+    /// * `Result<(TxNo, bool), BlockProcError>` - Transaction number and whether it's a new
+    ///   transaction
+    fn process_transaction(
+        &mut self,
+        tx: &bpwallet::Tx,
+        block_id: BlockId,
+        txno_counter: &mut TxNo,
+        block_txs: &mut Vec<TxNo>,
+        block_spends: &mut Vec<(TxNo, u32)>,
+    ) -> Result<(TxNo, bool), BlockProcError> {
+        // Calculate transaction ID
+        let txid = tx.txid();
+        let txid_bytes = txid.to_byte_array();
+
+        // Check if this txid already exists
+        let existing_txno = self
+            .txids_table
+            .get(txid_bytes)
+            .map_err(BlockProcError::TxidLookup)?
+            .map(|v| v.value());
+
+        // Get or assign transaction number
+        let txno = if let Some(existing) = existing_txno {
+            existing // Use existing transaction number
+        } else {
+            // Assign new transaction number
+            txno_counter.inc_assign();
+            *txno_counter
+        };
+
+        // Add transaction to the list for this block
+        block_txs.push(txno);
+
+        // Store transaction ID mapping (or update if needed)
+        self.txids_table
+            .insert(txid_bytes, txno)
+            .map_err(BlockProcError::TxidStorage)?;
+
+        // Associate transaction with block ID
+        self.tx_blocks_table
+            .insert(txno, block_id)
+            .map_err(|e| BlockProcError::Custom(format!("Tx-blocks storage error: {}", e)))?;
+
+        // Process transaction inputs
+        for (vin_idx, input) in tx.inputs.iter().enumerate() {
+            if !input.prev_output.is_coinbase() {
+                let prev_txid = input.prev_output.txid;
+                let prev_vout = input.prev_output.vout;
+
+                // Look up previous transaction number
+                if let Some(prev_txno) = self
+                    .txids_table
+                    .get(prev_txid.to_byte_array())
+                    .map_err(BlockProcError::TxidLookup)?
+                    .map(|v| v.value())
+                {
+                    // Mark UTXO as spent
+                    self.utxos_table
+                        .remove(&(prev_txno, prev_vout.into_u32()))
+                        .map_err(|e| {
+                            BlockProcError::Custom(format!("UTXOs removal error: {}", e))
+                        })?;
+
+                    // Record UTXO spent in this block
+                    block_spends.push((prev_txno, prev_vout.into_u32()));
+
+                    // Record input-output mapping
+                    self.inputs_table
+                        .insert((txno, vin_idx as u32), (prev_txno, prev_vout.into_u32()))
+                        .map_err(|e| {
+                            BlockProcError::Custom(format!("Inputs storage error: {}", e))
+                        })?;
+
+                    // Update spending relationships
+                    let mut spending_txs = self
+                        .outs_table
+                        .get(prev_txno)
+                        .map_err(|e| BlockProcError::Custom(format!("Outs lookup error: {}", e)))?
+                        .map(|v| v.value().to_vec())
+                        .unwrap_or_default();
+
+                    // Avoid duplicate entries in fork case
+                    if !spending_txs.contains(&txno) {
+                        spending_txs.push(txno);
+                        self.outs_table
+                            .insert(prev_txno, spending_txs)
+                            .map_err(|e| {
+                                BlockProcError::Custom(format!("Outs update error: {}", e))
+                            })?;
+                    }
+                }
+            }
+        }
+
+        // Process transaction outputs
+        for (vout_idx, output) in tx.outputs.iter().enumerate() {
+            // Add new UTXO
+            self.utxos_table
+                .insert((txno, vout_idx as u32), ())
+                .map_err(|e| BlockProcError::Custom(format!("UTXOs storage error: {}", e)))?;
+
+            // Index script pubkey
+            let script = &output.script_pubkey;
+            if !script.is_empty() {
+                let mut txnos = self
+                    .spks_table
+                    .get(script.as_slice())
+                    .map_err(|e| BlockProcError::Custom(format!("SPKs lookup error: {}", e)))?
+                    .map(|v| v.value().to_vec())
+                    .unwrap_or_default();
+
+                // Avoid duplicate entries in fork case
+                if !txnos.contains(&txno) {
+                    txnos.push(txno);
+                    self.spks_table
+                        .insert(script.as_slice(), txnos)
+                        .map_err(|e| BlockProcError::Custom(format!("SPKs update error: {}", e)))?;
+                }
+            }
+        }
+
+        // Store complete transaction data if it's new
+        if existing_txno.is_none() {
+            self.txes_table
+                .insert(txno, DbTx::from(tx.clone()))
+                .map_err(BlockProcError::TxesStorage)?;
+        }
+
+        // Return transaction number and whether it was newly added
+        Ok((txno, existing_txno.is_none()))
+    }
+
+    /// Finalize block processing by storing block transaction and spend data
+    ///
+    /// This method handles the common post-processing steps after all transactions
+    /// in a block have been processed.
+    ///
+    /// # Parameters
+    /// * `block_id` - ID of the processed block
+    /// * `block_txs` - Transaction IDs in this block
+    /// * `block_spends` - UTXOs spent in this block
+    /// * `txno_counter` - Current transaction number counter to update in the main table
+    ///
+    /// # Returns
+    /// * `Result<(), BlockProcError>` - Success or error
+    fn finalize_block_processing(
+        &mut self,
+        db: &WriteTransaction,
+        block_id: BlockId,
+        block_txs: Vec<TxNo>,
+        block_spends: Vec<(TxNo, u32)>,
+        txno_counter: TxNo,
+    ) -> Result<(), BlockProcError> {
+        // Store all transaction numbers in this block
+        self.block_txs_table
+            .insert(block_id, block_txs)
+            .map_err(|e| BlockProcError::Custom(format!("Block-txs storage error: {}", e)))?;
+
+        // Store UTXOs spent in this block
+        self.block_spends_table
+            .insert(block_id, block_spends)
+            .map_err(|e| BlockProcError::Custom(format!("Block spends storage error: {}", e)))?;
+
+        // Update global counters
+        let mut main = db
+            .open_table(TABLE_MAIN)
+            .map_err(BlockProcError::MainTable)?;
+
+        // Update transaction counter
+        main.insert(REC_TXNO, txno_counter.to_byte_array().as_slice())
+            .map_err(BlockProcError::TxNoUpdate)?;
+
+        Ok(())
+    }
+}
+
 pub struct BlockProcessor {
     db: USender<DbMsg>,
     broker: Sender<ImporterMsg>,
@@ -67,6 +332,27 @@ impl BlockProcessor {
 
     pub fn untrack(&mut self, filters: Vec<BloomFilter32>) {
         self.tracking.retain(|filter| !filters.contains(filter));
+    }
+
+    /// Check if a transaction should trigger a notification based on tracking filters
+    ///
+    /// # Parameters
+    /// * `txid_bytes` - Transaction ID bytes to check against filters
+    ///
+    /// # Returns
+    /// * `bool` - Whether notification should be sent
+    fn should_notify_transaction(&self, txid_bytes: [u8; 32]) -> bool {
+        if self.tracking.is_empty() {
+            return false;
+        }
+
+        for filter in &self.tracking {
+            if filter.contains(txid_bytes) {
+                return true;
+            }
+        }
+
+        false
     }
 
     // Helper function to calculate block height based on previous block hash
@@ -223,10 +509,7 @@ impl BlockProcessor {
             // Get current transaction number or use starting value if not found
             match main.get(REC_TXNO).map_err(BlockProcError::TxNoAbsent)? {
                 Some(rec) => TxNo::from_slice(rec.value()).map_err(BlockProcError::TxNoInvalid)?,
-                None => {
-                    log::debug!(target: NAME, "No transaction counter found, starting from zero");
-                    TxNo::start()
-                }
+                None => TxNo::start(),
             }
         };
 
@@ -238,8 +521,8 @@ impl BlockProcessor {
 
             let blockid = self.get_next_block_id(&db)?;
 
-            // Open tables needed in the loop to avoid repeated opening/closing which affects
-            // performance
+            // Initialize the transaction tables context
+            let mut tx_ctx = TxTablesContext::new(&db)?;
             let mut blocks_table = db
                 .open_table(TABLE_BLKS)
                 .map_err(BlockProcError::BlockTable)?;
@@ -255,42 +538,6 @@ impl BlockProcessor {
             let mut block_heights_table = db
                 .open_table(TABLE_BLOCK_HEIGHTS)
                 .map_err(|e| BlockProcError::Custom(format!("Block heights table error: {}", e)))?;
-
-            let mut txids_table = db
-                .open_table(TABLE_TXIDS)
-                .map_err(BlockProcError::TxidTable)?;
-
-            let mut tx_blocks_table = db
-                .open_table(TABLE_TX_BLOCKS)
-                .map_err(|e| BlockProcError::Custom(format!("Tx-blocks table error: {}", e)))?;
-
-            let mut utxos_table = db
-                .open_table(TABLE_UTXOS)
-                .map_err(|e| BlockProcError::Custom(format!("UTXOs table error: {}", e)))?;
-
-            let mut inputs_table = db
-                .open_table(TABLE_INPUTS)
-                .map_err(|e| BlockProcError::Custom(format!("Inputs table error: {}", e)))?;
-
-            let mut outs_table = db
-                .open_table(TABLE_OUTS)
-                .map_err(|e| BlockProcError::Custom(format!("Outs table error: {}", e)))?;
-
-            let mut spks_table = db
-                .open_table(TABLE_SPKS)
-                .map_err(|e| BlockProcError::Custom(format!("SPKs table error: {}", e)))?;
-
-            let mut txes_table = db
-                .open_table(TABLE_TXES)
-                .map_err(BlockProcError::TxesTable)?;
-
-            let mut block_txs_table = db
-                .open_table(TABLE_BLOCK_TXS)
-                .map_err(|e| BlockProcError::Custom(format!("Block-txs table error: {}", e)))?;
-
-            let mut block_spends_table = db
-                .open_table(TABLE_BLOCK_SPENDS)
-                .map_err(|e| BlockProcError::Custom(format!("Block spends table error: {}", e)))?;
 
             // Store block header
             blocks_table
@@ -327,144 +574,32 @@ impl BlockProcessor {
 
             // Process transactions in the block
             for tx in block.transactions {
-                // Get txno from TABLE_TXIDS using txid. If it doesn't exist, use txno-counter,
-                // otherwise use the existing txno. This is mainly to avoid issues after block
-                // reorganization, where the same txid in different blocks could be
-                // assigned different txno values, leading to incorrect processing
-                let txid = tx.txid();
-                let txno = txids_table
-                    .get(txid.to_byte_array())
-                    .map_err(BlockProcError::TxidLookup)?
-                    .map(|v| v.value())
-                    .unwrap_or_else(|| {
-                        txno_counter.inc_assign();
-                        txno_counter
-                    });
-
-                // Add transaction to the list for this block
-                block_txs.push(txno);
-
-                txids_table
-                    .insert(txid.to_byte_array(), txno)
-                    .map_err(BlockProcError::TxidStorage)?;
-
-                // Associate transaction with block ID
-                tx_blocks_table.insert(txno, blockid).map_err(|e| {
-                    BlockProcError::Custom(format!("Tx-blocks storage error: {}", e))
-                })?;
-
-                // Process transaction inputs
-                for (vin_idx, input) in tx.inputs.iter().enumerate() {
-                    if !input.prev_output.is_coinbase() {
-                        let prev_txid = input.prev_output.txid;
-                        let prev_vout = input.prev_output.vout;
-
-                        // Look up previous transaction number
-                        if let Some(prev_txno) = txids_table
-                            .get(prev_txid.to_byte_array())
-                            .map_err(BlockProcError::TxidLookup)?
-                            .map(|v| v.value())
-                        {
-                            // Mark UTXO as spent
-                            utxos_table
-                                .remove(&(prev_txno, prev_vout.into_u32()))
-                                .map_err(|e| {
-                                    BlockProcError::Custom(format!("UTXOs removal error: {}", e))
-                                })?;
-
-                            // Record UTXO spent in this block
-                            block_spends.push((prev_txno, prev_vout.into_u32()));
-
-                            // Record input-output mapping
-                            inputs_table
-                                .insert((txno, vin_idx as u32), (prev_txno, prev_vout.into_u32()))
-                                .map_err(|e| {
-                                    BlockProcError::Custom(format!("Inputs storage error: {}", e))
-                                })?;
-
-                            // Update spending relationships
-                            let mut spending_txs = outs_table
-                                .get(prev_txno)
-                                .map_err(|e| {
-                                    BlockProcError::Custom(format!("Outs lookup error: {}", e))
-                                })?
-                                .map(|v| v.value().to_vec())
-                                .unwrap_or_default();
-                            spending_txs.push(txno);
-                            outs_table.insert(prev_txno, spending_txs).map_err(|e| {
-                                BlockProcError::Custom(format!("Outs update error: {}", e))
-                            })?;
-                        }
-                    }
-                }
-
-                // Process transaction outputs
-                for (vout_idx, output) in tx.outputs.iter().enumerate() {
-                    // Add new UTXO
-                    utxos_table
-                        .insert((txno, vout_idx as u32), ())
-                        .map_err(|e| {
-                            BlockProcError::Custom(format!("UTXOs storage error: {}", e))
-                        })?;
-
-                    // Index script pubkey
-                    let script = &output.script_pubkey;
-                    if !script.is_empty() {
-                        let mut txnos = spks_table
-                            .get(script.as_slice())
-                            .map_err(|e| {
-                                BlockProcError::Custom(format!("SPKs lookup error: {}", e))
-                            })?
-                            .map(|v| v.value().to_vec())
-                            .unwrap_or_default();
-                        txnos.push(txno);
-                        spks_table.insert(script.as_slice(), txnos).map_err(|e| {
-                            BlockProcError::Custom(format!("SPKs update error: {}", e))
-                        })?;
-                    }
-                }
-
-                // Store complete transaction
-                txes_table
-                    .insert(txno, DbTx::from(tx))
-                    .map_err(BlockProcError::TxesStorage)?;
+                let _ = tx_ctx.process_transaction(
+                    &tx,
+                    blockid,
+                    &mut txno_counter,
+                    &mut block_txs,
+                    &mut block_spends,
+                )?;
 
                 // Check if transaction ID is in tracking list and notify if needed
+                let txid = tx.txid();
                 let txid_bytes = txid.to_byte_array();
-                let mut should_notify = false;
-                for filter in &self.tracking {
-                    if filter.contains(txid_bytes) {
-                        should_notify = true;
-                        break;
-                    }
-                }
-                if should_notify {
+                if self.should_notify_transaction(txid_bytes) {
                     self.broker.send(ImporterMsg::Mined(txid))?;
                 }
 
                 count += 1;
             }
 
-            // Store all transaction numbers in this block
-            block_txs_table
-                .insert(blockid, block_txs)
-                .map_err(|e| BlockProcError::Custom(format!("Block-txs storage error: {}", e)))?;
-
-            // Store UTXOs spent in this block
-            block_spends_table
-                .insert(blockid, block_spends)
-                .map_err(|e| {
-                    BlockProcError::Custom(format!("Block spends storage error: {}", e))
-                })?;
-
-            // Update global counters
-            let mut main = db
-                .open_table(TABLE_MAIN)
-                .map_err(BlockProcError::MainTable)?;
-
-            // Update transaction counter
-            main.insert(REC_TXNO, txno_counter.to_byte_array().as_slice())
-                .map_err(BlockProcError::TxNoUpdate)?;
+            // Finalize the block processing
+            tx_ctx.finalize_block_processing(
+                &db,
+                blockid,
+                block_txs,
+                block_spends,
+                txno_counter,
+            )?;
 
             // Log successful block processing
             log::debug!(
@@ -1955,10 +2090,7 @@ impl BlockProcessor {
             // Get current transaction number or use starting value if not found
             match main.get(REC_TXNO).map_err(BlockProcError::TxNoAbsent)? {
                 Some(rec) => TxNo::from_slice(rec.value()).map_err(BlockProcError::TxNoInvalid)?,
-                None => {
-                    log::debug!(target: NAME, "No transaction counter found, starting from zero");
-                    TxNo::start()
-                }
+                None => TxNo::start(),
             }
         };
 
@@ -1966,45 +2098,11 @@ impl BlockProcessor {
         let mut total_utxos_added = 0;
         let mut total_utxos_spent = 0;
 
+        let mut tx_ctx = TxTablesContext::new(db)?;
+
         let fork_blocks_table = db
             .open_table(TABLE_FORK_BLOCKS)
             .map_err(|e| BlockProcError::Custom(format!("Fork blocks table error: {}", e)))?;
-
-        let mut txids_table = db
-            .open_table(TABLE_TXIDS)
-            .map_err(BlockProcError::TxidTable)?;
-
-        let mut txes_table = db
-            .open_table(TABLE_TXES)
-            .map_err(BlockProcError::TxesTable)?;
-
-        let mut tx_blocks_table = db
-            .open_table(TABLE_TX_BLOCKS)
-            .map_err(|e| BlockProcError::Custom(format!("Tx-blocks table error: {}", e)))?;
-
-        let mut utxos_table = db
-            .open_table(TABLE_UTXOS)
-            .map_err(|e| BlockProcError::Custom(format!("UTXOs table error: {}", e)))?;
-
-        let mut inputs_table = db
-            .open_table(TABLE_INPUTS)
-            .map_err(|e| BlockProcError::Custom(format!("Inputs table error: {}", e)))?;
-
-        let mut outs_table = db
-            .open_table(TABLE_OUTS)
-            .map_err(|e| BlockProcError::Custom(format!("Outs table error: {}", e)))?;
-
-        let mut spks_table = db
-            .open_table(TABLE_SPKS)
-            .map_err(|e| BlockProcError::Custom(format!("SPKs table error: {}", e)))?;
-
-        let mut block_txs_table = db
-            .open_table(TABLE_BLOCK_TXS)
-            .map_err(|e| BlockProcError::Custom(format!("Block-txs table error: {}", e)))?;
-
-        let mut block_spends_table = db
-            .open_table(TABLE_BLOCK_SPENDS)
-            .map_err(|e| BlockProcError::Custom(format!("Block spends table error: {}", e)))?;
 
         let mut heights_table = db
             .open_table(TABLE_HEIGHTS)
@@ -2052,144 +2150,38 @@ impl BlockProcessor {
 
             // Process all transactions in the block
             for tx in &block.transactions {
+                let (_, is_new) = tx_ctx.process_transaction(
+                    tx,
+                    block_id,
+                    &mut txno,
+                    &mut block_txs,
+                    &mut block_spends,
+                )?;
+
+                // Check if transaction ID is in tracking list and notify if needed
                 let txid = tx.txid();
+                let txid_bytes = txid.to_byte_array();
+                if self.should_notify_transaction(txid_bytes) {
+                    self.broker.send(ImporterMsg::Mined(txid))?;
+                }
 
-                // For fork blocks, txids may already be in the database with assigned txno
-                // Check if this txid already exists
-                let existing_txno = txids_table
-                    .get(txid.to_byte_array())
-                    .map_err(BlockProcError::TxidLookup)?
-                    .map(|v| v.value());
-
-                let tx_txno = if let Some(existing) = existing_txno {
-                    // Use the existing transaction number
-                    existing
-                } else {
-                    // Assign a new transaction number
-                    txno.inc_assign();
-                    txno
-                };
-
-                // Add transaction to the list for this block
-                block_txs.push(tx_txno);
-
-                // If this is a new transaction, store its mapping and data
-                if existing_txno.is_none() {
-                    txids_table
-                        .insert(txid.to_byte_array(), tx_txno)
-                        .map_err(BlockProcError::TxidStorage)?;
-
-                    // Store the transaction data
-                    txes_table
-                        .insert(tx_txno, DbTx::from(tx.clone()))
-                        .map_err(BlockProcError::TxesStorage)?;
-
+                if is_new {
                     block_txs_added += 1;
                 }
 
-                // Associate transaction with block ID (update even if transaction existed)
-                tx_blocks_table.insert(tx_txno, block_id).map_err(|e| {
-                    BlockProcError::Custom(format!("Tx-blocks storage error: {}", e))
-                })?;
+                // Count UTXOs added (outputs)
+                block_utxos_added += tx.outputs.len();
 
-                // Process transaction inputs
-                for (vin_idx, input) in tx.inputs.iter().enumerate() {
+                // Count UTXOs spent (inputs except coinbase)
+                for input in &tx.inputs {
                     if !input.prev_output.is_coinbase() {
-                        let prev_txid = input.prev_output.txid;
-                        let prev_vout = input.prev_output.vout;
-
-                        // Look up previous transaction number
-                        if let Some(prev_txno) = txids_table
-                            .get(prev_txid.to_byte_array())
-                            .map_err(BlockProcError::TxidLookup)?
-                            .map(|v| v.value())
-                        {
-                            // Mark UTXO as spent
-                            utxos_table
-                                .remove(&(prev_txno, prev_vout.into_u32()))
-                                .map_err(|e| {
-                                    BlockProcError::Custom(format!("UTXOs removal error: {}", e))
-                                })?;
-
-                            block_utxos_spent += 1;
-
-                            // Record UTXO spent in this block
-                            block_spends.push((prev_txno, prev_vout.into_u32()));
-
-                            // Record input-output mapping
-                            inputs_table
-                                .insert(
-                                    (tx_txno, vin_idx as u32),
-                                    (prev_txno, prev_vout.into_u32()),
-                                )
-                                .map_err(|e| {
-                                    BlockProcError::Custom(format!("Inputs storage error: {}", e))
-                                })?;
-
-                            // Update spending relationships
-                            let mut spending_txs = outs_table
-                                .get(prev_txno)
-                                .map_err(|e| {
-                                    BlockProcError::Custom(format!("Outs lookup error: {}", e))
-                                })?
-                                .map(|v| v.value().to_vec())
-                                .unwrap_or_default();
-
-                            // Avoid duplicate entries
-                            if !spending_txs.contains(&tx_txno) {
-                                spending_txs.push(tx_txno);
-                                outs_table.insert(prev_txno, spending_txs).map_err(|e| {
-                                    BlockProcError::Custom(format!("Outs update error: {}", e))
-                                })?;
-                            }
-                        }
-                    }
-                }
-
-                // Process transaction outputs
-                for (vout_idx, output) in tx.outputs.iter().enumerate() {
-                    // Add new UTXO
-                    utxos_table
-                        .insert((tx_txno, vout_idx as u32), ())
-                        .map_err(|e| {
-                            BlockProcError::Custom(format!("UTXOs storage error: {}", e))
-                        })?;
-
-                    block_utxos_added += 1;
-
-                    // Index script pubkey
-                    let script = &output.script_pubkey;
-                    if !script.is_empty() {
-                        let mut txnos = spks_table
-                            .get(script.as_slice())
-                            .map_err(|e| {
-                                BlockProcError::Custom(format!("SPKs lookup error: {}", e))
-                            })?
-                            .map(|v| v.value().to_vec())
-                            .unwrap_or_default();
-
-                        // Avoid duplicate entries
-                        if !txnos.contains(&tx_txno) {
-                            txnos.push(tx_txno);
-                            spks_table.insert(script.as_slice(), txnos).map_err(|e| {
-                                BlockProcError::Custom(format!("SPKs update error: {}", e))
-                            })?;
-                        }
+                        block_utxos_spent += 1;
                     }
                 }
             }
 
-            // Store all transaction numbers in this block
-            block_txs_table
-                .insert(block_id, block_txs)
-                .map_err(|e| BlockProcError::Custom(format!("Block-txs storage error: {}", e)))?;
-
-            // Store UTXOs spent in this block
-            block_spends_table
-                .insert(block_id, block_spends)
-                .map_err(|e| {
-                    BlockProcError::Custom(format!("Block spends storage error: {}", e))
-                })?;
+            // Finalize the block processing
+            tx_ctx.finalize_block_processing(db, block_id, block_txs, block_spends, txno)?;
 
             // Update the heights tables
             heights_table
@@ -2220,13 +2212,6 @@ impl BlockProcessor {
                 block_utxos_spent
             );
         }
-
-        // Update the global transaction counter
-        let mut main = db
-            .open_table(TABLE_MAIN)
-            .map_err(BlockProcError::MainTable)?;
-        main.insert(REC_TXNO, txno.to_byte_array().as_slice())
-            .map_err(BlockProcError::TxNoUpdate)?;
 
         log::info!(
             target: NAME,
