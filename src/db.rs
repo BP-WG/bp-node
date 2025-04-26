@@ -346,9 +346,9 @@ impl UService for IndexDb {
     }
 
     fn terminate(&mut self) {
-        log::info!("Compacting database on shutdown...");
+        log::info!(target: Self::NAME, "Compacting database on shutdown...");
         if let Err(e) = self.0.compact() {
-            log::error!("Failed to compact database: {e}");
+            log::error!(target: Self::NAME, "Failed to compact database: {e}");
         }
     }
 }

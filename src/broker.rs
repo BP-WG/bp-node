@@ -82,7 +82,7 @@ impl Broker {
         let importer = service::Runtime::new(conf.import[0], controller, listen)
             .map_err(|err| BrokerError::Import(err.into()))?;
 
-        log::info!("Starting RPC server thread...");
+        log::info!("Starting the RPC server thread...");
         let (rpc_tx, rpc_rx) = crossbeam_channel::unbounded::<BrokerRpcMsg>();
         let controller = RpcController::new(conf.network, rpc_tx.clone());
         let listen = conf.rpc.iter().map(|addr| {

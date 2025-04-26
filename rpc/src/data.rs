@@ -32,8 +32,11 @@ use crate::BP_RPC_LIB;
 #[repr(u8)]
 pub enum FailureCode {
     /// Network mismatch
-    #[strict_type(dumb)]
     NetworkMismatch = 1,
+
+    /// Internal server error
+    #[strict_type(dumb)]
+    InternalError = 0xFF,
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Display)]
@@ -56,7 +59,17 @@ impl Failure {
         }
     }
 
+    pub fn with(code: FailureCode, message: &str) -> Self {
+        Self {
+            code: code.into(),
+            message: TinyString::from_checked(message.to_string()),
+            details: Default::default(),
+        }
+    }
+
     pub fn network_mismatch() -> Self { Self::new(FailureCode::NetworkMismatch) }
+
+    pub fn internal_error(msg: &str) -> Self { Self::with(FailureCode::InternalError, msg) }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
