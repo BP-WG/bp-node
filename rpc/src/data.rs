@@ -34,6 +34,9 @@ pub enum FailureCode {
     /// Network mismatch
     NetworkMismatch = 1,
 
+    /// The result is too large to be encoded and sent in the response
+    TooLarge = 2,
+
     /// Internal server error
     #[strict_type(dumb)]
     InternalError = 0xFF,
@@ -67,7 +70,21 @@ impl Failure {
         }
     }
 
+    pub fn add_detail(mut self, key: &'static str, value: impl ToString) -> Self {
+        self.details
+            .insert(
+                TinyString::from_checked(key.to_string()),
+                TinyString::from_checked(value.to_string()),
+            )
+            .expect("Too many details");
+        self
+    }
+
     pub fn network_mismatch() -> Self { Self::new(FailureCode::NetworkMismatch) }
+
+    pub fn too_large(id: impl ToString) -> Self {
+        Self::new(FailureCode::TooLarge).add_detail("id", id)
+    }
 
     pub fn internal_error(msg: &str) -> Self { Self::with(FailureCode::InternalError, msg) }
 }
