@@ -34,8 +34,11 @@ pub enum FailureCode {
     /// Network mismatch
     NetworkMismatch = 1,
 
+    /// Not found
+    NotFound = 2,
+
     /// The result is too large to be encoded and sent in the response
-    TooLarge = 2,
+    TooLarge = 3,
 
     /// Internal server error
     #[strict_type(dumb)]
@@ -81,6 +84,10 @@ impl Failure {
     }
 
     pub fn network_mismatch() -> Self { Self::new(FailureCode::NetworkMismatch) }
+
+    pub fn not_found(id: impl ToString) -> Self {
+        Self::new(FailureCode::NotFound).add_detail("id", id)
+    }
 
     pub fn too_large(id: impl ToString) -> Self {
         Self::new(FailureCode::TooLarge).add_detail("id", id)
