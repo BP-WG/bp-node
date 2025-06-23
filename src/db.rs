@@ -89,7 +89,7 @@ impl ByteArray<5> for TxNo {
         if len != 5 {
             return Err(FromSliceError { expected: 5, actual: len });
         }
-        Ok(Self::from_slice_unsafe(slice))
+        Ok(Self::from_slice_checked(slice))
     }
 
     fn from_slice_unsafe(slice: impl AsRef<[u8]>) -> Self {
@@ -124,7 +124,7 @@ impl redb::Value for TxNo {
     fn from_bytes<'a>(data: &'a [u8]) -> Self::SelfType<'a>
     where Self: 'a {
         debug_assert_eq!(data.len(), 5);
-        TxNo::from_slice_unsafe(data)
+        TxNo::from_slice_checked(data)
     }
 
     fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>

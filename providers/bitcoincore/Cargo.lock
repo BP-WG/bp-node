@@ -23,14 +23,16 @@ dependencies = [
 
 [[package]]
 name = "amplify"
-version = "4.8.0"
+version = "4.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "448cf0c3afc71439b5f837aac5399a1ef2b223f5f38324dbfb4343deec3b80cc"
+checksum = "3f7fb4ac7c881e54a8e7015e399b6112a2a5bc958b6c89ac510840ff20273b31"
 dependencies = [
  "amplify_derive",
  "amplify_num",
  "amplify_syn",
  "ascii",
+ "getrandom 0.2.15",
+ "getrandom 0.3.2",
  "serde",
  "stringly_conversions",
  "wasm-bindgen",
@@ -303,55 +305,61 @@ dependencies = [
 
 [[package]]
 name = "bp-consensus"
-version = "0.12.0-beta.5"
-source = "git+https://github.com/BP-WG/bp-core?branch=v0.12#5a2f816d554edf3f583023d5eed90893f31fff61"
+version = "0.12.0-rc.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "810f5e6361430adfcd6be36151c84409e9c05f3fb8a7455c8d4aa583fd89f043"
 dependencies = [
  "amplify",
  "chrono",
  "commit_verify",
+ "getrandom 0.2.15",
+ "getrandom 0.3.2",
  "secp256k1",
  "serde",
  "strict_encoding",
+ "wasm-bindgen",
 ]
 
 [[package]]
 name = "bp-core"
-version = "0.12.0-beta.5"
+version = "0.12.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d5da3b6f01c30d70426892fa7cc116399beb96c3dd4c3492e4cf084456eafab"
+checksum = "623967430fd243db8c937dd7748cd3242529b96174f0c92b7bebb80d094fa750"
 dependencies = [
- "amplify",
  "bp-consensus",
  "bp-dbc",
  "bp-seals",
  "commit_verify",
  "getrandom 0.2.15",
+ "getrandom 0.3.2",
  "serde",
- "single_use_seals",
  "strict_encoding",
  "wasm-bindgen",
 ]
 
 [[package]]
 name = "bp-dbc"
-version = "0.12.0-beta.5"
+version = "0.12.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd3206ef558ad665cdc75cbbe8415aaa207d5aa75a8129a3dfe6556cdc9272d7"
+checksum = "40929fd199eea16879cc5e05ce49b12d4429a98939309478dbecc52a88da3773"
 dependencies = [
  "amplify",
  "base85",
  "bp-consensus",
  "commit_verify",
+ "getrandom 0.2.15",
+ "getrandom 0.3.2",
  "secp256k1",
  "serde",
  "strict_encoding",
+ "wasm-bindgen",
 ]
 
 [[package]]
 name = "bp-derive"
-version = "0.12.0-beta.5"
+version = "0.12.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "683863b99e01d34c44ec77e93945425ad7aea5cbef714c10d000c9bb64630a78"
+checksum = "2628678dfde56beba482a7d2e696d136dd540a703a5740df8f988122c8a457a9"
 dependencies = [
  "amplify",
  "bp-consensus",
@@ -365,12 +373,12 @@ dependencies = [
 
 [[package]]
 name = "bp-electrum"
-version = "0.12.0-beta.5"
+version = "0.12.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67f35e140915b2510f80d047a1da65a95cb628a5cabaf61dbb6604a12943b2c2"
+checksum = "4adff9269e377a2f2424442f8e228aa45789f76c639c62ab81960c7aa03c4deb"
 dependencies = [
  "amplify",
- "bp-std",
+ "bp-core",
  "byteorder",
  "libc",
  "log",
@@ -384,12 +392,13 @@ dependencies = [
 
 [[package]]
 name = "bp-esplora"
-version = "0.12.0-beta.5.1"
+version = "0.12.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ec6536fdc52c7be3e5d1b5204e5276f7f782225fb6fc7080411039d32bc47f4"
+checksum = "fc5542e440042e34b5b60d7285f3c3a3e81e39eaa40b77f98e3f4f4ef177119a"
 dependencies = [
  "amplify",
- "bp-std",
+ "bp-core",
+ "bp-invoice",
  "log",
  "minreq",
  "serde",
@@ -399,8 +408,9 @@ dependencies = [
 
 [[package]]
 name = "bp-invoice"
-version = "0.12.0-beta.5"
-source = "git+https://github.com/BP-WG/bp-std?branch=v0.12#2c4d5fca66c48305db33299006ff91d3d11a79e1"
+version = "0.12.0-rc.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8310eb6e38aa93ce040e238a605c23a29761f717ed5945447688dc233d54390f"
 dependencies = [
  "amplify",
  "bech32",
@@ -440,26 +450,27 @@ dependencies = [
 
 [[package]]
 name = "bp-seals"
-version = "0.12.0-beta.5"
+version = "0.12.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08f7762a1a99f0b61f81e795e273f22c221609749279cf66c9a2cfcc5f58f8ee"
+checksum = "e7e5b12ef7876d2d6762a748540837d3c363e8fbe0e9d45b0d6fe389b4806810"
 dependencies = [
  "amplify",
- "baid64",
  "bp-consensus",
  "bp-dbc",
  "commit_verify",
- "rand 0.8.5",
+ "getrandom 0.2.15",
+ "getrandom 0.3.2",
  "serde",
  "single_use_seals",
  "strict_encoding",
+ "wasm-bindgen",
 ]
 
 [[package]]
 name = "bp-std"
-version = "0.12.0-beta.5"
+version = "0.12.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f89b997e50a6d0078152a260369b18945f1bc7620809c12aea8a145e10c8467c"
+checksum = "42800c56bf19604f490d5f037041bd93c95d0cfd4c5c33caddfdc626218c357e"
 dependencies = [
  "amplify",
  "bp-consensus",
@@ -468,6 +479,7 @@ dependencies = [
  "bp-invoice",
  "descriptors",
  "getrandom 0.2.15",
+ "getrandom 0.3.2",
  "psbt",
  "secp256k1",
  "serde",
@@ -476,9 +488,9 @@ dependencies = [
 
 [[package]]
 name = "bp-wallet"
-version = "0.12.0-beta.5"
+version = "0.12.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15c370fa0777c3a9243ad517e003290d4151a03f1981be565fdcfa13c897f2c5"
+checksum = "41bfb4d3b583ddfd094d042eb787c997af5ab042a33fd7c86abf246eb963c4f8"
 dependencies = [
  "amplify",
  "base64 0.22.1",
@@ -489,6 +501,8 @@ dependencies = [
  "colored",
  "descriptors",
  "env_logger",
+ "getrandom 0.2.15",
+ "getrandom 0.3.2",
  "log",
  "nonasync",
  "psbt",
@@ -499,6 +513,7 @@ dependencies = [
  "shellexpand",
  "strict_encoding",
  "toml 0.8.20",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -686,9 +701,9 @@ dependencies = [
 
 [[package]]
 name = "commit_encoding_derive"
-version = "0.12.0-beta.4"
+version = "0.12.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9613582af45e1564c09d813dae82e7c7bca95678b9c42dae955a8499ecc6ae95"
+checksum = "783e42e09ad9dbc48d01532fc59fd1f1c64c98c09f523abeb6a069756651c9c3"
 dependencies = [
  "amplify",
  "amplify_syn",
@@ -699,19 +714,22 @@ dependencies = [
 
 [[package]]
 name = "commit_verify"
-version = "0.12.0-beta.5"
+version = "0.12.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4de6c513328b7228446f116caf74d658a2d39b305683f5ed24b73edccc3f9cf3"
+checksum = "2c91d4e2c820279c133f8cb1c7c7544caba346c8049d6a7749dca1031d7acb68"
 dependencies = [
  "amplify",
  "commit_encoding_derive",
- "rand 0.8.5",
+ "getrandom 0.2.15",
+ "getrandom 0.3.2",
+ "rand 0.9.1",
  "ripemd",
  "serde",
  "sha2",
  "strict_encoding",
  "strict_types",
  "vesper-lang",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -886,9 +904,9 @@ dependencies = [
 
 [[package]]
 name = "descriptors"
-version = "0.12.0-beta.5"
+version = "0.12.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f12e573874ca7f5ac6d1bbc556820a683f51665887478fd2ad6340190825c4e"
+checksum = "f151852414c6fb91312499a4067fb657795da115b3484e919cbce8bf5faed15b"
 dependencies = [
  "amplify",
  "bp-derive",
@@ -1057,9 +1075,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73fea8450eea4bac3940448fb7ae50d91f034f941199fcd9d909a5a07aa455f0"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "r-efi",
  "wasi 0.14.2+wasi-0.2.4",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1399,7 +1419,7 @@ dependencies = [
  "io-reactor",
  "libc",
  "log",
- "rand 0.9.0",
+ "rand 0.9.1",
  "socket2",
 ]
 
@@ -1543,9 +1563,9 @@ dependencies = [
 
 [[package]]
 name = "psbt"
-version = "0.12.0-beta.5"
+version = "0.12.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56340b512dd6c77021e063dca36530b49ff29f0da39b9e0ab4540351b7ad70d4"
+checksum = "4ba164682a8d7bb3686830a7960fb357d2c8f086f9a927940ef8f0147e5bedc7"
 dependencies = [
  "amplify",
  "base64 0.22.1",
@@ -1583,13 +1603,12 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3779b94aeb87e8bd4e834cee3650289ee9e0d5677f976ecdb6d219e5f4f6cd94"
+checksum = "9fbfd9d094a40bf3ae768db9361049ace4c0e04a4fd6b359518bd7b73a73dd97"
 dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.3",
- "zerocopy",
 ]
 
 [[package]]
@@ -1922,9 +1941,9 @@ checksum = "74233d3b3b2f6d4b006dc19dee745e73e2a6bfb6f93607cd3b02bd5b00797d7c"
 
 [[package]]
 name = "single_use_seals"
-version = "0.12.0-beta.5"
+version = "0.12.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6aca5a44fa5e544b62816ecb7309355e53a3bb36d55219606be0028227c13b64"
+checksum = "18d25690afbb2fc820d3b045d3ae6053d4fa81d86a382031880e814ac6bf0c55"
 
 [[package]]
 name = "socket2"
@@ -1948,11 +1967,13 @@ dependencies = [
 
 [[package]]
 name = "strict_encoding"
-version = "2.8.1"
+version = "2.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fd36b71bb44ca146be0b2185ed6c6deb3684cc0d5c3a94284e97fe7fa6a642f"
+checksum = "5b8d9721d221d797767f8d5ad72b3a34dcdb5b9d646fe76248ee0f5e6fa6ca89"
 dependencies = [
  "amplify",
+ "getrandom 0.2.15",
+ "getrandom 0.3.2",
  "serde",
  "strict_encoding_derive",
  "wasm-bindgen",
@@ -1973,12 +1994,14 @@ dependencies = [
 
 [[package]]
 name = "strict_types"
-version = "2.8.2"
+version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0930ae36d58638b14dc7d5491c1a269b13f6cebb16a55ef6d753d3325c395ca8"
+checksum = "493821521630a023d79a210033fe1f5135ae3d3f8fccd8dbf1a98b7dfe56b144"
 dependencies = [
  "amplify",
  "baid64",
+ "getrandom 0.2.15",
+ "getrandom 0.3.2",
  "indexmap 2.9.0",
  "sha2",
  "strict_encoding",

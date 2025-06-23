@@ -16,9 +16,9 @@ name = "bp-bc-import"
 path = "src/main.rs"
 
 [dependencies]
-strict_encoding = "2.8.1"
-bp-consensus = { version = "0.12.0-beta.5" }
-bp-invoice = { version = "0.12.0-beta.5" }
+strict_encoding = "2.9.1"
+bp-consensus = { version = "0.12.0-rc.2" }
+bp-invoice = { version = "0.12.0-rc.2" }
 bp-client = { version = "0.12.0-alpha.1" }
 cyphernet = { version = "0.5.2", features = ["tor", "dns", "ed25519", "p2p-ed25519"] }
 microservices = { version = "0.12.0" }
@@ -35,7 +35,4 @@ cypheraddr = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = 
 microservices = { git = "https://github.com/cyphernet-labs/microservices.rs", branch = "master" }
 netservices = { git = "https://github.com/cyphernet-labs/netservices.rs", branch = "server" }
 
-bp-consensus = { git = "https://github.com/BP-WG/bp-core", branch = "v0.12" }
-bp-invoice = { git = "https://github.com/BP-WG/bp-std", branch = "v0.12" }
-#bp-client = { git = "https://github.com/BP-WG/bp-node", branch = "master" }
 bp-client = { path = "../../client" }

@@ -13,10 +13,10 @@ rust-version = "1.85.0"
 license = "Apache-2.0"
 
 [workspace.dependencies]
-amplify = "4.8.0"
-strict_encoding = "2.8.1"
-bp-std = "0.12.0-beta.5"
-bp-wallet = { version = "0.12.0-beta.5", default-features = false }
+amplify = "4.9.0"
+strict_encoding = "2.9.1"
+bp-std = "0.12.0-rc.2"
+bp-wallet = { version = "0.12.0-rc.2", default-features = false }
 
 io-reactor = "0.6.0"
 cyphernet = { version = "0.5.2", features = ["tor", "dns", "ed25519", "p2p-ed25519"] }
@@ -100,8 +100,6 @@ server = ["dep:dotenv", "dep:clap", "dep:settings", "dep:configure_me", "dep:she
 spec = "config_spec.toml"
 
 [patch.crates-io]
-bp-consensus = { git = "https://github.com/BP-WG/bp-core", branch = "v0.12" }
-
 io-reactor = { git = "https://github.com/rust-amplify/io-reactor", branch = "v0.6" }
 cyphergraphy = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
 cypheraddr = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
