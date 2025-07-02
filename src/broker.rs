@@ -189,11 +189,11 @@ pub enum BrokerError {
     /// {0}
     Importer(IoError),
 
-    /// unable to open database.
+    /// unable to open the database.
     ///
     /// {0}
     ///
-    /// Tip: make sure you have initialized database with `bpd init` command.
+    /// Tip: make sure you have initialized the database with `bpd init` command.
     #[from]
     Db(DatabaseError),
 

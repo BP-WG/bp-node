@@ -32,7 +32,7 @@ use crossbeam_channel::{SendError, Sender};
 use microservices::UService;
 use redb::{
     Database, DatabaseError, Key, ReadTransaction, TableDefinition, TransactionError, TypeName,
-    Value, WriteTransaction,
+    WriteTransaction,
 };
 
 // see also constants in `bin/bpd.rs`
@@ -220,7 +220,7 @@ pub const REC_TXNO: &str = "txno";
 pub const REC_BLOCKID: &str = "blockid";
 pub const REC_CHAIN: &str = "chain";
 pub const REC_ORPHANS: &str = "orphans";
-// Network information record in main table
+// Network information record in the main table
 pub const REC_NETWORK: &str = "network";
 // Constants for fork management
 pub const REC_FORK_ID: &str = "forkid";
@@ -449,7 +449,7 @@ fn create_fork_tables(tx: &WriteTransaction) {
 }
 
 /// Generic function to create a table with error handling
-fn create_table<K: Key + 'static, V: Value + 'static>(
+fn create_table<K: Key + 'static, V: redb::Value + 'static>(
     tx: &WriteTransaction,
     table_def: TableDefinition<K, V>,
     table_name: &str,
