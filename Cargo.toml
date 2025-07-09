@@ -16,7 +16,6 @@ license = "Apache-2.0"
 amplify = "4.9.0"
 strict_encoding = "2.9.1"
 bp-std = "0.12.0-rc.2"
-bp-wallet = { version = "0.12.0-rc.2", default-features = false }
 
 io-reactor = "0.6.0"
 cyphernet = { version = "0.5.2", features = ["tor", "dns", "ed25519", "p2p-ed25519"] }
@@ -63,7 +62,7 @@ required-features = ["server"]
 [dependencies]
 amplify.workspace = true
 strict_encoding.workspace = true
-bp-wallet = { workspace = true, features = ["cli"] }
+bp-std.workspace = true
 bp-rpc = { version = "0.12.0-alpha.1", path = "rpc" }
 io-reactor.workspace = true
 microservices = { workspace = true, features = ["log"] }
@@ -80,7 +79,7 @@ dotenv = { workspace = true, optional = true }
 
 [build-dependencies]
 amplify.workspace = true
-bp-wallet = { workspace = true, features = ["cli"] }
+bp-std.workspace = true
 bp-rpc = { version = "0.12.0-alpha.1", path = "rpc" }
 clap.workspace = true
 clap_complete.workspace = true
@@ -105,3 +104,11 @@ cyphergraphy = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch 
 cypheraddr = { git = "https://github.com/cyphernet-labs/cyphernet.rs", branch = "master" }
 microservices = { git = "https://github.com/cyphernet-labs/microservices.rs", branch = "master" }
 netservices = { git = "https://github.com/cyphernet-labs/netservices.rs", branch = "develop" }
+
+bp-consensus = { git = "https://github.com/BP-WG/bp-core" }
+bp-core = { git = "https://github.com/BP-WG/bp-core" }
+bp-invoice = { git = "https://github.com/BP-WG/bp-std", branch = "feat/descriptors" }
+bp-derive = { git = "https://github.com/BP-WG/bp-std", branch = "feat/descriptors" }
+descriptors = { git = "https://github.com/BP-WG/bp-std", branch = "feat/descriptors" }
+psbt = { git = "https://github.com/BP-WG/bp-std", branch = "feat/descriptors" }
+bp-std = { git = "https://github.com/BP-WG/bp-std", branch = "feat/descriptors" }

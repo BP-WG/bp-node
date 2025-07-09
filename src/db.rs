@@ -27,7 +27,7 @@ use std::process::exit;
 
 use amplify::num::u40;
 use amplify::{ByteArray, FromSliceError};
-use bpwallet::{Block, BlockHeader, ConsensusDecode, ConsensusEncode, Network, Tx};
+use bpstd::{Block, BlockHeader, ConsensusDecode, ConsensusEncode, Network, Tx};
 use crossbeam_channel::{SendError, Sender};
 use microservices::UService;
 use redb::{

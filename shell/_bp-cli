@@ -17,8 +17,8 @@ _bp-cli() {
     _arguments "${_arguments_options[@]}" : \
 '-r+[]:REMOTE:_default' \
 '--remote=[]:REMOTE:_default' \
-'*-v[Set verbosity level]' \
-'*--verbose[Set verbosity level]' \
+'*-v[Set the verbosity level]' \
+'*--verbose[Set the verbosity level]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
 '-V[Print version]' \
@@ -34,8 +34,8 @@ _bp-cli() {
         case $line[1] in
             (ping)
 _arguments "${_arguments_options[@]}" : \
-'*-v[Set verbosity level]' \
-'*--verbose[Set verbosity level]' \
+'*-v[Set the verbosity level]' \
+'*--verbose[Set the verbosity level]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
 && ret=0

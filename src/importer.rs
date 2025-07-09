@@ -26,7 +26,7 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::str::FromStr;
 
 use bprpc::{BloomFilter32, ClientInfo, ExporterPub, Failure, ImporterReply, RemoteAddr, Session};
-use bpwallet::{Network, Txid};
+use bpstd::{Network, Txid};
 use crossbeam_channel::Sender;
 use microservices::USender;
 use netservices::Direction;

@@ -30,7 +30,7 @@ use std::process::{ExitCode, Termination, exit};
 
 pub use bpnode;
 use bpnode::{Broker, BrokerError, Config, PATH_INDEXDB, initialize_db_tables};
-use bpwallet::Network;
+use bpstd::Network;
 use clap::Parser;
 use loglevel::LogLevel;
 use redb::Database;
@@ -80,7 +80,7 @@ fn initialize_database(opts: &Opts) -> Status {
     eprint!("Initializing ... ");
 
     // Prepare the database path
-    let index_path = opts.general.data_dir.join(PATH_INDEXDB);
+    let index_path = opts.data_dir.join(PATH_INDEXDB);
 
     // Check if database already exists
     if let Err(err) = check_db_path(&index_path, false) {
@@ -88,11 +88,8 @@ fn initialize_database(opts: &Opts) -> Status {
     }
 
     // Create data directory if needed
-    if let Err(err) = fs::create_dir_all(&opts.general.data_dir) {
-        eprintln!(
-            "Unable to create data directory at '{}'\n{err}",
-            opts.general.data_dir.display()
-        );
+    if let Err(err) = fs::create_dir_all(&opts.data_dir) {
+        eprintln!("Unable to create data directory at '{}'\n{err}", opts.data_dir.display());
         exit(EXIT_DIR_CREATE_ERROR);
     }
 
@@ -106,7 +103,7 @@ fn initialize_database(opts: &Opts) -> Status {
     };
 
     // Initialize database with network information and create all tables
-    let network = opts.general.network;
+    let network = opts.network;
     initialize_db_tables(&db, network);
 
     eprintln!("Index database initialized for {} network, exiting", network);

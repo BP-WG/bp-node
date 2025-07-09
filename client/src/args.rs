@@ -21,11 +21,11 @@
 
 use bprpc::RemoteAddr;
 
-/// Command-line tool for working with store daemon
+/// Command-line tool for working with BP Node
 #[derive(Parser, Clone, PartialEq, Eq, Debug)]
 #[command(name = "bp-cli", bin_name = "bp-cli", author, version)]
 pub struct Args {
-    /// Set verbosity level.
+    /// Set the verbosity level.
     ///
     /// Can be used multiple times to increase verbosity.
     #[arg(short, long, global = true, action = clap::ArgAction::Count)]

@@ -23,8 +23,8 @@ Register-ArgumentCompleter -Native -CommandName 'bp-cli' -ScriptBlock {
         'bp-cli' {
             [CompletionResult]::new('-r', '-r', [CompletionResultType]::ParameterName, 'r')
             [CompletionResult]::new('--remote', '--remote', [CompletionResultType]::ParameterName, 'remote')
-            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Set verbosity level')
-            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Set verbosity level')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Set the verbosity level')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Set the verbosity level')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
@@ -34,8 +34,8 @@ Register-ArgumentCompleter -Native -CommandName 'bp-cli' -ScriptBlock {
             break
         }
         'bp-cli;ping' {
-            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Set verbosity level')
-            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Set verbosity level')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Set the verbosity level')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Set the verbosity level')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             break

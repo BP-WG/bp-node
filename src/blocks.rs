@@ -26,7 +26,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use amplify::{ByteArray, FromSliceError};
 use bprpc::BloomFilter32;
-use bpwallet::{Block, BlockHash};
+use bpstd::{Block, BlockHash};
 use crossbeam_channel::{RecvError, SendError, Sender};
 use microservices::USender;
 use redb::{
@@ -143,7 +143,7 @@ impl<'a> TxTablesContext<'a> {
     ///   transaction
     fn process_transaction(
         &mut self,
-        tx: &bpwallet::Tx,
+        tx: &bpstd::Tx,
         block_id: BlockId,
         txno_counter: &mut TxNo,
         block_txs: &mut Vec<TxNo>,

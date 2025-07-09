@@ -33,11 +33,12 @@ mod client;
 mod command;
 
 use bprpc::Response;
-use bpwallet::cli::{ExecError, LogLevel};
 use clap::Parser;
+use loglevel::LogLevel;
 
 pub use crate::args::{Args, Command};
 use crate::client::BpClient;
+use crate::command::ExecError;
 
 fn main() -> Result<(), ExecError> {
     let args = Args::parse();
