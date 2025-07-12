@@ -28,10 +28,9 @@ use clap::ValueHint;
 use crate::bpnode::Config;
 
 pub const BP_NODE_CONFIG: &str = "{data_dir}/bp-node.toml";
-pub const BP_NETWORK_ENV: &str = "BP_NETWORK";
-pub const BP_NO_NETWORK_PREFIX_ENV: &str = "BP_NO_NETWORK_PREFIX";
+pub const BP_NETWORK_ENV: &str = "BP_NODE_NETWORK";
 
-pub const BP_DATA_DIR_ENV: &str = "BP_DATA_DIR";
+pub const BP_DATA_DIR_ENV: &str = "BP_NODE_DATA_DIR";
 #[cfg(any(
     target_os = "linux",
     target_os = "freebsd",
@@ -44,9 +43,9 @@ pub const BP_DATA_DIR: &str = "~/Library/Application Support/BP Node";
 #[cfg(target_os = "windows")]
 pub const BP_DATA_DIR: &str = "~\\AppData\\Local\\BP Node";
 #[cfg(target_os = "ios")]
-pub const BP_DATA_DIR: &str = "~/Documents";
+pub const BP_DATA_DIR: &str = "~/Documents/BP Node";
 #[cfg(target_os = "android")]
-pub const BP_DATA_DIR: &str = ".";
+pub const BP_DATA_DIR: &str = "./BP Node";
 
 // Uses XDG_DATA_HOME if set, otherwise falls back to RGB_DATA_DIR
 fn default_data_dir() -> PathBuf {
@@ -84,7 +83,7 @@ pub struct Opts {
     pub network: Network,
 
     /// Do not add network name as a prefix to the data directory
-    #[arg(long, global = true, env = BP_NO_NETWORK_PREFIX_ENV)]
+    #[arg(long, global = true)]
     pub no_network_prefix: bool,
 
     /// Address(es) to listen for client RPC connections
